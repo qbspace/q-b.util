@@ -126,8 +126,19 @@ function applyPrefs() {
 }
 
 ipcMain.on('prefs:apply', applyPrefs);
-ipcMain.on('notify', (_e, title, body) => {
-  if (Notification.isSupported()) new Notification({ title, body, icon: ICON, silent: true }).show();
+// держим ссылки, иначе Windows может «потерять» клик по уведомлению
+const liveNotes = new Set();
+ipcMain.on('notify', (_e, title, body, tag) => {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title, body, icon: ICON, silent: true });
+  liveNotes.add(n);
+  n.on('click', () => {
+    showWindow();
+    if (win && tag) win.webContents.send('notify:click', tag);
+  });
+  n.on('close', () => liveNotes.delete(n));
+  setTimeout(() => liveNotes.delete(n), 10 * 60000);
+  n.show();
 });
 
 ipcMain.on('win:minimize', () => win.minimize());

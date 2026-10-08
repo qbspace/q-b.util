@@ -31,6 +31,7 @@
   };
 
   const settings = Object.assign({ autocopy: false, history: true, mask: false, theme: 'light', tray: true, hotkey: true, autostart: true }, load('qb.settings', {}));
+  if (!settings.notify) settings.notify = { on: true };
   const stats = Object.assign({ gen: 0, copied: 0 }, load('qb.stats', {}));
   let history = settings.history ? load('qb.history', []) : [];
   let session = 0;
@@ -564,6 +565,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '3.1.0': [
+      '🔔 Уведомления Windows: аукцион, перебили, счастливый час, завоз, колесо, силы, задания',
+      'Клик по уведомлению открывает нужное окно; настройка — в «Настройках»',
+    ],
     '3.0.1': [
       'Скин «Чемпион сезона» и наклейка 🏆 больше не продаются за 0 — только награда пропуска',
       'Нарисован скин «Чемпион сезона»: клетчатый флаг, золото и перелив',
@@ -2390,6 +2395,7 @@
     } else if (e.acked && lot.leader !== aucId) {
       setCoins(e.amount);
       toast(`🔨 ${lot.leaderNick} перебил тебя: ${fmtShort(lot.price)}`);
+      pushNote('outbid', '🔨 Тебя перебили!', `${lot.leaderNick} поставил ${fmtShort(lot.price)} за ${P.format(lot.p)}`);
       plState.auction.esc = null;
     }
     savePl();
@@ -2609,7 +2615,11 @@
       if (q.type === type && !q.claimed && q.progress < q.target) {
         q.progress = Math.min(q.target, q.progress + n);
         changed = true;
-        if (q.progress >= q.target) toast(`📅 Задание готово: ${P.DAILY_POOL.find((x) => x.type === type).name(q.target)}`);
+        if (q.progress >= q.target) {
+          const qn = P.DAILY_POOL.find((x) => x.type === type).name(q.target);
+          toast(`📅 Задание готово: ${qn}`);
+          pushNote('quests', '📅 Задание выполнено', `${qn} — забери награду`);
+        }
       }
     }));
     if (changed) { savePl(); if (!$('#pl-quests').hidden) renderQuests(); }
@@ -2941,6 +2951,79 @@
   $('#pl-profile').onclick = () => openProfile(myCard(), profile.photo);
   $('#pl-trade').onclick = () => { if (!TR.ch) { $('#tr-menu').hidden = false; $('#tr-room').hidden = true; } else renderTrade(); $('#trade-modal').hidden = false; };
   ['salon', 'profile', 'trade', 'season'].forEach((m) => { $(`#${m}-close`).onclick = () => { $(`#${m}-modal`).hidden = true; }; });
+
+  /* ======================= уведомления Windows ======================= */
+  // приходят, только когда окно свёрнуто или не в фокусе; клик ведёт в нужное место
+  const NOTE_TYPES = {
+    auction: '🔨 Аукцион: скоро лот и старт торгов',
+    outbid: '🔨 Тебя перебили на аукционе',
+    happy: '🔥 Начался счастливый час',
+    market: '🕶 Новый завоз на чёрном рынке',
+    wheel: '🎡 Колесо фортуны доступно',
+    energy: '⚡ Силы для работы восстановились',
+    quests: '📅 Задание дня или недели выполнено',
+  };
+  if (!plState.notified) plState.notified = {};
+  const noteOn = (type) => settings.notify && settings.notify.on && settings.notify[type] !== false;
+  function pushNote(type, title, body) {
+    if (!noteOn(type) || !window.qb || !window.qb.notify) return;
+    if (!document.hidden && document.hasFocus()) return; // ты и так в приложении
+    window.qb.notify(title, body, type);
+  }
+
+  function noteTick() {
+    const N = plState.notified, now = Date.now();
+    // аукцион: за минуту и на старте
+    const nextW = aucWindow() + 1, left = nextW * P.AUCTION_EVERY - now;
+    if (left > 0 && left <= 60000 && N.aucPre !== nextW) {
+      N.aucPre = nextW;
+      pushNote('auction', '🔨 Аукцион через минуту', 'Скоро новый легендарный или мифический лот — заходи в зал');
+    }
+    if (lotOpen(lot) && N.aucLive !== lot.w) {
+      N.aucLive = lot.w;
+      pushNote('auction', `🔨 Лот в продаже: ${P.format(lot.p)}`, `${P.TIERS.find((t) => t.id === lot.tier).name} · старт ${fmtShort(lot.start)} · аренда +${P.fleetRent(lot.total)}/мин`);
+    }
+    // счастливый час
+    if (happyActive() && N.happy !== plState.happyUntil) {
+      N.happy = plState.happyUntil;
+      pushNote('happy', '🔥 Счастливый час!', `Все выплаты ×2 ещё ${Math.round((plState.happyUntil - now) / 60000)} мин`);
+    }
+    // новый завоз
+    const mw = marketWindow();
+    if (N.market !== mw) {
+      const first = N.market == null;
+      N.market = mw;
+      if (!first) {
+        const legend = currentStock().find((x) => x.rarity === 'legendary');
+        pushNote('market', legend ? '🕶 На рынке легендарка!' : '🕶 Новый завоз на чёрном рынке',
+          legend ? `${itemDef(legend).name} — успей, пока не разобрали` : 'Продавец выложил свежий товар');
+      }
+    }
+    // колесо фортуны
+    const dk = dayKey();
+    if (dailyInfo() && N.wheel !== dk) {
+      N.wheel = dk;
+      pushNote('wheel', '🎡 Колесо фортуны доступно', 'Крутани бонус дня, пока не сгорела серия');
+    }
+    // силы восстановились
+    regenEnergy();
+    if (plState.energy >= ENERGY_MAX) {
+      if (!N.energyFull) { N.energyFull = true; pushNote('energy', '⚡ Силы восстановились', 'Можно снова идти на работу'); }
+    } else N.energyFull = false;
+    savePl();
+  }
+  setInterval(noteTick, 5000);
+
+  if (window.qb && window.qb.onNotifyClick) {
+    window.qb.onNotifyClick((tag) => {
+      go('plates');
+      if (tag === 'auction' || tag === 'outbid') $('#pl-auction').click();
+      if (tag === 'market') $('#pl-market').click();
+      if (tag === 'wheel' && !$('#pl-daily').hidden) $('#pl-daily').click();
+      if (tag === 'energy') $('#pl-work').click();
+      if (tag === 'quests') $('#pl-tabs [data-v=quests]').click();
+    });
+  }
 
   tickGarage();
   setInterval(() => tickGarage(true), 15000);
@@ -3364,6 +3447,25 @@
     };
   });
   $('#set-clear').onclick = clearHistory;
+
+  // уведомления Windows: общий переключатель и галочки по типам
+  function renderNoteSettings() {
+    $('#set-notify').checked = !!settings.notify.on;
+    $('#set-notify-list').innerHTML = Object.entries(NOTE_TYPES).map(([k, label]) =>
+      `<label class="tgl small"><input type="checkbox" data-note="${k}" ${settings.notify[k] !== false ? 'checked' : ''} ${settings.notify.on ? '' : 'disabled'}><i></i>${label}</label>`).join('');
+  }
+  $('#set-notify').onchange = (e) => { settings.notify.on = e.target.checked; persist(); renderNoteSettings(); };
+  $('#set-notify-list').onchange = (e) => {
+    const c = e.target.closest('[data-note]');
+    if (!c) return;
+    settings.notify[c.dataset.note] = c.checked;
+    persist();
+  };
+  $('#set-notify-test').onclick = () => {
+    if (window.qb && window.qb.notify) window.qb.notify('q-b.util', 'Так будут выглядеть уведомления 🔔', 'auction');
+    else toast('Уведомления работают только в установленном приложении');
+  };
+  renderNoteSettings();
 
   /* ---------------- dashboard ---------------- */
   function renderHero() {

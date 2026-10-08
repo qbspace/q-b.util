@@ -2081,3 +2081,12 @@ kbd {
 .plate.skin-season, .plate.skin-season .plate-region, .mini-plate.skin-season, .mini-plate.skin-season em { border-color: #f0c552; }
 .plate.skin-season .plate-main { padding-left: 40px; }
 .plate.skin-season .plate-rus { color: #ffd76a; text-shadow: none; }
+
+/* уведомления в настройках */
+.notify-list { padding-left: 50px; gap: 8px; }
+.tgl.small { font-size: 12px; }
+.tgl.small i { width: 30px; height: 18px; }
+.tgl.small i::after { width: 12px; height: 12px; }
+.tgl.small input:checked + i::after { transform: translateX(12px); }
+.tgl.small input:disabled + i { opacity: .4; }
+#set-notify-test { align-self: flex-start; height: 34px; }
