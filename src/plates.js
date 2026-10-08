@@ -156,9 +156,108 @@
     { id: 'classic', name: 'Классика', price: 0 },
     { id: 'night', name: 'Ночь', price: 800 },
     { id: 'gold', name: 'Золото', price: 2500 },
+    { id: 'taxi', name: 'Такси', price: 3000 },
     { id: 'neon', name: 'Неон', price: 5000 },
+    { id: 'police', name: 'Полиция', price: 6000 },
+    { id: 'military', name: 'Военный', price: 8000 },
     { id: 'holo', name: 'Голограмма', price: 12000 },
+    { id: 'diplomat', name: 'Дипломат', price: 15000 },
+    { id: 'ussr', name: 'СССР', price: 20000 },
+    { id: 'carbon', name: 'Карбон', price: 30000 },
+    { id: 'camo', name: 'Камуфляж', price: 40000 },
+    { id: 'chrome', name: 'Хром', price: 50000 },
+    { id: 'matrix', name: 'Матрица', price: 80000 },
+    { id: 'lava', name: 'Лава', price: 120000 },
+    { id: 'ice', name: 'Лёд', price: 120000 },
+    { id: 'space', name: 'Космос', price: 250000 },
+    // эксклюзивы — только на чёрном рынке
+    { id: 'rainbow', name: 'Радуга', price: 200000, market: 'rare' },
+    { id: 'blackgold', name: 'Чёрное золото', price: 350000, market: 'epic' },
+    { id: 'glitch', name: 'Глитч', price: 400000, market: 'epic' },
+    { id: 'plasma', name: 'Плазма', price: 1000000, market: 'legendary' },
+    { id: 'diamond', name: 'Бриллиант', price: 1500000, market: 'legendary' },
   ];
+
+  /* ---------------- чёрный рынок ---------------- */
+  const MARKET_RARITY = {
+    common: { name: 'Обычный', color: '#9a9a95', w: 55 },
+    rare: { name: 'Редкий', color: '#5b8def', w: 30 },
+    epic: { name: 'Эпический', color: '#a06cf0', w: 12 },
+    legendary: { name: 'Легендарный', color: '#f0b35a', w: 3 },
+  };
+
+  // Брелки — постоянные бусты, одновременно можно носить 3
+  const KEY_SLOTS = 3;
+  const BOOST_TEXT = {
+    pay: (v) => `+${v}% к выплатам`,
+    luck: (v) => `+${v}% шанс двойной крутки`,
+    moscow: (v) => `+${v}% к московскому региону`,
+    garage: (v) => `+${v}% к доходу гаража`,
+    work: (v) => `+${v}% к оплате работы`,
+    xp: (v) => `+${v}% опыта`,
+    happy: (v) => `счастливый час +${v} мин`,
+  };
+  const KEYCHAINS = [
+    { id: 'tree', name: 'Ёлочка-вонючка', icon: '🌲', rarity: 'common', price: 8000, boost: { pay: 2 } },
+    { id: 'dice', name: 'Кубики на зеркало', icon: '🎲', rarity: 'common', price: 8000, boost: { luck: 1 } },
+    { id: 'gkey', name: 'Ключ от гаража', icon: '🔑', rarity: 'common', price: 6000, boost: { garage: 20 } },
+    { id: 'helmet', name: 'Каска прораба', icon: '⛑️', rarity: 'common', price: 5000, boost: { work: 25 } },
+    { id: 'clover', name: 'Клевер', icon: '🍀', rarity: 'rare', price: 40000, boost: { pay: 4 } },
+    { id: 'star', name: 'Кремлёвская звезда', icon: '⭐', rarity: 'rare', price: 40000, boost: { moscow: 2 } },
+    { id: 'clock', name: 'Будильник', icon: '⏰', rarity: 'rare', price: 35000, boost: { happy: 1 } },
+    { id: 'book', name: 'Конспект ПДД', icon: '📘', rarity: 'rare', price: 30000, boost: { xp: 30 } },
+    { id: 'goldkey', name: 'Золотой ключик', icon: '🗝️', rarity: 'epic', price: 150000, boost: { pay: 7 } },
+    { id: 'siren', name: 'Мигалка', icon: '🚨', rarity: 'epic', price: 150000, boost: { luck: 3 } },
+    { id: 'safe', name: 'Сейф', icon: '🧰', rarity: 'epic', price: 120000, boost: { garage: 50, work: 25 } },
+    { id: 'crown', name: 'Корона', icon: '👑', rarity: 'legendary', price: 600000, boost: { pay: 12, luck: 2 } },
+    { id: 'blackcard', name: 'Чёрная карта', icon: '💳', rarity: 'legendary', price: 500000, boost: { pay: 10, happy: 1 } },
+  ];
+
+  // Расходники — копятся в рюкзаке, применяются кнопкой
+  const CONSUMABLES = [
+    { id: 'energy', name: 'Энергетик', icon: '⚡', rarity: 'common', price: 3000, desc: 'Сразу восстанавливает все силы для работы' },
+    { id: 'cash', name: 'Инкассация', icon: '💰', rarity: 'common', price: 5000, desc: 'Сразу 2 часа дохода гаража' },
+    { id: 'ticket', name: 'Билет в счастливый час', icon: '🎟️', rarity: 'rare', price: 15000, desc: 'Запускает счастливый час прямо сейчас' },
+    { id: 'talon', name: 'Талон удачи', icon: '🧿', rarity: 'rare', price: 20000, desc: 'Следующая крутка — минимум «Редкий»' },
+    { id: 'x3', name: 'Купон ×3', icon: '🔥', rarity: 'epic', price: 40000, desc: 'Следующие 10 круток — выплаты ×3' },
+  ];
+
+  const MARKET_PERIOD = 2 * 60 * 60000;
+  const MARKET_SLOTS = 6;
+  const MARKET_REROLL = 25000;
+
+  // Детерминированный ассортимент на окно времени: перезапуск приложения его не меняет
+  function marketStock(windowIdx, salt) {
+    let a = (windowIdx * 2654435761 + salt) >>> 0;
+    const rnd01 = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const pickW = (obj) => { const tot = Object.values(obj).reduce((s, x) => s + x.w, 0); let r = rnd01() * tot; for (const [k, v] of Object.entries(obj)) { if ((r -= v.w) < 0) return k; } return 'common'; };
+    const stock = [];
+    const used = new Set();
+    for (let i = 0; i < MARKET_SLOTS * 4 && stock.length < MARKET_SLOTS; i++) {
+      const rarity = pickW(MARKET_RARITY);
+      const kindR = rnd01();
+      const kind = kindR < 0.45 ? 'key' : kindR < 0.62 ? 'skin' : 'item';
+      const pool = kind === 'key' ? KEYCHAINS.filter((k) => k.rarity === rarity)
+        : kind === 'skin' ? SKINS.filter((s) => s.market === rarity)
+          : CONSUMABLES.filter((c) => c.rarity === rarity);
+      if (!pool.length) continue;
+      const it = pool[Math.floor(rnd01() * pool.length)];
+      if (used.has(it.id)) continue;
+      used.add(it.id);
+      const sale = rnd01() < 0.2 ? 0.7 : 1; // иногда скидка 30%
+      const swing = 0.85 + rnd01() * 0.3; // «цена дня»
+      stock.push({
+        kind, id: it.id, rarity, sale: sale < 1,
+        price: Math.round((it.price * sale * swing) / 100) * 100,
+        qty: kind === 'item' ? 1 + Math.floor(rnd01() * 3) : 1,
+      });
+    }
+    return stock;
+  }
+
+  // Требование для престижа растёт: 1 млн, 2 млн, 3 млн…
+  const prestigeNeed = (n) => 1000000 * (n + 1);
+  const PRESTIGE_BONUS = 25;
 
   const TIER_INDEX = Object.fromEntries(TIERS.map((t, i) => [t.id, i]));
   const atLeast = (st, tier) => Object.entries(st.tiers || {}).some(([id, n]) => n > 0 && TIER_INDEX[id] >= TIER_INDEX[tier]);
@@ -179,6 +278,8 @@
     { id: 'bigwin', name: 'Выиграй 1 000 за одну крутку', reward: 1500, done: (s) => (s.bestWin || 0) >= 1000 },
     { id: 'work', name: 'Отработай 20 заданий', reward: 300, done: (s) => (s.jobs || 0) >= 20, progress: (s) => [Math.min(s.jobs || 0, 20), 20] },
     { id: 'online1', name: 'Выиграй онлайн-батл', reward: 450, done: (s) => ((s.pvpStats || {}).wins || 0) >= 1 },
+    { id: 'key1', name: 'Купи первый брелок на чёрном рынке', reward: 3000, done: (s) => (s.keys || []).length >= 1 },
+    { id: 'prestige1', name: 'Первый престиж', reward: 50000, done: (s) => (s.prestige || 0) >= 1 },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 1200, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
     { id: 'rich2', name: 'Накопи 100 000 монет', reward: 10000, done: (s) => s.coins >= 100000, progress: (s) => [Math.min(s.coins, 100000), 100000] },
     { id: 'million', name: 'Миллионер: накопи 1 000 000', reward: 100000, done: (s) => s.coins >= 1000000, progress: (s) => [Math.min(s.coins, 1000000), 1000000] },
@@ -272,6 +373,7 @@
   window.Plates = {
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
     SPIN_COST, PAYOUT, BETS, BET_UNLOCK, UPGRADES, SKINS, QUESTS,
+    MARKET_RARITY, KEY_SLOTS, BOOST_TEXT, KEYCHAINS, CONSUMABLES, MARKET_PERIOD, MARKET_SLOTS, MARKET_REROLL, marketStock, prestigeNeed, PRESTIGE_BONUS,
     makeOrder, orderTest, ORDER_TTL, xpNeed, levelReward, titleFor, JACKPOT_SEED, JACKPOT_RATE, WHEEL,
   };
 })();

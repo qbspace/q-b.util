@@ -564,6 +564,13 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.1.0': [
+      '🕶 Чёрный рынок: завоз каждые 2 часа, редкие вещи появляются редко',
+      '🔑 Брелки с бустами — носи до трёх сразу',
+      '🎒 Расходники: энергетик, инкассация, билет в счастливый час, талон удачи, купон ×3',
+      '🎨 12 новых скинов + 5 эксклюзивов только с рынка',
+      '⭐ Престиж: +25% к выплатам навсегда за каждый круг',
+    ],
     '2.0.1': [
       'Отсчёт до следующего счастливого часа — плашка 🔥 в «Номерах» видна всегда',
     ],
@@ -837,6 +844,7 @@
     garageTs: Date.now(), batyaTs: 0, bet: 1,
     xp: 0, level: 1, orders: [], jackpot: P.JACKPOT_SEED, hist: [], duels: { w: 0, l: 0 },
     happyUntil: 0, happyNext: 0,
+    keys: [], keyEq: [], items: {}, prestige: 0, market: { w: 0, bought: {}, rerolls: 0 }, talonActive: false, x3Left: 0,
   };
   const plSaved = load('qb.plates', null);
   const plState = Object.assign({}, PL_DEFAULT, plSaved || {});
@@ -855,23 +863,27 @@
 
   const lvl = (id) => plState.upgrades[id] || 0;
   const upg = (id) => P.UPGRADES.find((u) => u.id === id);
-  const luckChance = () => lvl('luck') * upg('luck').per / 100;
-  const moscowChance = () => lvl('moscow') * upg('moscow').per / 100;
-  const payMult = () => 1 + lvl('collector') * upg('collector').per / 100;
+  // суммарный буст надетых брелков по типу
+  const kb = (type) => plState.keyEq.reduce((sum, id) => sum + (((P.KEYCHAINS.find((k) => k.id === id) || {}).boost || {})[type] || 0), 0);
+  const luckChance = () => (lvl('luck') * upg('luck').per + kb('luck')) / 100;
+  const moscowChance = () => (lvl('moscow') * upg('moscow').per + kb('moscow')) / 100;
+  const payMult = () => 1 + (lvl('collector') * upg('collector').per + kb('pay') + plState.prestige * P.PRESTIGE_BONUS) / 100;
   const spinCost = () => P.SPIN_COST * plState.bet;
   // Оценка отдачи по результатам симуляций (на 1 млн круток)
-  const rtp = () => Math.round(123 + lvl('luck') * 1.8 + lvl('moscow') * 3.5 + lvl('collector') * 2.6);
+  // оценка отдачи по симуляциям: база 123%, удача и Москва поднимают шанс редких номеров
+  const rtp = () => Math.round(123 * payMult() * (1 + luckChance() * 1.07) * (1 + moscowChance() * 1.75));
   // значение улучшения на уровне l: таблица values или шаг per
   const upVal = (u, l) => (u.values ? u.values[l - 1] : +(l * u.per).toFixed(1));
 
   /* --- счастливый час: раз в 20–40 минут на 3 минуты выплаты ×2 --- */
   const HAPPY_LEN = 3 * 60000;
+  const happyLen = () => HAPPY_LEN + kb('happy') * 60000;
   const happyActive = () => Date.now() < plState.happyUntil;
   function checkHappy() {
     const now = Date.now();
     if (!plState.happyNext) plState.happyNext = now + G.rnd.int(5, 15) * 60000;
     if (!happyActive() && now >= plState.happyNext) {
-      plState.happyUntil = now + HAPPY_LEN;
+      plState.happyUntil = now + happyLen();
       plState.happyNext = plState.happyUntil + G.rnd.int(20, 40) * 60000;
       savePl();
       toast('🔥 СЧАСТЛИВЫЙ ЧАС: 3 минуты все выплаты ×2!');
@@ -904,15 +916,17 @@
     renderWallet();
   }
 
+  const garageRate = () => (lvl('garage') ? upVal(upg('garage'), lvl('garage')) * (1 + kb('garage') / 100) : 0);
+
   /* --- гараж: пассивный доход, в том числе пока приложение закрыто --- */
   function tickGarage(silent) {
-    const rate = lvl('garage') ? upVal(upg('garage'), lvl('garage')) : 0;
+    const rate = garageRate();
     const now = Date.now();
     if (!rate) { plState.garageTs = now; return 0; }
     const minutes = Math.min((now - plState.garageTs) / 60000, 720);
     const whole = Math.floor(minutes);
     if (whole < 1) return 0;
-    const gain = whole * rate;
+    const gain = Math.round(whole * rate);
     plState.garageTs = now - (minutes - whole) * 60000;
     plState.coins += gain;
     savePl();
@@ -1000,7 +1014,7 @@
   function renderLevel() {
     const need = P.xpNeed(plState.level);
     $('#pl-lvl').textContent = plState.level;
-    $('#pl-title').textContent = P.titleFor(plState.level);
+    $('#pl-title').textContent = (plState.prestige ? `★${plState.prestige} ` : '') + P.titleFor(plState.level);
     $('#pl-xp').style.width = Math.min(100, (plState.xp / need) * 100) + '%';
     $('#pl-xp-t').textContent = `${plState.xp} / ${need} XP`;
   }
@@ -1082,7 +1096,7 @@
             : `<button class="shop-buy" data-up="${u.id}" ${plState.coins < price ? 'disabled' : ''}><i class="coin"></i>${fmt(price)}</button>`}
         </div>`;
     }).join('');
-    const skins = P.SKINS.map((sk) => {
+    const skins = P.SKINS.filter((sk) => !sk.market || plState.skins.includes(sk.id)).map((sk) => {
       const owned = plState.skins.includes(sk.id), active = plState.skin === sk.id;
       return `
         <button class="skin-card ${active ? 'on' : ''}" data-skin="${sk.id}" ${!owned && plState.coins < sk.price ? 'disabled' : ''}>
@@ -1091,13 +1105,37 @@
           <span class="skin-price">${active ? 'ВЫБРАН' : owned ? 'НАДЕТЬ' : `<i class="coin"></i>${fmt(sk.price)}`}</span>
         </button>`;
     }).join('');
-    $('#pl-shop').innerHTML = `
+    const need = P.prestigeNeed(plState.prestige);
+    const prestigeHTML = `
+      <div class="prestige">
+        <div class="prestige-top"><b>⭐ Престиж ${plState.prestige}</b><span>+${plState.prestige * P.PRESTIGE_BONUS}% к выплатам навсегда</span></div>
+        <div class="quest-bar"><i style="width:${Math.min(100, (plState.coins / need) * 100)}%"></i></div>
+        <small>Нужно ${fmtShort(need)} · обнулит баланс и улучшения, скины, брелки и уровень останутся. Следующий: +${(plState.prestige + 1) * P.PRESTIGE_BONUS}%</small>
+        <button class="shop-buy" id="pl-prestige" ${plState.coins < need ? 'disabled' : ''}>Уйти в престиж</button>
+      </div>`;
+    $('#pl-shop').innerHTML = prestigeHTML + `
       <span class="cap">УЛУЧШЕНИЯ</span>
       <div class="shop-list">${ups}</div>
       <span class="cap">СКИНЫ НОМЕРА <span class="dim-cap">· ТОЛЬКО КРАСОТА</span></span>
       <div class="skins">${skins}</div>`;
   }
+  let prestigeArm = 0;
   $('#pl-shop').onclick = (e) => {
+    const pb = e.target.closest('#pl-prestige');
+    if (pb) {
+      if (plState.coins < P.prestigeNeed(plState.prestige)) return;
+      if (Date.now() - prestigeArm > 3000) {
+        prestigeArm = Date.now();
+        pb.textContent = 'Точно? Нажми ещё раз';
+        return;
+      }
+      plState.prestige++;
+      Object.assign(plState, { coins: 500, upgrades: {}, bet: 1, orders: [], hist: [500] });
+      savePl();
+      toast(`⭐ Престиж ${plState.prestige}! Теперь +${plState.prestige * P.PRESTIGE_BONUS}% ко всем выплатам`);
+      burst('#f0c552', 80);
+      return refreshPlates();
+    }
     const b = e.target.closest('[data-up]');
     if (b) {
       const u = upg(b.dataset.up), l = lvl(u.id), price = u.prices[l];
@@ -1355,7 +1393,12 @@
     $('#pl-result').classList.remove('show');
 
     // «Связи в ГИБДД»: иногда крутим дважды и берём лучший
-    let p = P.random(moscowChance()), sc = P.score(p), second = false;
+    let p = P.random(moscowChance()), sc = P.score(p), second = false, talon = false;
+    if (plState.talonActive) {
+      for (let i = 0; i < 5000 && P.TIERS.indexOf(sc.tier) < 2; i++) { p = P.random(moscowChance()); sc = P.score(p); }
+      plState.talonActive = false;
+      talon = true;
+    }
     if (luckChance() && G.rnd.int(0, 9999) < luckChance() * 10000) {
       const p2 = P.random(moscowChance()), sc2 = P.score(p2);
       second = true;
@@ -1371,8 +1414,12 @@
     await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], Math.round((14 + i * 4) * k), Math.round((900 + i * 210) * k))));
 
     const t = sc.tier;
-    let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult() * (happyActive() ? 2 : 1));
+    const x3 = plState.x3Left > 0;
+    if (x3) plState.x3Left--;
+    let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult() * (happyActive() ? 2 : 1) * (x3 ? 3 : 1));
     const extras = [];
+    if (talon) extras.push('<span class="pl-reason happy"><b>🧿</b>талон удачи</span>');
+    if (x3) extras.push(`<span class="pl-reason happy"><b>🔥</b>купон ×3 <em>ещё ${plState.x3Left}</em></span>`);
     if (happyActive()) extras.push('<span class="pl-reason happy"><b>🔥</b>счастливый час <em>×2</em></span>');
     // джекпот уходит мифику
     if (t.id === 'mythic') {
@@ -1390,7 +1437,7 @@
       toast(`Заказ «${o.text}» выполнен: +${fmt(o.reward)}`);
       return false;
     });
-    addXp(1 + P.TIERS.indexOf(t) * 2);
+    addXp(Math.round((1 + P.TIERS.indexOf(t) * 2) * (1 + kb('xp') / 100)));
     plCurrent = p;
     plState.spins++;
     plState.won += win;
@@ -1533,7 +1580,7 @@
   /* --- работа: мини-игры за монеты, ограничены силами --- */
   const ENERGY_MAX = 15, ENERGY_REGEN = 60000;
   if (plState.energy == null) { plState.energy = ENERGY_MAX; plState.energyTs = Date.now(); plState.jobs = 0; }
-  const workMult = () => Math.min(2, 1 + 0.03 * (plState.level - 1));
+  const workMult = () => Math.min(2, 1 + 0.03 * (plState.level - 1)) * (1 + kb('work') / 100);
   let workTimer = null, workKey = null;
 
   function regenEnergy() {
@@ -1739,6 +1786,157 @@
   $('#pl-auto').onclick = () => (plAuto ? (plAuto = false) : autoSpin());
   $('#pl-copy').onclick = () => (plCurrent ? copy(P.format(plCurrent)) : toast('Сначала крутани'));
   $('#pl-qr').onclick = () => (plCurrent ? showQR(P.format(plCurrent)) : toast('Сначала крутани'));
+
+  /* --- чёрный рынок: брелки, эксклюзивные скины, расходники --- */
+  const MR = P.MARKET_RARITY;
+  const marketWindow = () => Math.floor(Date.now() / P.MARKET_PERIOD);
+  const saltOf = (id) => [...id].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
+  function currentStock() {
+    const w = marketWindow();
+    if (plState.market.w !== w) plState.market = { w, bought: {}, rerolls: 0, seen: plState.market.seen };
+    return P.marketStock(w, (saltOf(load('qb.pid', 'x')) + plState.market.rerolls * 7919) >>> 0);
+  }
+  const itemDef = (s) => (s.kind === 'key' ? P.KEYCHAINS : s.kind === 'skin' ? P.SKINS : P.CONSUMABLES).find((x) => x.id === s.id);
+  const boostLine = (b) => Object.entries(b).map(([k, v]) => P.BOOST_TEXT[k](v)).join(', ');
+  const owns = (s) => (s.kind === 'key' ? plState.keys.includes(s.id) : s.kind === 'skin' ? plState.skins.includes(s.id) : false);
+
+  function renderMarket() {
+    const stock = currentStock();
+    $('#mk-stock').innerHTML = stock.map((s, i) => {
+      const d = itemDef(s), r = MR[s.rarity];
+      const left = s.qty - (plState.market.bought[i] || 0);
+      const visual = s.kind === 'skin'
+        ? `<span class="mini-plate skin-${s.id}"><b>А777МР</b><em>77</em></span>`
+        : `<span class="mk-ico">${d.icon}</span>`;
+      const desc = s.kind === 'key' ? `🔑 ${boostLine(d.boost)}` : s.kind === 'skin' ? '🎨 Эксклюзивный скин номера' : `🎒 ${d.desc}`;
+      const state = owns(s) ? '<span class="mk-owned">УЖЕ ЕСТЬ</span>'
+        : left <= 0 ? '<span class="mk-owned">РАЗОБРАЛИ</span>'
+          : `<button class="mk-buy" data-buy="${i}" ${plState.coins < s.price ? 'disabled' : ''}><i class="coin"></i>${fmtShort(s.price)}</button>`;
+      return `
+        <div class="mk-card ${left <= 0 || owns(s) ? 'gone' : ''}" style="--mc:${r.color}">
+          ${s.sale ? '<span class="mk-sale">−30%</span>' : ''}
+          <span class="mk-rar">${r.name}</span>
+          <div class="mk-visual">${visual}</div>
+          <b class="mk-name">${esc(d.name)}</b>
+          <span class="mk-desc">${desc}</span>
+          <div class="mk-bottom">${s.kind === 'item' && left > 0 ? `<small>осталось ${left}</small>` : '<small></small>'}${state}</div>
+        </div>`;
+    }).join('');
+    $('#mk-reroll').disabled = plState.coins < P.MARKET_REROLL;
+    $('#mk-reroll').innerHTML = `🤝 Подкупить продавца — новый завоз · <i class="coin"></i>${fmt(P.MARKET_REROLL)}`;
+
+    // брелки
+    $('#mk-eqc').textContent = `${plState.keyEq.length} / ${P.KEY_SLOTS}`;
+    $('#mk-keys').innerHTML = plState.keys.length ? plState.keys.map((id) => {
+      const k = P.KEYCHAINS.find((x) => x.id === id), on = plState.keyEq.includes(id);
+      return `<button class="mk-key ${on ? 'on' : ''}" data-key="${id}" style="--mc:${MR[k.rarity].color}" title="${esc(boostLine(k.boost))}">
+        <span>${k.icon}</span><b>${esc(k.name)}</b><small>${on ? 'НАДЕТ' : 'СНЯТ'}</small></button>`;
+    }).join('') : '<div class="note">Пока пусто — брелки появляются в завозе</div>';
+    const total = ['pay', 'luck', 'moscow', 'garage', 'work', 'xp', 'happy'].filter((t) => kb(t)).map((t) => P.BOOST_TEXT[t](kb(t)));
+    $('#mk-boosts').textContent = total.length ? `Сейчас действует: ${total.join(' · ')}` : 'Надень брелки, чтобы получить бусты';
+
+    // рюкзак
+    $('#mk-bag').innerHTML = P.CONSUMABLES.map((c) => {
+      const n = plState.items[c.id] || 0;
+      return `<div class="mk-item ${n ? '' : 'none'}" style="--mc:${MR[c.rarity].color}" title="${esc(c.desc)}">
+        <span>${c.icon}</span><b>${esc(c.name)}</b><small>×${n}</small>
+        <button data-use="${c.id}" ${n ? '' : 'disabled'}>Юзнуть</button></div>`;
+    }).join('');
+    const status = [];
+    if (plState.talonActive) status.push('🧿 талон удачи заряжен');
+    if (plState.x3Left) status.push(`🔥 купон ×3: ещё ${plState.x3Left} круток`);
+    $('#mk-active').textContent = status.join(' · ');
+  }
+
+  function marketTimer() {
+    const left = P.MARKET_PERIOD - (Date.now() % P.MARKET_PERIOD);
+    const h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000), s = Math.floor((left % 60000) / 1000);
+    $('#mk-timer').textContent = `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    if (plState.market.w !== marketWindow() && !$('#market-modal').hidden) renderMarket();
+    $('#pl-market').classList.toggle('fresh', plState.market.seen !== marketWindow());
+  }
+  setInterval(marketTimer, 1000);
+
+  $('#pl-market').onclick = () => {
+    plState.market.seen = marketWindow();
+    savePl();
+    renderMarket();
+    marketTimer();
+    $('#market-modal').hidden = false;
+  };
+  $('#mk-close').onclick = () => { $('#market-modal').hidden = true; };
+  $('#mk-reroll').onclick = () => {
+    if (plState.coins < P.MARKET_REROLL) return;
+    plState.market.rerolls++;
+    plState.market.bought = {};
+    setCoins(-P.MARKET_REROLL);
+    toast('Продавец порылся в багажнике: новый завоз');
+    renderMarket();
+  };
+
+  $('#mk-stock').onclick = (e) => {
+    const b = e.target.closest('[data-buy]');
+    if (!b) return;
+    const i = +b.dataset.buy, s = currentStock()[i], d = itemDef(s);
+    if (plState.coins < s.price || owns(s) || (plState.market.bought[i] || 0) >= s.qty) return;
+    plState.market.bought[i] = (plState.market.bought[i] || 0) + 1;
+    if (s.kind === 'key') {
+      plState.keys.push(s.id);
+      if (plState.keyEq.length < P.KEY_SLOTS) plState.keyEq.push(s.id);
+    } else if (s.kind === 'skin') plState.skins.push(s.id);
+    else plState.items[s.id] = (plState.items[s.id] || 0) + 1;
+    setCoins(-s.price);
+    toast(`Куплено: ${d.name}`);
+    if (MR[s.rarity] && s.rarity === 'legendary') burst('#f0b35a', 40);
+    renderMarket();
+    refreshPlates();
+  };
+
+  $('#mk-keys').onclick = (e) => {
+    const b = e.target.closest('[data-key]');
+    if (!b) return;
+    const id = b.dataset.key, i = plState.keyEq.indexOf(id);
+    if (i >= 0) plState.keyEq.splice(i, 1);
+    else if (plState.keyEq.length >= P.KEY_SLOTS) return toast(`Можно носить только ${P.KEY_SLOTS} брелка — сними какой-нибудь`);
+    else plState.keyEq.push(id);
+    savePl();
+    renderMarket();
+    refreshPlates();
+  };
+
+  $('#mk-bag').onclick = (e) => {
+    const b = e.target.closest('[data-use]');
+    if (!b || !(plState.items[b.dataset.use] > 0)) return;
+    const id = b.dataset.use;
+    const use = {
+      energy: () => { plState.energy = ENERGY_MAX; plState.energyTs = Date.now(); return 'Силы восстановлены ⚡'; },
+      cash: () => {
+        const rate = garageRate();
+        if (!rate) return null;
+        const gain = Math.round(rate * 120);
+        plState.coins += gain;
+        return `Инкассация: +${fmt(gain)}`;
+      },
+      ticket: () => {
+        if (happyActive()) return null;
+        plState.happyUntil = Date.now() + happyLen();
+        plState.happyNext = plState.happyUntil + G.rnd.int(20, 40) * 60000;
+        return '🔥 Счастливый час запущен!';
+      },
+      talon: () => { if (plState.talonActive) return null; plState.talonActive = true; return 'Талон заряжен: следующая крутка минимум «Редкий»'; },
+      x3: () => { plState.x3Left += 10; return 'Купон ×3 активен на 10 круток'; },
+    }[id];
+    const msg = use();
+    if (!msg) {
+      return toast({ cash: 'Сначала купи гараж в магазине', ticket: 'Счастливый час уже идёт', talon: 'Талон уже заряжен' }[id]);
+    }
+    plState.items[id]--;
+    savePl();
+    toast(msg);
+    renderMarket();
+    refreshPlates();
+    checkHappy();
+  };
 
   tickGarage();
   setInterval(() => tickGarage(true), 15000);
@@ -2290,7 +2488,7 @@
       spinPlate();
     }
     if (e.key === 'Escape') {
-      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal'].forEach((m) => { $(m).hidden = true; });
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal'].forEach((m) => { $(m).hidden = true; });
       stopJob();
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);

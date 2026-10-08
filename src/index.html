@@ -435,6 +435,7 @@
               </div>
               <div class="pl-head-right">
                 <div class="pl-happy" id="pl-happy"><b id="pl-happy-l">🔥 через</b> <span id="pl-happy-t">—</span></div>
+                <button class="pl-market-btn" id="pl-market">🕶 Чёрный рынок</button>
                 <div class="pl-jackpot"><span>💎 ДЖЕКПОТ</span><b><i class="coin"></i><span id="pl-jp">500</span></b></div>
                 <button class="pl-daily" id="pl-daily" hidden>🎁 <span id="pl-daily-t">Бонус дня</span></button>
                 <div class="pl-tier" id="pl-tier" hidden><i></i><span id="pl-tier-name">Обычный</span></div>
@@ -641,6 +642,30 @@
     <div class="wheel-streak" id="wheel-streak"></div>
     <div class="wheel-res" id="wheel-res"></div>
     <button class="btn-main" id="wheel-go">Крутить колесо <i>›</i></button>
+  </div>
+</div>
+
+<div class="modal" id="market-modal" hidden>
+  <div class="modal-card market-card">
+    <div class="card-head"><span class="cap">🕶 ЧЁРНЫЙ РЫНОК</span><button class="dots" id="mk-close">✕</button></div>
+    <div class="mk-top">
+      <div class="mk-seller">«Есть товар, брат. Бери, пока не разобрали»</div>
+      <div class="mk-timer">Новый завоз через <b id="mk-timer">—</b></div>
+    </div>
+    <div class="mk-stock" id="mk-stock"></div>
+    <button class="pill pill-white wide" id="mk-reroll"></button>
+    <div class="mk-cols">
+      <div>
+        <span class="cap">🔑 БРЕЛКИ · НОСИШЬ <b id="mk-eqc">0 / 3</b></span>
+        <div class="mk-keys" id="mk-keys"></div>
+        <div class="note" id="mk-boosts"></div>
+      </div>
+      <div>
+        <span class="cap">🎒 РЮКЗАК</span>
+        <div class="mk-bag" id="mk-bag"></div>
+        <div class="note" id="mk-active"></div>
+      </div>
+    </div>
   </div>
 </div>
 
