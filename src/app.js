@@ -564,6 +564,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.5.0': [
+      '🎲 Новые ставки ×250, ×500, ×1000 и ×2500 — дорогие уровни «Высоких ставок»',
+      '⚡ Автокрутка ×20, ×40 и ×100 — новые уровни улучшения',
+    ],
     '2.4.1': [
       '🔊 Тихий звук рулетки: щелчки ленты, мягкий «тук» на остановке и аккорд по редкости',
       'Звук выключается кнопкой 🔊 рядом с QR',
@@ -1088,18 +1092,29 @@
     $('#pl-cost').hidden = broke;
     $('#pl-batya').hidden = !(plState.coins < P.SPIN_COST);
     $('#pl-auto').hidden = !lvl('auto');
+    if (lvl('auto')) $('#pl-auto').textContent = `×${upVal(upg('auto'), lvl('auto'))}`;
     renderBets();
   }
 
   function renderBets() {
     const bets = P.BETS.filter((b) => b <= P.BET_UNLOCK[lvl('highroller')]);
     if (!bets.includes(plState.bet)) plState.bet = 1;
-    $('#pl-bet').innerHTML = bets.map((b) => `<button data-v="${b}" class="${b === plState.bet ? 'on' : ''}">×${b} · ${b * P.SPIN_COST}</button>`).join('');
+    const cost = (v) => (v >= 1000 ? `${v / 1000}к` : v);
+    // компактный переключатель: ‹ ×100 · 1к › и MAX — влезает при любом числе ставок
+    const i = bets.indexOf(plState.bet);
+    $('#pl-bet').innerHTML = `
+      <button data-d="-1" ${i <= 0 ? 'disabled' : ''}>‹</button>
+      <span class="bet-cur">×${plState.bet} <small>· ${cost(plState.bet * P.SPIN_COST)}</small></span>
+      <button data-d="1" ${i >= bets.length - 1 ? 'disabled' : ''}>›</button>
+      <button data-max="1" class="bet-max" ${i >= bets.length - 1 ? 'disabled' : ''}>MAX</button>
+      <button data-min="1" class="bet-max" ${i <= 0 ? 'disabled' : ''}>MIN</button>`;
   }
   $('#pl-bet').onclick = (e) => {
     const b = e.target.closest('button');
-    if (!b || plSpinning) return;
-    plState.bet = +b.dataset.v;
+    if (!b || b.disabled || plSpinning) return;
+    const bets = P.BETS.filter((x) => x <= P.BET_UNLOCK[lvl('highroller')]);
+    const i = bets.indexOf(plState.bet);
+    plState.bet = b.dataset.max ? bets[bets.length - 1] : b.dataset.min ? bets[0] : bets[Math.max(0, Math.min(bets.length - 1, i + +b.dataset.d))];
     savePl();
     renderWallet();
     renderOdds();
@@ -1614,7 +1629,8 @@
     if (plAuto || plSpinning) return;
     plAuto = true;
     $('#pl-auto').classList.add('running');
-    for (let i = 0; i < 10 && plAuto; i++) {
+    const count = upVal(upg('auto'), lvl('auto'));
+    for (let i = 0; i < count && plAuto; i++) {
       const order = await spinPlate(true);
       if (order === false || order >= 4) break; // нет денег или выпала легендарка
       await new Promise((r) => setTimeout(r, 350));

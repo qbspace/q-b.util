@@ -1941,3 +1941,11 @@ kbd {
 .au-log > div.me { background: rgba(142, 211, 198, .14); }
 .au-log > div.me span { color: #8ed3c6; font-weight: 600; }
 .au-wait small .mini-plate { font-size: 11px; vertical-align: middle; }
+
+/* много ставок — переносим в две строки */
+#pl-bet { align-items: center; gap: 4px; }
+#pl-bet button { flex: 0 0 auto; min-width: 34px; font-size: 15px; }
+#pl-bet button:disabled { opacity: .3; cursor: default; }
+#pl-bet .bet-max { font-size: 10px; letter-spacing: .06em; }
+#pl-bet .bet-cur { min-width: 120px; text-align: center; font-size: 14px; font-weight: 700; color: #fff; }
+#pl-bet .bet-cur small { font-size: 11px; font-weight: 500; color: #b9b8b2; }
