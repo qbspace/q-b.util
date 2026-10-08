@@ -1828,3 +1828,110 @@ kbd {
 .tn-btn.buy { background: var(--accent); color: #111; }
 .tn-btn.off { background: transparent; border: 1px solid rgba(255, 255, 255, .2); color: #c9c8c2; }
 .tn-btn:disabled { opacity: .35; cursor: default; }
+
+/* ================= GEMS ================= */
+.gem {
+  display: inline-block; width: .9em; height: .9em; vertical-align: -.1em; margin-right: .3em; flex: none;
+  background: linear-gradient(135deg, #f0d6ff, #b07bff 40%, #6b2bff 75%, #3a127f);
+  clip-path: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%);
+  filter: drop-shadow(0 0 .25em rgba(176, 123, 255, .7));
+}
+.pl-gems { display: inline-flex; align-items: center; gap: 2px; margin-top: 2px; font-size: 15px; font-weight: 600; color: #d9c4ff; }
+.pl-gems .gem { width: 16px; height: 16px; margin-right: 6px; }
+.pl-reason.gemchip { background: rgba(176, 123, 255, .2); border-color: rgba(176, 123, 255, .45); }
+.quest-reward .gem, .shop-buy .gem { margin-left: .15em; }
+
+.mk-reroll-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.mk-reroll-row .pill { height: 40px; background: rgba(255, 255, 255, .07); color: #f2f2ee; box-shadow: none; }
+.mk-reroll-row .pill:disabled { opacity: .4; }
+.mk-reroll-row .gemb { background: rgba(176, 123, 255, .18); color: #e6d6ff; }
+
+.gem-section { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: radial-gradient(80% 60% at 50% 0%, rgba(176, 123, 255, .16), transparent 70%), #1a1622; border: 1px solid rgba(176, 123, 255, .25); }
+.gem-section .cap b { color: #d9c4ff; }
+.gem-shop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.gem-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px 10px; border-radius: 16px; text-align: center;
+  background: #1f1b28; border: 1.5px solid color-mix(in srgb, var(--mc) 45%, transparent);
+}
+.gem-card.gone { opacity: .45; }
+.gem-card .mk-visual { height: 46px; }
+.gem-card .mk-ico { font-size: 30px; }
+.gem-card .mk-name { font-size: 12px; }
+.gem-card .mk-desc { font-size: 10.5px; min-height: 28px; }
+.gem-buy {
+  margin-top: 2px; height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center;
+  background: linear-gradient(135deg, #b07bff, #6b2bff); color: #fff;
+}
+.gem-buy:disabled { opacity: .35; cursor: default; }
+.gem-exchange { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c9c8c2; flex-wrap: wrap; }
+.gem-exchange span { margin-right: auto; display: inline-flex; align-items: center; gap: 2px; }
+.gem-exchange .pill { height: 32px; background: rgba(255, 255, 255, .08); color: #f2f2ee; box-shadow: none; }
+.gem-exchange .pill:disabled { opacity: .35; }
+
+/* скины за кристаллы */
+.plate.skin-amethyst, .mini-plate.skin-amethyst {
+  color: #fff; text-shadow: 0 0 10px #d8b4ff;
+  background: radial-gradient(60% 90% at 30% 20%, #c79bff, #7a3fe0 50%, #3a1474);
+}
+.plate.skin-amethyst, .plate.skin-amethyst .plate-region, .mini-plate.skin-amethyst, .mini-plate.skin-amethyst em { border-color: #e9d6ff; }
+.plate.skin-aurora, .mini-plate.skin-aurora {
+  color: #f2fff8; text-shadow: 0 0 12px #6bffb8;
+  background:
+    linear-gradient(100deg, transparent 10%, rgba(107, 255, 184, .65) 30%, transparent 45%, rgba(140, 107, 255, .6) 65%, transparent 85%),
+    linear-gradient(180deg, #06121f, #0b2236);
+  background-size: 250% 100%, 100% 100%; animation: holo 7s ease-in-out infinite alternate;
+}
+.plate.skin-aurora, .plate.skin-aurora .plate-region, .mini-plate.skin-aurora, .mini-plate.skin-aurora em { border-color: #9fffd4; }
+.plate.skin-dragon, .mini-plate.skin-dragon {
+  color: #ffe9a8; text-shadow: 0 0 10px #ff9a1f, 0 2px 0 #3a1400;
+  background:
+    repeating-radial-gradient(circle at 0 100%, transparent 0 10px, rgba(255, 190, 70, .18) 10px 12px),
+    repeating-radial-gradient(circle at 100% 0, transparent 0 10px, rgba(255, 120, 30, .18) 10px 12px),
+    linear-gradient(135deg, #5a0f00, #a32a00 45%, #e07a10 70%, #5a0f00);
+}
+.plate.skin-dragon, .plate.skin-dragon .plate-region, .mini-plate.skin-dragon, .mini-plate.skin-dragon em { border-color: #f0c552; }
+
+/* ================= AUCTION ================= */
+.pl-market-btn.auction { background: linear-gradient(135deg, #2a1414, #120909); border-color: rgba(229, 72, 77, .35); }
+.pl-market-btn.auction em { font-style: normal; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 6px; background: #e5484d; color: #fff; margin-left: 4px; animation: pulse 1.2s infinite; }
+.auction-card { width: min(560px, calc(100vw - 32px)); gap: 14px; color: #f2f2ee; background: radial-gradient(70% 50% at 50% 0%, rgba(229, 72, 77, .14), transparent 60%), #141413 !important; border: 1px solid rgba(255, 255, 255, .08); }
+.auction-card .cap { color: #9a9a95; }
+.auction-card .dots { color: #f2f2ee; }
+.auction-card .note { color: #8a8984; }
+#au-body { display: flex; flex-direction: column; gap: 12px; }
+.au-wait { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 20px 10px; }
+.au-wait .sparkle { font-size: 40px; }
+.au-wait b { font-size: 18px; }
+.au-wait span { font-size: 13px; color: #b9b8b2; line-height: 1.5; max-width: 420px; }
+.au-wait small { font-size: 12px; color: #f0c552; }
+.au-lot { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px; border-radius: 20px; background: radial-gradient(60% 80% at 50% 50%, color-mix(in srgb, var(--t) 28%, transparent), transparent 70%), #1b1b19; border: 1.5px solid color-mix(in srgb, var(--t) 50%, transparent); }
+.au-plate .mini-plate { font-size: 30px; border-width: 3px; border-radius: 9px; box-shadow: 0 0 30px color-mix(in srgb, var(--t) 50%, transparent); }
+.au-plate .mini-plate em { font-size: 22px; border-left-width: 3px; }
+.au-meta { font-size: 12.5px; color: #c9c8c2; }
+.au-meta b { color: #8ed3c6; }
+.au-tier { color: var(--t); font-weight: 700; }
+.au-price { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.au-price > div { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 14px; background: #1d1d1b; }
+.au-price span { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; color: #8a8984; }
+.au-price b { font-size: 17px; font-weight: 600; display: flex; align-items: center; }
+.au-price b.me { color: #8ed3c6; }
+.au-price b.hot { color: #ff6b70; animation: pulse 1s infinite; }
+.au-bar { height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.au-bar i { display: block; height: 100%; background: linear-gradient(90deg, #e5484d, #f0b35a); transition: width 1s linear; }
+.au-actions { display: flex; gap: 8px; }
+.au-actions .pill { flex: 1; height: 46px; font-size: 12px; }
+.au-actions .pill-dark { background: var(--accent); color: #111; box-shadow: none; }
+.au-actions .pill-white { background: rgba(255, 255, 255, .1); color: #f2f2ee; box-shadow: none; }
+.au-actions .pill:disabled { opacity: .35; }
+.au-lead { flex: 1; text-align: center; padding: 14px; border-radius: 14px; background: rgba(142, 211, 198, .14); color: #8ed3c6; font-size: 13px; font-weight: 600; }
+.au-log { display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow: auto; }
+.au-log > div { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 10px; border-radius: 10px; background: #1b1b19; color: #c9c8c2; }
+.au-log > div b { font-family: var(--mono); color: #f2f2ee; font-weight: 500; }
+
+/* автопарк в «Гараже» */
+.fleet-head { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 2px 2px; }
+.fleet-head b { font-size: 13px; }
+.fleet-head span { font-size: 11px; color: #3aa68f; font-weight: 600; }
+.pl-best-row.fleet { background: rgba(240, 197, 82, .12); }
+:root[data-theme="dark"] .pl-best-row.fleet { background: rgba(240, 197, 82, .1); }
+@media (max-width: 1100px) { .gem-shop { grid-template-columns: repeat(2, 1fr); } }

@@ -176,6 +176,10 @@
     { id: 'glitch', name: 'Глитч', price: 400000, market: 'epic' },
     { id: 'plasma', name: 'Плазма', price: 1000000, market: 'legendary' },
     { id: 'diamond', name: 'Бриллиант', price: 1500000, market: 'legendary' },
+    // только за кристаллы
+    { id: 'amethyst', name: 'Аметист', price: 0, gems: 60 },
+    { id: 'aurora', name: 'Северное сияние', price: 0, gems: 120 },
+    { id: 'dragon', name: 'Золотой дракон', price: 0, gems: 300 },
   ];
 
   /* ---------------- чёрный рынок ---------------- */
@@ -224,7 +228,10 @@
 
   const MARKET_PERIOD = 2 * 60 * 60000;
   const MARKET_SLOTS = 6;
-  const MARKET_REROLL = 25000;
+  // Перезапуск рынка: 50к, дальше каждый следующий в том же завозе вдвое дороже; или 3 кристалла
+  const MARKET_REROLL = 50000;
+  const MARKET_REROLL_GEMS = 3;
+  const rerollPrice = (n) => MARKET_REROLL * 2 ** n;
 
   // Детерминированный ассортимент на окно времени: перезапуск приложения его не меняет
   function marketStock(windowIdx, salt) {
@@ -296,6 +303,36 @@
   const tuningStyle = (t) => Math.max(1, Math.round(Math.log10(t.price) * 5 - 17));
   const STYLE_DIV = 5;
 
+  /* ---------------- кристаллы ---------------- */
+  const GEM_RATE = 500000; // обменник: монет за 1 кристалл
+  const GEM_SHOP = [
+    { id: 'slot4', kind: 'slot', name: '4-й слот для брелка', icon: '➕', gems: 150, need: 0 },
+    { id: 'slot5', kind: 'slot', name: '5-й слот для брелка', icon: '➕', gems: 400, need: 1 },
+    { id: 'goldkey', kind: 'key', gems: 80 },
+    { id: 'siren', kind: 'key', gems: 80 },
+    { id: 'blackcard', kind: 'key', gems: 220 },
+    { id: 'crown', kind: 'key', gems: 250 },
+    { id: 'amethyst', kind: 'skin', gems: 60 },
+    { id: 'aurora', kind: 'skin', gems: 120 },
+    { id: 'dragon', kind: 'skin', gems: 300 },
+    { id: 'pack-talon', kind: 'pack', name: 'Талоны удачи ×5', icon: '🧿', item: 'talon', n: 5, gems: 25 },
+    { id: 'pack-ticket', kind: 'pack', name: 'Билеты в счастливый час ×3', icon: '🎟️', item: 'ticket', n: 3, gems: 20 },
+    { id: 'pack-x3', kind: 'pack', name: 'Купоны ×3 · три штуки', icon: '🔥', item: 'x3', n: 3, gems: 30 },
+  ];
+  // кристаллы за редкость номера
+  const GEMS_FOR_TIER = { epic: 1, legendary: 5, mythic: 25 };
+  // кристаллы за задание: 1–5 в зависимости от награды
+  const questGems = (q) => Math.max(1, Math.min(5, Math.round(Math.log10(q.reward)) - 1));
+
+  /* ---------------- аукцион и аренда ---------------- */
+  const AUCTION_EVERY = 10 * 60000;
+  const AUCTION_LEN = 90000;
+  const AUCTION_EXTEND = 15000;
+  const AUCTION_BOTS = ['Ашот', 'Гоша с рынка', 'Рустам', 'Дядя Валера', 'Тимур', 'Арсен', 'Михалыч', 'Серёга-таксист'];
+  // аренда: монет в минуту за номер в автопарке и за лучшие номера коллекции
+  const fleetRent = (total) => Math.round(total / 5);
+  const collectionRent = (total) => total / 40;
+
   // Требование для престижа растёт: 1 млн, 2 млн, 3 млн…
   const prestigeNeed = (n) => 1000000 * (n + 1);
   const PRESTIGE_BONUS = 25;
@@ -323,6 +360,8 @@
     { id: 'prestige1', name: 'Первый престиж', reward: 50000, done: (s) => (s.prestige || 0) >= 1 },
     { id: 'tune1', name: 'Купи первый обвес в тюнинге', reward: 5000, done: (s) => ((s.tuning || {}).owned || []).length >= 1 },
     { id: 'style50', name: 'Набери 50 стиля', reward: 500000, done: (s) => (s.styleNow || 0) >= 50, progress: (s) => [Math.min(s.styleNow || 0, 50), 50] },
+    { id: 'auction1', name: 'Выиграй аукцион', reward: 20000, done: (s) => (s.fleet || []).length >= 1 },
+    { id: 'gems100', name: 'Накопи 100 кристаллов', reward: 50000, done: (s) => (s.gems || 0) >= 100, progress: (s) => [Math.min(s.gems || 0, 100), 100] },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 1200, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
     { id: 'rich2', name: 'Накопи 100 000 монет', reward: 10000, done: (s) => s.coins >= 100000, progress: (s) => [Math.min(s.coins, 100000), 100000] },
     { id: 'million', name: 'Миллионер: накопи 1 000 000', reward: 100000, done: (s) => s.coins >= 1000000, progress: (s) => [Math.min(s.coins, 1000000), 1000000] },
@@ -417,6 +456,7 @@
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
     SPIN_COST, PAYOUT, BETS, BET_UNLOCK, UPGRADES, SKINS, QUESTS,
     TUNING_CATS, TUNING, tuningStyle, STYLE_DIV,
+    MARKET_REROLL_GEMS, rerollPrice, GEM_RATE, GEM_SHOP, GEMS_FOR_TIER, questGems, AUCTION_EVERY, AUCTION_LEN, AUCTION_EXTEND, AUCTION_BOTS, fleetRent, collectionRent,
     MARKET_RARITY, KEY_SLOTS, BOOST_TEXT, KEYCHAINS, CONSUMABLES, MARKET_PERIOD, MARKET_SLOTS, MARKET_REROLL, marketStock, prestigeNeed, PRESTIGE_BONUS,
     makeOrder, orderTest, ORDER_TTL, xpNeed, levelReward, titleFor, JACKPOT_SEED, JACKPOT_RATE, WHEEL,
   };

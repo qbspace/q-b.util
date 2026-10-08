@@ -427,6 +427,7 @@
               <div class="pl-wallet">
                 <span class="cap">БАЛАНС</span>
                 <div class="pl-coins"><i class="coin"></i><b id="pl-coins">0</b><svg class="pl-spark" id="pl-spark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg></div>
+                <div class="pl-gems" title="Кристаллы — редкая валюта"><i class="gem"></i><b id="pl-gems">0</b></div>
                 <div class="pl-spins">Круток: <b id="pl-spins">0</b> · отдача ≈ <b id="pl-rtp">93%</b></div>
                 <div class="pl-level">
                   <div class="pl-level-top"><span><b id="pl-title">Пешеход</b> · ур. <b id="pl-lvl">1</b></span><small id="pl-xp-t"></small></div>
@@ -437,6 +438,7 @@
                 <div class="pl-happy" id="pl-happy"><b id="pl-happy-l">🔥 через</b> <span id="pl-happy-t">—</span></div>
                 <button class="pl-market-btn" id="pl-market">🕶 Чёрный рынок</button>
                 <button class="pl-market-btn tune" id="pl-tune">🔧 Тюнинг</button>
+                <button class="pl-market-btn auction" id="pl-auction">🔨 Аукцион</button>
                 <div class="pl-jackpot"><span>💎 ДЖЕКПОТ</span><b><i class="coin"></i><span id="pl-jp">500</span></b></div>
                 <button class="pl-daily" id="pl-daily" hidden>🎁 <span id="pl-daily-t">Бонус дня</span></button>
                 <div class="pl-tier" id="pl-tier" hidden><i></i><span id="pl-tier-name">Обычный</span></div>
@@ -665,6 +667,13 @@
   </div>
 </div>
 
+<div class="modal" id="auction-modal" hidden>
+  <div class="modal-card auction-card">
+    <div class="card-head"><span class="cap">🔨 АУКЦИОН НОМЕРОВ</span><button class="dots" id="au-close">✕</button></div>
+    <div id="au-body"></div>
+  </div>
+</div>
+
 <div class="modal" id="market-modal" hidden>
   <div class="modal-card market-card">
     <div class="card-head"><span class="cap">🕶 ЧЁРНЫЙ РЫНОК</span><button class="dots" id="mk-close">✕</button></div>
@@ -673,7 +682,10 @@
       <div class="mk-timer">Новый завоз через <b id="mk-timer">—</b></div>
     </div>
     <div class="mk-stock" id="mk-stock"></div>
-    <button class="pill pill-white wide" id="mk-reroll"></button>
+    <div class="mk-reroll-row">
+      <button class="pill pill-white" id="mk-reroll"></button>
+      <button class="pill pill-white gemb" id="mk-reroll-gem"></button>
+    </div>
     <div class="mk-cols">
       <div>
         <span class="cap">🔑 БРЕЛКИ · НОСИШЬ <b id="mk-eqc">0 / 3</b></span>
@@ -684,6 +696,15 @@
         <span class="cap">🎒 РЮКЗАК</span>
         <div class="mk-bag" id="mk-bag"></div>
         <div class="note" id="mk-active"></div>
+      </div>
+    </div>
+    <div class="gem-section">
+      <span class="cap">💎 ЛАВКА КРИСТАЛЛОВ · У ТЕБЯ <b id="mk-gems">0</b></span>
+      <div class="gem-shop" id="mk-gemshop"></div>
+      <div class="gem-exchange">
+        <span>Обменник: 1 <i class="gem"></i> = 500 000 <i class="coin"></i></span>
+        <button class="pill pill-white" id="mk-buygem">Купить 1 💎</button>
+        <button class="pill pill-white" id="mk-buygem10">Купить 10 💎</button>
       </div>
     </div>
   </div>

@@ -564,6 +564,13 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.3.0': [
+      '💎 Кристаллы — новая редкая валюта: за эпики, легендарки, мифики, задания, уровни и колесо',
+      '💎 Лавка кристаллов на чёрном рынке: слоты под брелки, легендарные брелки, эксклюзивные скины, наборы',
+      '🔨 Аукцион номеров: раз в 10 минут легендарка или мифик, торгуйся с перекупами',
+      '🚗 Автопарк: выигранные номера приносят аренду, даже когда приложение закрыто',
+      'Перезапуск чёрного рынка дороже — или за 3 кристалла',
+    ],
     '2.2.0': [
       '🔧 Тюнинг номера: рамки, подсветка, наклейки, болты и ауры — с бесплатной примеркой',
       'Стиль обвесов даёт бонус к выплатам — до +19% на полном топе',
@@ -854,7 +861,7 @@
     garageTs: Date.now(), batyaTs: 0, bet: 1,
     xp: 0, level: 1, orders: [], jackpot: P.JACKPOT_SEED, hist: [], duels: { w: 0, l: 0 },
     happyUntil: 0, happyNext: 0,
-    tuning: { owned: [], eq: {} }, styleNow: 0,
+    tuning: { owned: [], eq: {} }, styleNow: 0, gems: 0, extraSlots: 0, fleet: [],
     keys: [], keyEq: [], items: {}, prestige: 0, market: { w: 0, bought: {}, rerolls: 0 }, talonActive: false, x3Left: 0,
   };
   const plSaved = load('qb.plates', null);
@@ -875,6 +882,7 @@
   const lvl = (id) => plState.upgrades[id] || 0;
   const upg = (id) => P.UPGRADES.find((u) => u.id === id);
   // суммарный буст надетых брелков по типу
+  const keySlots = () => P.KEY_SLOTS + (plState.extraSlots || 0);
   const kb = (type) => plState.keyEq.reduce((sum, id) => sum + (((P.KEYCHAINS.find((k) => k.id === id) || {}).boost || {})[type] || 0), 0);
   // стиль надетых обвесов тюнинга: каждые 5 очков = +1% к выплатам
   const styleNow = () => Object.values(plState.tuning.eq).reduce((sum, id) => {
@@ -934,9 +942,13 @@
 
   const garageRate = () => (lvl('garage') ? upVal(upg('garage'), lvl('garage')) * (1 + kb('garage') / 100) : 0);
 
-  /* --- гараж: пассивный доход, в том числе пока приложение закрыто --- */
+  // аренда: номера автопарка + понемногу лучшие номера коллекции
+  const rentRate = () => plState.fleet.reduce((sum, f) => sum + P.fleetRent(f.total), 0)
+    + plState.best.reduce((sum, b) => sum + P.collectionRent(b.total), 0);
+
+  /* --- гараж и аренда: пассивный доход, в том числе пока приложение закрыто --- */
   function tickGarage(silent) {
-    const rate = garageRate();
+    const rate = garageRate() + rentRate();
     const now = Date.now();
     if (!rate) { plState.garageTs = now; return 0; }
     const minutes = Math.min((now - plState.garageTs) / 60000, 720);
@@ -947,7 +959,7 @@
     plState.coins += gain;
     savePl();
     renderWallet();
-    if (!silent && gain >= 10) toast(`Гараж принёс +${fmt(gain)} монет`);
+    if (!silent && gain >= 10) toast(`Гараж и аренда принесли +${fmt(gain)} монет`);
     return gain;
   }
 
@@ -998,8 +1010,10 @@
     setTimeout(() => {
       const reward = Math.round(P.WHEEL[i] * (1 + 0.1 * Math.min(d.streak - 1, 10)));
       plState.daily = { last: dayKey(), streak: d.streak };
+      const wg = d.streak % 7 === 0 ? 5 : 1;
+      plState.gems = (plState.gems || 0) + wg;
       setCoins(reward);
-      $('#wheel-res').innerHTML = `Выпало <b>${P.WHEEL[i]}</b> → <b><i class="coin"></i>${reward}</b>`;
+      $('#wheel-res').innerHTML = `Выпало <b>${P.WHEEL[i]}</b> → <b><i class="coin"></i>${reward}</b> · <b><i class="gem"></i>+${wg}</b>`;
       floatWin(`+${reward}`, '#f0b35a');
       wheelBusy = false;
       renderWallet();
@@ -1040,9 +1054,10 @@
     while (plState.xp >= P.xpNeed(plState.level)) {
       plState.xp -= P.xpNeed(plState.level);
       plState.level++;
-      const r = P.levelReward(plState.level);
+      const r = P.levelReward(plState.level), g = plState.level % 10 === 0 ? 5 : 1;
       plState.coins += r;
-      toast(`Уровень ${plState.level}: «${P.titleFor(plState.level)}» · +${r}`);
+      plState.gems = (plState.gems || 0) + g;
+      toast(`Уровень ${plState.level}: «${P.titleFor(plState.level)}» · +${r} и 💎 +${g}`);
     }
   }
 
@@ -1050,6 +1065,7 @@
     $('#pl-coins').textContent = fmtShort(plState.coins);
     $('#pl-coins').title = fmt(plState.coins);
     $('#pl-jp').textContent = fmt(plState.jackpot);
+    $('#pl-gems').textContent = fmt(plState.gems || 0);
     renderLevel();
     renderSpark();
     $('#pl-spins').textContent = fmt(plState.spins);
@@ -1112,7 +1128,7 @@
             : `<button class="shop-buy" data-up="${u.id}" ${plState.coins < price ? 'disabled' : ''}><i class="coin"></i>${fmt(price)}</button>`}
         </div>`;
     }).join('');
-    const skins = P.SKINS.filter((sk) => !sk.market || plState.skins.includes(sk.id)).map((sk) => {
+    const skins = P.SKINS.filter((sk) => (!sk.market && !sk.gems) || plState.skins.includes(sk.id)).map((sk) => {
       const owned = plState.skins.includes(sk.id), active = plState.skin === sk.id;
       return `
         <button class="skin-card ${active ? 'on' : ''}" data-skin="${sk.id}" ${!owned && plState.coins < sk.price ? 'disabled' : ''}>
@@ -1146,6 +1162,7 @@
         return;
       }
       plState.prestige++;
+      plState.gems = (plState.gems || 0) + 50;
       Object.assign(plState, { coins: 500, upgrades: {}, bet: 1, orders: [], hist: [500] });
       savePl();
       toast(`⭐ Престиж ${plState.prestige}! Теперь +${plState.prestige * P.PRESTIGE_BONUS}% ко всем выплатам`);
@@ -1229,8 +1246,8 @@
             ${pr ? `<div class="quest-bar"><i style="width:${Math.min(100, (pr[0] / pr[1]) * 100)}%"></i></div><small>${fmt(pr[0])} / ${fmt(pr[1])}</small>` : ''}
           </div>
           ${got ? '<span class="quest-done">✓</span>'
-            : done ? `<button class="shop-buy claim" data-q="${q.id}">Забрать <i class="coin"></i>${fmt(q.reward)}</button>`
-              : `<span class="quest-reward"><i class="coin"></i>${fmt(q.reward)}</span>`}
+            : done ? `<button class="shop-buy claim" data-q="${q.id}">Забрать <i class="coin"></i>${fmt(q.reward)} <i class="gem"></i>${P.questGems(q)}</button>`
+              : `<span class="quest-reward"><i class="coin"></i>${fmtShort(q.reward)} · <i class="gem"></i>${P.questGems(q)}</span>`}
         </div>`;
     }).join('');
     const n = claimable();
@@ -1243,6 +1260,7 @@
     const q = P.QUESTS.find((x) => x.id === b.dataset.q);
     if (!q.done(plState) || plState.quests[q.id]) return;
     plState.quests[q.id] = Date.now();
+    plState.gems = (plState.gems || 0) + P.questGems(q);
     setCoins(q.reward);
     floatWin(`+${fmt(q.reward)}`, '#5fc2ae');
     toast(`Задание «${q.name}»: +${fmt(q.reward)}`);
@@ -1252,11 +1270,20 @@
   /* --- коллекция --- */
   const plateHTML = (p) => `<span class="mini-plate"><b>${p.l1}${p.digits}${p.l2}</b><em>${p.region}</em></span>`;
   function renderBest() {
+    const fleetSum = plState.fleet.reduce((sum, f) => sum + P.fleetRent(f.total), 0);
+    const colSum = plState.best.reduce((sum, b) => sum + P.collectionRent(b.total), 0);
+    const fleet = `
+      <div class="fleet-head"><b>🚗 Автопарк</b><span>аренда +${fmt(fleetSum)}/мин</span></div>
+      ${plState.fleet.length ? plState.fleet.map((f) => {
+        const t = P.TIERS.find((x) => x.id === f.tier);
+        return `<div class="pl-best-row fleet" style="--t:${t.color}">${plateHTML(f.p)}<span class="pl-best-tier">${t.name}</span><b>+${P.fleetRent(f.total)}/мин</b></div>`;
+      }).join('') : '<div class="note">Выигрывай номера на 🔨 аукционе — они приносят аренду</div>'}
+      <div class="fleet-head"><b>🏆 Коллекция</b><span>аренда +${colSum.toFixed(1)}/мин</span></div>`;
     if (!plState.best.length) {
-      $('#pl-best').innerHTML = `<div class="feed-empty"><div class="sparkle">✦</div><br>ЛУЧШИЕ НОМЕРА БУДУТ ТУТ</div>`;
+      $('#pl-best').innerHTML = fleet + `<div class="feed-empty"><div class="sparkle">✦</div><br>ЛУЧШИЕ НОМЕРА БУДУТ ТУТ</div>`;
       return;
     }
-    $('#pl-best').innerHTML = plState.best.map((b, i) => {
+    $('#pl-best').innerHTML = fleet + plState.best.map((b, i) => {
       const t = P.TIERS.find((x) => x.id === b.tier);
       return `<div class="pl-best-row" data-i="${i}" style="--t:${t.color}" title="Нажми, чтобы скопировать">
         ${plateHTML(b.p)}<span class="pl-best-tier">${t.name}</span><b>${b.total}</b></div>`;
@@ -1435,6 +1462,11 @@
     if (x3) plState.x3Left--;
     let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult() * (happyActive() ? 2 : 1) * (x3 ? 3 : 1));
     const extras = [];
+    const gemsWon = P.GEMS_FOR_TIER[t.id] || 0;
+    if (gemsWon) {
+      plState.gems = (plState.gems || 0) + gemsWon;
+      extras.push(`<span class="pl-reason gemchip"><b>💎</b>кристаллы <em>+${gemsWon}</em></span>`);
+    }
     if (talon) extras.push('<span class="pl-reason happy"><b>🧿</b>талон удачи</span>');
     if (x3) extras.push(`<span class="pl-reason happy"><b>🔥</b>купон ×3 <em>ещё ${plState.x3Left}</em></span>`);
     if (happyActive()) extras.push('<span class="pl-reason happy"><b>🔥</b>счастливый час <em>×2</em></span>');
@@ -1662,6 +1694,7 @@
   function payJob(base, label) {
     const pay = Math.round(base * workMult());
     plState.jobs = (plState.jobs || 0) + 1;
+    if (G.rnd.int(0, 99) < 8) { plState.gems = (plState.gems || 0) + 1; toast('💎 +1 — премия от начальства'); }
     if (pay > 0) {
       setCoins(pay);
       floatWin(`+${pay}`, '#5fc2ae');
@@ -1857,11 +1890,15 @@
           <div class="mk-bottom">${s.kind === 'item' && left > 0 ? `<small>осталось ${left}</small>` : '<small></small>'}${state}</div>
         </div>`;
     }).join('');
-    $('#mk-reroll').disabled = plState.coins < P.MARKET_REROLL;
-    $('#mk-reroll').innerHTML = `🤝 Подкупить продавца — новый завоз · <i class="coin"></i>${fmt(P.MARKET_REROLL)}`;
+    const rp = P.rerollPrice(plState.market.rerolls);
+    $('#mk-reroll').disabled = plState.coins < rp;
+    $('#mk-reroll').innerHTML = `🤝 Подкупить продавца · <i class="coin"></i>${fmtShort(rp)}`;
+    $('#mk-reroll-gem').disabled = (plState.gems || 0) < P.MARKET_REROLL_GEMS;
+    $('#mk-reroll-gem').innerHTML = `🤝 За кристаллы · <i class="gem"></i>${P.MARKET_REROLL_GEMS}`;
+    renderGemShop();
 
     // брелки
-    $('#mk-eqc').textContent = `${plState.keyEq.length} / ${P.KEY_SLOTS}`;
+    $('#mk-eqc').textContent = `${plState.keyEq.length} / ${keySlots()}`;
     $('#mk-keys').innerHTML = plState.keys.length ? plState.keys.map((id) => {
       const k = P.KEYCHAINS.find((x) => x.id === id), on = plState.keyEq.includes(id);
       return `<button class="mk-key ${on ? 'on' : ''}" data-key="${id}" style="--mc:${MR[k.rarity].color}" title="${esc(boostLine(k.boost))}">
@@ -1900,11 +1937,23 @@
     $('#market-modal').hidden = false;
   };
   $('#mk-close').onclick = () => { $('#market-modal').hidden = true; };
-  $('#mk-reroll').onclick = () => {
-    if (plState.coins < P.MARKET_REROLL) return;
+  function rerollMarket() {
     plState.market.rerolls++;
     plState.market.bought = {};
-    setCoins(-P.MARKET_REROLL);
+  }
+  $('#mk-reroll-gem').onclick = () => {
+    if ((plState.gems || 0) < P.MARKET_REROLL_GEMS) return;
+    plState.gems -= P.MARKET_REROLL_GEMS;
+    rerollMarket();
+    savePl();
+    toast('Продавец взял кристаллы: новый завоз');
+    renderMarket();
+  };
+  $('#mk-reroll').onclick = () => {
+    const rp = P.rerollPrice(plState.market.rerolls);
+    if (plState.coins < rp) return;
+    rerollMarket();
+    setCoins(-rp);
     toast('Продавец порылся в багажнике: новый завоз');
     renderMarket();
   };
@@ -1917,7 +1966,7 @@
     plState.market.bought[i] = (plState.market.bought[i] || 0) + 1;
     if (s.kind === 'key') {
       plState.keys.push(s.id);
-      if (plState.keyEq.length < P.KEY_SLOTS) plState.keyEq.push(s.id);
+      if (plState.keyEq.length < keySlots()) plState.keyEq.push(s.id);
     } else if (s.kind === 'skin') plState.skins.push(s.id);
     else plState.items[s.id] = (plState.items[s.id] || 0) + 1;
     setCoins(-s.price);
@@ -1932,7 +1981,7 @@
     if (!b) return;
     const id = b.dataset.key, i = plState.keyEq.indexOf(id);
     if (i >= 0) plState.keyEq.splice(i, 1);
-    else if (plState.keyEq.length >= P.KEY_SLOTS) return toast(`Можно носить только ${P.KEY_SLOTS} брелка — сними какой-нибудь`);
+    else if (plState.keyEq.length >= keySlots()) return toast(`Можно носить только ${keySlots()} брелка — сними какой-нибудь или купи слот за 💎`);
     else plState.keyEq.push(id);
     savePl();
     renderMarket();
@@ -2079,6 +2128,185 @@
     renderTune();
     refreshPlates();
   };
+
+  /* --- лавка кристаллов --- */
+  const gemItem = (g) => {
+    if (g.kind === 'key') { const k = P.KEYCHAINS.find((x) => x.id === g.id); return { ...g, name: k.name, icon: k.icon, desc: boostLine(k.boost), rarity: k.rarity }; }
+    if (g.kind === 'skin') { const s = P.SKINS.find((x) => x.id === g.id); return { ...g, name: s.name, desc: 'Эксклюзивный скин только за кристаллы', rarity: 'legendary' }; }
+    if (g.kind === 'slot') return { ...g, desc: 'Можно носить на один брелок больше', rarity: 'epic' };
+    return { ...g, desc: 'Набор расходников в рюкзак', rarity: 'rare' };
+  };
+  const gemOwned = (g) => (g.kind === 'slot' ? (plState.extraSlots || 0) > g.need
+    : g.kind === 'key' ? plState.keys.includes(g.id)
+      : g.kind === 'skin' ? plState.skins.includes(g.id) : false);
+  const gemLocked = (g) => g.kind === 'slot' && (plState.extraSlots || 0) < g.need;
+
+  function renderGemShop() {
+    $('#mk-gems').textContent = fmt(plState.gems || 0);
+    $('#mk-gemshop').innerHTML = P.GEM_SHOP.map((raw) => {
+      const g = gemItem(raw), owned = gemOwned(g), locked = gemLocked(g);
+      const visual = g.kind === 'skin' ? `<span class="mini-plate skin-${g.id}"><b>А777МР</b><em>77</em></span>` : `<span class="mk-ico">${g.icon}</span>`;
+      const btn = owned ? '<span class="mk-owned">УЖЕ ЕСТЬ</span>'
+        : locked ? '<span class="mk-owned">СНАЧАЛА 4-Й СЛОТ</span>'
+          : `<button class="gem-buy" data-gem="${g.id}" ${(plState.gems || 0) < g.gems ? 'disabled' : ''}><i class="gem"></i>${g.gems}</button>`;
+      return `<div class="gem-card ${owned ? 'gone' : ''}" style="--mc:${MR[g.rarity].color}">
+        <div class="mk-visual">${visual}</div><b class="mk-name">${esc(g.name)}</b><span class="mk-desc">${esc(g.desc)}</span>${btn}</div>`;
+    }).join('');
+    $('#mk-buygem').disabled = plState.coins < P.GEM_RATE;
+    $('#mk-buygem10').disabled = plState.coins < P.GEM_RATE * 10;
+  }
+  $('#mk-gemshop').onclick = (e) => {
+    const b = e.target.closest('[data-gem]');
+    if (!b) return;
+    const g = gemItem(P.GEM_SHOP.find((x) => x.id === b.dataset.gem));
+    if ((plState.gems || 0) < g.gems || gemOwned(g) || gemLocked(g)) return;
+    plState.gems -= g.gems;
+    if (g.kind === 'slot') plState.extraSlots = (plState.extraSlots || 0) + 1;
+    else if (g.kind === 'key') { plState.keys.push(g.id); if (plState.keyEq.length < keySlots()) plState.keyEq.push(g.id); }
+    else if (g.kind === 'skin') plState.skins.push(g.id);
+    else plState.items[g.item] = (plState.items[g.item] || 0) + g.n;
+    savePl();
+    toast(`💎 Куплено: ${g.name}`);
+    burst('#b07bff', 30);
+    renderMarket();
+    refreshPlates();
+  };
+  function buyGems(n) {
+    const cost = P.GEM_RATE * n;
+    if (plState.coins < cost) return;
+    plState.gems = (plState.gems || 0) + n;
+    setCoins(-cost);
+    toast(`Обменник: +${n} 💎 за ${fmtShort(cost)}`);
+    renderMarket();
+  }
+  $('#mk-buygem').onclick = () => buyGems(1);
+  $('#mk-buygem10').onclick = () => buyGems(10);
+
+  /* --- аукцион номеров: боты-перекупы торгуются против тебя --- */
+  if (!plState.auction) plState.auction = { lot: null, nextAt: Date.now() + 60000 };
+  if (!plState.fleet) plState.fleet = [];
+  let aucLastTick = Date.now();
+
+  function newLot() {
+    let p, sc;
+    for (let i = 0; i < 300000; i++) { p = P.random(); sc = P.score(p); if (P.TIERS.indexOf(sc.tier) >= 4) break; }
+    const start = Math.round((P.PAYOUT[sc.tier.id] * 80) / 100) * 100;
+    const now = Date.now();
+    const bots = G.rnd.shuffle([...P.AUCTION_BOTS]).slice(0, 3).map((name) => ({
+      name, max: Math.round(start * (1.3 + G.rnd.int(0, 220) / 100) * (sc.tier.id === 'mythic' ? 1.25 : 1)),
+    }));
+    plState.auction.lot = { p, total: sc.total, tier: sc.tier.id, price: start, leader: null, myBid: 0, ends: now + P.AUCTION_LEN, bots, log: [] };
+    savePl();
+    toast(`🔨 Новый лот на аукционе: ${P.format(p)} (${sc.tier.name})`);
+  }
+
+  const nextBid = (lot, k = 1.1) => (lot.leader ? Math.ceil((lot.price * k) / 100) * 100 : lot.price);
+
+  function placeBid(lot, who, amount) {
+    const now = Date.now();
+    if (lot.leader === 'me' && who !== 'me') {
+      setCoins(lot.myBid); // твою ставку перебили — монеты вернулись
+      toast(`🔨 ${who} перебил тебя: ${fmtShort(amount)}`);
+      lot.myBid = 0;
+    }
+    lot.price = amount;
+    lot.leader = who;
+    lot.log.unshift({ who, amount });
+    lot.log = lot.log.slice(0, 8);
+    if (lot.ends - now < P.AUCTION_EXTEND) lot.ends = now + P.AUCTION_EXTEND;
+  }
+
+  function finishLot(lot) {
+    if (lot.leader === 'me') {
+      plState.fleet.push({ p: lot.p, total: lot.total, tier: lot.tier, paid: lot.myBid, ts: Date.now() });
+      toast(`🏆 Лот твой: ${P.format(lot.p)} · аренда +${P.fleetRent(lot.total)}/мин`);
+      burst('#f0c552', 70);
+    } else if (lot.leader && lot.myTried) toast(`🔨 Лот ушёл к ${lot.leader} за ${fmtShort(lot.price)}`);
+    plState.auction.lot = null;
+    plState.auction.nextAt = Date.now() + P.AUCTION_EVERY;
+    savePl();
+    refreshPlates();
+  }
+
+  function aucTick() {
+    const now = Date.now(), A = plState.auction;
+    // приложение было закрыто — доигрываем торги за ботов разом
+    if (A.lot && now - aucLastTick > 5000 && A.lot.leader === 'me') {
+      const rival = A.lot.bots.filter((b) => b.max >= nextBid(A.lot)).sort((a, b) => b.max - a.max)[0];
+      if (rival) placeBid(A.lot, rival.name, Math.min(rival.max, nextBid(A.lot, 1.25)));
+    }
+    aucLastTick = now;
+    if (!A.lot && now >= A.nextAt) newLot();
+    const lot = A.lot;
+    if (lot) {
+      if (now >= lot.ends) finishLot(lot);
+      else {
+        const closing = lot.ends - now < 20000;
+        lot.bots.forEach((b) => {
+          if (plState.auction.lot !== lot || lot.leader === b.name) return;
+          const bid = nextBid(lot);
+          const chance = lot.leader === 'me' ? (closing ? 45 : 22) : (closing ? 25 : 10);
+          if (b.max >= bid && G.rnd.int(0, 99) < chance) placeBid(lot, b.name, bid);
+        });
+        savePl();
+      }
+    }
+    renderAuctionBtn();
+    if (!$('#auction-modal').hidden) renderAuction();
+  }
+  setInterval(aucTick, 1000);
+
+  const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+  function renderAuctionBtn() {
+    const A = plState.auction, b = $('#pl-auction');
+    b.classList.toggle('live', !!A.lot);
+    b.innerHTML = A.lot ? '🔨 Аукцион <em>LIVE</em>' : `🔨 Аукцион · ${mmss(Math.max(0, A.nextAt - Date.now()))}`;
+  }
+
+  function renderAuction() {
+    const A = plState.auction, lot = A.lot, body = $('#au-body');
+    const fleetRentNow = plState.fleet.reduce((s, f) => s + P.fleetRent(f.total), 0);
+    if (!lot) {
+      body.innerHTML = `<div class="au-wait"><div class="sparkle">🔨</div><b>Следующий лот через ${mmss(Math.max(0, A.nextAt - Date.now()))}</b>
+        <span>На торги выставляется гарантированно легендарный или мифический номер. Выиграешь — он встанет в автопарк и будет приносить аренду.</span>
+        <small>Твой автопарк: ${plState.fleet.length} номеров · +${fmt(fleetRentNow)}/мин</small></div>`;
+      return;
+    }
+    const t = P.TIERS.find((x) => x.id === lot.tier), left = Math.max(0, lot.ends - Date.now());
+    const b10 = nextBid(lot), b25 = nextBid(lot, 1.25), mine = lot.leader === 'me';
+    body.innerHTML = `
+      <div class="au-lot" style="--t:${t.color}">
+        <div class="au-plate">${plateHTML(lot.p)}</div>
+        <div class="au-meta"><span class="au-tier">${t.name}</span> · ${lot.total} очков · аренда <b>+${P.fleetRent(lot.total)}/мин</b></div>
+      </div>
+      <div class="au-price">
+        <div><span>ТЕКУЩАЯ СТАВКА</span><b><i class="coin"></i>${fmt(lot.price)}</b></div>
+        <div><span>ЛИДЕР</span><b class="${mine ? 'me' : ''}">${lot.leader ? (mine ? 'Ты 😎' : esc(lot.leader)) : '—'}</b></div>
+        <div><span>ДО КОНЦА</span><b class="${left < 15000 ? 'hot' : ''}">${mmss(left)}</b></div>
+      </div>
+      <div class="au-bar"><i style="width:${(left / P.AUCTION_LEN) * 100}%"></i></div>
+      <div class="au-actions">
+        ${mine ? '<div class="au-lead">Ты лидируешь — ждём, перебьют ли</div>' : `
+        <button class="pill pill-dark" data-bid="${b10}" ${plState.coins < b10 ? 'disabled' : ''}>${lot.leader ? '+10%' : 'Старт'} · ${fmtShort(b10)}</button>
+        ${lot.leader ? `<button class="pill pill-white" data-bid="${b25}" ${plState.coins < b25 ? 'disabled' : ''}>+25% · ${fmtShort(b25)}</button>` : ''}`}
+      </div>
+      <div class="au-log">${lot.log.map((l) => `<div><span>${l.who === 'me' ? 'Ты' : esc(l.who)}</span><b>${fmt(l.amount)}</b></div>`).join('') || '<div class="note">Ставок пока нет — будь первым</div>'}</div>`;
+  }
+  $('#au-body').onclick = (e) => {
+    const b = e.target.closest('[data-bid]');
+    const lot = plState.auction.lot;
+    if (!b || !lot || lot.leader === 'me') return;
+    const amount = +b.dataset.bid;
+    if (plState.coins < amount) return toast('Не хватает монет');
+    setCoins(-amount);
+    lot.myBid = amount;
+    lot.myTried = true;
+    placeBid(lot, 'me', amount);
+    savePl();
+    renderAuction();
+  };
+  $('#pl-auction').onclick = () => { renderAuction(); $('#auction-modal').hidden = false; };
+  $('#au-close').onclick = () => { $('#auction-modal').hidden = true; };
 
   tickGarage();
   setInterval(() => tickGarage(true), 15000);
@@ -2418,7 +2646,7 @@
       if (iWon && !winners.some((w) => w.id === x.id)) rec.w++;
       if (!iWon && winners.some((w) => w.id === x.id)) rec.l++;
     });
-    if (iWon) plState.pvpStats.wins++;
+    if (iWon) { plState.pvpStats.wins++; plState.gems = (plState.gems || 0) + 2; }
     savePl();
     room.round = null;
 
@@ -2640,7 +2868,7 @@
       spinPlate();
     }
     if (e.key === 'Escape') {
-      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal'].forEach((m) => { $(m).hidden = true; });
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal', '#auction-modal'].forEach((m) => { $(m).hidden = true; });
       stopJob();
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);
