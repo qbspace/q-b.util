@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:">
+  <title>q-b.util</title>
+  <link rel="icon" href="assets/icon.png">
+  <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/300.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/400.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/500.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/600.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="shell">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="logo drag"><img src="assets/logo.png" alt=""><span class="logo-text">Q-B<span>.</span>UTIL</span></div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-go="dashboard">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="10" rx="1.5"/><rect x="13" y="3" width="8" height="6" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/></svg>
+        <span>Дашборд</span>
+      </button>
+      <button class="nav-item" data-go="passwords">
+        <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <span>Пароли</span>
+      </button>
+      <button class="nav-item" data-go="keys">
+        <svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>
+        <span>Ключи</span>
+      </button>
+      <button class="nav-item" data-go="emails">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>
+        <span>Почты</span>
+      </button>
+      <button class="nav-item" data-go="phones">
+        <svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18h3"/></svg>
+        <span>Телефоны</span>
+      </button>
+      <button class="nav-item" data-go="identity">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>
+        <span>Личности</span>
+      </button>
+      <button class="nav-item" data-go="misc">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" class="fill"/></svg>
+        <span>Разное</span>
+      </button>
+      <button class="nav-item" data-go="history">
+        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
+        <span>История</span>
+      </button>
+      <button class="nav-item" data-go="settings">
+        <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>Настройки</span>
+      </button>
+    </nav>
+
+    <div class="upd-card" id="upd-card" hidden>
+      <div class="upd-top"><span class="upd-spark">✦</span><span id="upd-card-title">ДОСТУПНО ОБНОВЛЕНИЕ</span></div>
+      <div class="upd-ver" id="upd-card-ver">v1.0.0</div>
+      <div class="upd-bar"><i id="upd-card-bar"></i></div>
+      <div class="upd-sub" id="upd-card-sub">Скачивается… 0%</div>
+      <button class="pill pill-dark" id="upd-card-btn" hidden>Перезапустить <i>›</i></button>
+    </div>
+
+    <div class="promo glass" data-go="identity" data-action="quick-identity">
+      <div class="sparkle">✦</div>
+      <div class="promo-title">ПОЛНАЯ ФЕЙК-ЛИЧНОСТЬ<br>ЗА ОДИН КЛИК</div>
+      <button class="pill pill-dark">Создать <i>›</i></button>
+    </div>
+
+    <button class="me" data-go="settings" title="Профиль">
+      <div class="me-ava" id="me-ava">QB</div>
+      <div class="me-text">
+        <div class="me-name" id="me-name">LOCAL MODE</div>
+        <div class="me-role" id="me-role">OFFLINE · CRYPTO RNG</div>
+      </div>
+    </button>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <header class="topbar drag">
+      <div>
+        <h1 id="page-title">Привет 👋</h1>
+        <button class="crumb nodrag" id="page-crumb" data-go="dashboard">ЛОКАЛЬНЫЙ ГЕНЕРАТОР ФЕЙКОВЫХ ДАННЫХ <i>›</i></button>
+      </div>
+      <div class="top-actions nodrag">
+        <button class="icon-btn" data-go="history" title="История">
+          <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
+        </button>
+        <button class="icon-btn bell" id="bell" data-go="settings" title="Уведомления">
+          <svg viewBox="0 0 24 24"><path d="M18 16v-5a6 6 0 0 0-12 0v5l-2 2h16zM10 21h4"/></svg>
+        </button>
+        <div class="winctl">
+          <button id="w-min" title="Свернуть"><svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg></button>
+          <button id="w-max" title="Развернуть"><svg viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="1.5"/></svg></button>
+          <button id="w-close" class="close" title="Закрыть"><svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>
+        </div>
+      </div>
+    </header>
+
+    <div class="pages">
+      <!-- ---------- DASHBOARD ---------- -->
+      <section class="page active" data-page="dashboard">
+        <div class="dash">
+          <div class="card hero" id="hero">
+            <div class="hero-bg"><span id="hero-mono">ЕВ</span></div>
+            <button class="hero-refresh" id="hero-refresh" title="Новая личность">↻</button>
+            <div class="hero-plate glass">
+              <div class="hero-name" id="hero-name">—</div>
+              <div class="hero-sub" id="hero-sub">—</div>
+            </div>
+          </div>
+
+          <div class="card ring-card">
+            <div class="card-head">
+              <h3>Состав пароля</h3>
+              <button class="dots" data-go="passwords" title="Открыть генератор">⋮</button>
+            </div>
+            <div class="ring-wrap">
+              <svg viewBox="0 0 120 120" class="rings" id="rings"></svg>
+              <div class="ring-center"><b id="ring-bits">0</b><span>БИТ</span></div>
+            </div>
+            <div class="legend" id="ring-legend"></div>
+          </div>
+
+          <div class="card sand tasks">
+            <div class="card-head">
+              <h3>Последние</h3>
+              <b class="big-pct" id="strength-pct">0%</b>
+            </div>
+            <div class="progress"><div class="progress-fill" id="strength-fill"></div><i class="progress-mark" id="strength-mark"></i></div>
+            <div class="progress-scale"><span>0%</span><span>НАДЁЖНОСТЬ ПОСЛЕДНЕГО ПАРОЛЯ</span><span>100%</span></div>
+            <div class="feed" id="feed"></div>
+          </div>
+
+          <div class="card quick">
+            <div class="quick-head">
+              <button class="pill pill-white" id="q-prev"><i>‹</i> <span id="q-prev-l">PIN</span></button>
+              <h2 id="q-title">Быстрая генерация</h2>
+              <button class="pill pill-white" id="q-next"><span id="q-next-l">UUID</span> <i>›</i></button>
+            </div>
+            <div class="quick-grid" id="quick-grid"></div>
+            <div class="quick-out">
+              <code id="q-out">Нажми на любой генератор ↑</code>
+              <button class="copy-dot" id="q-copy" title="Копировать"></button>
+            </div>
+          </div>
+
+          <div class="card stat">
+            <b class="stat-num" id="st-gen">0</b>
+            <div class="stat-label">СГЕНЕРИРОВАНО ВСЕГО<br><span id="st-gen-session">+0 ЗА СЕССИЮ</span></div>
+            <div class="slider-mini"><i id="st-mark"></i></div>
+            <div class="slider-scale"><span>0</span><span id="st-mid">50</span><span id="st-max">100</span></div>
+          </div>
+          <div class="card beige stat">
+            <b class="stat-num" id="st-copy">0</b>
+            <div class="stat-label">СКОПИРОВАНО<br><span>В БУФЕР ОБМЕНА</span></div>
+            <button class="pill pill-white wide" data-go="history">Вся история</button>
+          </div>
+          <div class="card grey stat">
+            <b class="stat-num">7</b>
+            <div class="stat-label">ИНСТРУМЕНТОВ<br><span>22 СТРАНЫ ТЕЛЕФОНОВ</span></div>
+            <button class="pill pill-white wide" data-go="misc">Открыть</button>
+          </div>
+          <div class="card glass-card stat center">
+            <div class="sparkle">✦</div>
+            <b class="stat-num" id="st-uuid-n">UUID</b>
+            <div class="stat-label" id="st-uuid">—</div>
+            <div class="stat-foot">НАЖМИ, ЧТОБЫ СКОПИРОВАТЬ</div>
+          </div>
+          <div class="card photo stat" data-go="history" data-action="export">
+            <div class="photo-art"><svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
+            <button class="pill pill-glass">Экспорт истории</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- PASSWORDS ---------- -->
+      <section class="page" data-page="passwords">
+        <div class="tool">
+          <div class="card cfg">
+            <div class="seg" id="pw-mode">
+              <button class="on" data-v="chars">Символы</button>
+              <button data-v="phrase">Фраза</button>
+            </div>
+
+            <div data-mode="chars">
+              <label class="field">
+                <span>ДЛИНА <b id="pw-len-v">20</b></span>
+                <input type="range" id="pw-len" min="4" max="128" value="20">
+              </label>
+              <div class="toggles">
+                <label class="tgl"><input type="checkbox" id="pw-upper" checked><i></i>A–Z заглавные</label>
+                <label class="tgl"><input type="checkbox" id="pw-lower" checked><i></i>a–z строчные</label>
+                <label class="tgl"><input type="checkbox" id="pw-digits" checked><i></i>0–9 цифры</label>
+                <label class="tgl"><input type="checkbox" id="pw-symbols" checked><i></i>!@# символы</label>
+                <label class="tgl"><input type="checkbox" id="pw-amb"><i></i>Без похожих (Il1O0)</label>
+              </div>
+            </div>
+
+            <div data-mode="phrase" hidden>
+              <label class="field">
+                <span>СЛОВ <b id="pp-words-v">4</b></span>
+                <input type="range" id="pp-words" min="2" max="10" value="4">
+              </label>
+              <label class="field">
+                <span>РАЗДЕЛИТЕЛЬ</span>
+                <div class="seg small" id="pp-sep">
+                  <button class="on" data-v="-">-</button><button data-v=".">.</button><button data-v="_">_</button><button data-v=" ">пробел</button><button data-v="">нет</button>
+                </div>
+              </label>
+              <div class="toggles">
+                <label class="tgl"><input type="checkbox" id="pp-cap" checked><i></i>С заглавной</label>
+                <label class="tgl"><input type="checkbox" id="pp-num" checked><i></i>Добавить число</label>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>КОЛИЧЕСТВО <b id="pw-count-v">8</b></span>
+              <input type="range" id="pw-count" min="1" max="50" value="8">
+            </label>
+            <button class="btn-main" id="pw-gen">Сгенерировать <i>›</i></button>
+          </div>
+          <div class="card sand results" id="pw-results"></div>
+        </div>
+      </section>
+
+      <!-- ---------- KEYS ---------- -->
+      <section class="page" data-page="keys">
+        <div class="tool">
+          <div class="card cfg">
+            <span class="cap">ТИП КЛЮЧА</span>
+            <div class="chips" id="key-type"></div>
+            <label class="field" id="key-bytes-f">
+              <span>БАЙТ ЭНТРОПИИ <b id="key-bytes-v">32</b></span>
+              <input type="range" id="key-bytes" min="4" max="128" value="32">
+            </label>
+            <label class="field" id="key-prefix-f">
+              <span>ПРЕФИКС</span>
+              <input class="inp" id="key-prefix" value="sk_live" spellcheck="false">
+            </label>
+            <label class="field">
+              <span>КОЛИЧЕСТВО <b id="key-count-v">8</b></span>
+              <input type="range" id="key-count" min="1" max="50" value="8">
+            </label>
+            <button class="btn-main" id="key-gen">Сгенерировать <i>›</i></button>
+
+            <div class="divider"></div>
+            <span class="cap">ХЕШ ТЕКСТА</span>
+            <textarea class="inp" id="hash-in" rows="2" placeholder="Вставь текст…" spellcheck="false"></textarea>
+            <div class="seg small" id="hash-algo">
+              <button class="on" data-v="SHA-256">SHA-256</button><button data-v="SHA-1">SHA-1</button><button data-v="SHA-384">SHA-384</button><button data-v="SHA-512">SHA-512</button>
+            </div>
+            <div class="hash-out" id="hash-out" title="Нажми, чтобы скопировать">—</div>
+          </div>
+          <div class="card sand results" id="key-results"></div>
+        </div>
+      </section>
+
+      <!-- ---------- EMAILS ---------- -->
+      <section class="page" data-page="emails">
+        <div class="tool">
+          <div class="card cfg">
+            <span class="cap">ДОМЕНЫ</span>
+            <div class="seg" id="em-domains">
+              <button class="on" data-v="popular">Популярные</button>
+              <button data-v="safe">example.*</button>
+              <button data-v="custom">Свои</button>
+            </div>
+            <label class="field" id="em-custom-f" hidden>
+              <span>СВОИ ДОМЕНЫ ЧЕРЕЗ ЗАПЯТУЮ</span>
+              <input class="inp" id="em-custom" placeholder="company.com, test.dev" spellcheck="false">
+            </label>
+            <span class="cap">ШАБЛОН ЛОГИНА</span>
+            <div class="chips" id="em-style">
+              <button class="on" data-v="mixed">Микс</button>
+              <button data-v="dot">имя.фамилия</button>
+              <button data-v="initial">ифамилия</button>
+              <button data-v="under">имя_фамилия</button>
+              <button data-v="num">имяфамилия123</button>
+              <button data-v="year">фамилия.имя90</button>
+              <button data-v="nick">никнейм</button>
+            </div>
+            <span class="cap">ИМЕНА</span>
+            <div class="seg small" id="em-locale">
+              <button class="on" data-v="ru">Русские (транслит)</button>
+              <button data-v="en">Английские</button>
+            </div>
+            <label class="field">
+              <span>КОЛИЧЕСТВО <b id="em-count-v">10</b></span>
+              <input type="range" id="em-count" min="1" max="100" value="10">
+            </label>
+            <button class="btn-main" id="em-gen">Сгенерировать <i>›</i></button>
+          </div>
+          <div class="card sand results" id="em-results"></div>
+        </div>
+      </section>
+
+      <!-- ---------- PHONES ---------- -->
+      <section class="page" data-page="phones">
+        <div class="tool">
+          <div class="card cfg">
+            <span class="cap">СТРАНА</span>
+            <div class="countries" id="ph-country"></div>
+            <span class="cap">ФОРМАТ</span>
+            <div class="seg small" id="ph-format">
+              <button class="on" data-v="intl">+7 900 123-45-67</button>
+              <button data-v="e164">E.164</button>
+              <button data-v="digits">Только цифры</button>
+            </div>
+            <label class="field">
+              <span>КОЛИЧЕСТВО <b id="ph-count-v">10</b></span>
+              <input type="range" id="ph-count" min="1" max="100" value="10">
+            </label>
+            <div class="note" id="ph-note"></div>
+            <button class="btn-main" id="ph-gen">Сгенерировать <i>›</i></button>
+          </div>
+          <div class="card sand results" id="ph-results"></div>
+        </div>
+      </section>
+
+      <!-- ---------- IDENTITY ---------- -->
+      <section class="page" data-page="identity">
+        <div class="id-layout">
+          <div class="card id-card" id="id-card"></div>
+          <div class="card cfg">
+            <span class="cap">ЛОКАЛЬ</span>
+            <div class="seg" id="id-locale">
+              <button class="on" data-v="ru">RU</button>
+              <button data-v="en">EN</button>
+            </div>
+            <span class="cap">СТРАНА ТЕЛЕФОНА</span>
+            <select class="inp" id="id-country"></select>
+            <button class="btn-main" id="id-gen">Новая личность <i>›</i></button>
+            <div class="btn-row">
+              <button class="pill pill-white" id="id-copy-all">Копировать всё</button>
+              <button class="pill pill-white" id="id-copy-json">Как JSON</button>
+            </div>
+            <div class="note">Все данные выдуманы. Номера карт проходят только проверку Луна — для тестирования форм.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- MISC ---------- -->
+      <section class="page" data-page="misc">
+        <div class="tool">
+          <div class="card cfg">
+            <span class="cap">ЧТО ГЕНЕРИРУЕМ</span>
+            <div class="chips" id="misc-type"></div>
+            <div class="row2" id="misc-range" hidden>
+              <label class="field"><span>ОТ</span><input class="inp" type="number" id="misc-min" value="1"></label>
+              <label class="field"><span>ДО</span><input class="inp" type="number" id="misc-max" value="100"></label>
+            </div>
+            <label class="field">
+              <span>КОЛИЧЕСТВО <b id="misc-count-v">10</b></span>
+              <input type="range" id="misc-count" min="1" max="100" value="10">
+            </label>
+            <button class="btn-main" id="misc-gen">Сгенерировать <i>›</i></button>
+          </div>
+          <div class="card sand results" id="misc-results"></div>
+        </div>
+      </section>
+
+      <!-- ---------- HISTORY ---------- -->
+      <section class="page" data-page="history">
+        <div class="card sand results full" id="hist-results"></div>
+      </section>
+
+      <!-- ---------- SETTINGS ---------- -->
+      <section class="page" data-page="settings">
+        <div class="settings">
+          <div class="card profile">
+            <div class="profile-top">
+              <div class="profile-ava-wrap">
+                <div class="profile-ava" id="pf-ava">QB</div>
+                <button class="profile-ava-edit" id="pf-upload" title="Загрузить фото">
+                  <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                </button>
+              </div>
+              <div class="profile-id">
+                <span class="cap">ПРОФИЛЬ</span>
+                <div class="profile-name" id="pf-preview-name">LOCAL MODE</div>
+                <div class="profile-role" id="pf-preview-role">OFFLINE · CRYPTO RNG</div>
+              </div>
+            </div>
+
+            <input type="file" id="pf-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+            <div class="btn-row">
+              <button class="pill pill-dark" id="pf-upload-2">Загрузить аву <i>›</i></button>
+              <button class="pill pill-white" id="pf-remove">Убрать фото</button>
+            </div>
+
+            <span class="cap">ЦВЕТ АВАТАРКИ БЕЗ ФОТО</span>
+            <div class="swatches" id="pf-grad"></div>
+
+            <label class="field">
+              <span>НИК <b id="pf-nick-c">0/20</b></span>
+              <input class="inp" id="pf-nick" maxlength="20" placeholder="Например, quenixxx" spellcheck="false">
+            </label>
+            <label class="field">
+              <span>ПОДПИСЬ <b id="pf-role-c">0/28</b></span>
+              <input class="inp" id="pf-role" maxlength="28" placeholder="Например, Design Lead" spellcheck="false">
+            </label>
+            <label class="tgl"><input type="checkbox" id="pf-greet" checked><i></i>Обращаться по нику на дашборде</label>
+            <button class="pill pill-white wide" id="pf-reset">Сбросить профиль</button>
+          </div>
+
+          <div class="card cfg">
+            <span class="cap">ПОВЕДЕНИЕ</span>
+            <div class="toggles">
+              <label class="tgl"><input type="checkbox" id="set-autocopy"><i></i>Автокопирование, если сгенерирован 1 результат</label>
+              <label class="tgl"><input type="checkbox" id="set-history" checked><i></i>Сохранять историю между запусками</label>
+              <label class="tgl"><input type="checkbox" id="set-mask"><i></i>Скрывать пароли в истории</label>
+            </div>
+            <div class="divider"></div>
+            <span class="cap">ОБНОВЛЕНИЯ</span>
+            <div class="upd-row">
+              <div>
+                <div class="upd-cur">Версия <b id="upd-cur">1.0.0</b></div>
+                <div class="note" id="upd-status">Проверка при запуске и каждые 4 часа</div>
+              </div>
+              <span class="upd-dot" id="upd-dot"></span>
+            </div>
+            <div class="btn-row">
+              <button class="pill pill-dark" id="upd-check">Проверить <i>›</i></button>
+              <button class="pill pill-white" id="upd-releases">Все релизы</button>
+            </div>
+            <div class="divider"></div>
+            <span class="cap">ДАННЫЕ</span>
+            <button class="btn-main danger" id="set-clear">Очистить историю</button>
+          </div>
+          <div class="card glass-card about">
+            <img class="about-logo" src="assets/icon.png" alt="q-b.util">
+            <h2>q-b.util</h2>
+            <p>Всё генерируется локально через <code>crypto.getRandomValues</code>. Ничего не уходит в сеть.</p>
+            <p class="dim" id="about-ver">v1.0.0</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="generators.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
