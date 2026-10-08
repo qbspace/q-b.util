@@ -564,6 +564,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.4.1': [
+      '🔊 Тихий звук рулетки: щелчки ленты, мягкий «тук» на остановке и аккорд по редкости',
+      'Звук выключается кнопкой 🔊 рядом с QR',
+    ],
     '2.4.0': [
       '🔨 Аукцион стал общим: один лот на всех, перебивай кентов и ботов-перекупов',
       'В окне аукциона видно, сколько людей в зале и кто лидирует',
@@ -1419,6 +1423,69 @@
   $('#risk-again').onclick = () => $('#pl-risk-btn').onclick();
   $('#risk-take').onclick = () => { $('#pl-risk').hidden = true; riskPot = 0; showRiskBtn(); };
 
+  /* --- звук рулетки: тихие щелчки ленты, мягкий «тук» на остановке, аккорд по редкости --- */
+  if (plState.sound == null) plState.sound = true;
+  let actx = null, master = null;
+  function audio() {
+    if (!plState.sound) return null;
+    try {
+      if (!actx) {
+        actx = new AudioContext();
+        master = actx.createGain();
+        master.gain.value = 0.55;
+        const lp = actx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 2600; // срезаем верха, чтобы звук был мягким
+        master.connect(lp).connect(actx.destination);
+      }
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    } catch { return null; }
+  }
+  function tone(freq, start, dur, vol, type = 'sine') {
+    const a = audio();
+    if (!a) return;
+    const t = a.currentTime + start;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master);
+    o.start(t);
+    o.stop(t + dur + 0.03);
+  }
+  const reelTick = (at) => tone(1750 + Math.random() * 250, at, 0.035, 0.022, 'triangle');
+  const reelThunk = (at) => { tone(165, at, 0.16, 0.06); tone(330, at, 0.07, 0.018, 'triangle'); };
+  // моменты, когда лента проезжает очередной символ — по той же кривой, что у CSS-анимации
+  function reelTimes(steps, dur) {
+    const [x1, y1, x2, y2] = [0.12, 0.78, 0.18, 1.04];
+    const bz = (u, a, b) => 3 * (1 - u) * (1 - u) * u * a + 3 * (1 - u) * u * u * b + u * u * u;
+    const out = [];
+    let k = 1;
+    for (let i = 1; i <= 600 && k <= steps; i++) {
+      const u = i / 600;
+      if (bz(u, y1, y2) >= k / (steps + 1)) {
+        const at = (bz(u, x1, x2) * dur) / 1000;
+        if (!out.length || at - out[out.length - 1] >= 0.045) out.push(at); // без «жужжания» в начале
+        k++;
+      }
+    }
+    return out;
+  }
+  // пентатоника: обычный — одна тихая нота, мифик — шесть с переливом сверху
+  function resultChime(order) {
+    const notes = [523.25, 659.25, 783.99, 880, 1046.5, 1318.5];
+    const n = Math.max(1, Math.min(6, order + 1));
+    for (let i = 0; i < n; i++) tone(notes[i], i * 0.08, 0.7, order ? 0.035 : 0.02);
+    if (order >= 4) for (let i = 0; i < 6; i++) tone(2093 + i * 120, 0.5 + i * 0.05, 0.25, 0.012, 'triangle');
+  }
+  function renderSoundBtn() {
+    const b = $('#pl-sound');
+    if (b) { b.textContent = plState.sound ? '🔊' : '🔇'; b.title = plState.sound ? 'Выключить звук' : 'Включить звук'; }
+  }
+
   async function spinPlate(fast) {
     if (plSpinning) return false;
     $('#pl-risk').hidden = true;
@@ -1459,7 +1526,13 @@
     const pools = reels.map((r) => (r.classList.contains('l') ? () => G.rnd.pick(P.LETTERS)
       : r.classList.contains('d') ? () => G.rnd.pick(P.DIGITS)
         : () => G.rnd.pick(P.REGION_CODES)));
-    await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], Math.round((14 + i * 4) * k), Math.round((900 + i * 210) * k))));
+    const reelSteps = reels.map((_, i) => Math.round((14 + i * 4) * k)), reelDur = reels.map((_, i) => Math.round((900 + i * 210) * k));
+    // щелчки — по средней цифре, «тук» — на каждой остановке
+    if (plState.sound) {
+      reelTimes(reelSteps[2], reelDur[2]).forEach(reelTick);
+      reelDur.forEach((d) => reelThunk(d / 1000));
+    }
+    await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], reelSteps[i], reelDur[i])));
 
     const t = sc.tier;
     const x3 = plState.x3Left > 0;
@@ -1524,6 +1597,7 @@
     $('#pl-result').classList.add('show');
 
     const order = P.TIERS.findIndex((x) => x.id === t.id);
+    resultChime(order);
     floatWin(`+${fmt(win)}`, t.color);
     if (order >= 2) burst(t.color, [0, 0, 18, 34, 60, 90][order]);
     if (order >= 4) toast(`${t.name.toUpperCase()}: ${P.format(p)} · +${fmt(win)}`);
@@ -1854,6 +1928,13 @@
     };
   }
 
+  $('#pl-sound').onclick = () => {
+    plState.sound = !plState.sound;
+    savePl();
+    renderSoundBtn();
+    if (plState.sound) tone(880, 0, 0.25, 0.03);
+  };
+  renderSoundBtn();
   $('#pl-spin').onclick = () => (plState.coins < spinCost() ? openWork() : spinPlate());
   $('#pl-auto').onclick = () => (plAuto ? (plAuto = false) : autoSpin());
   $('#pl-copy').onclick = () => (plCurrent ? copy(P.format(plCurrent)) : toast('Сначала крутани'));
