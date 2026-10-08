@@ -20,4 +20,5 @@ contextBridge.exposeInMainWorld('qb', {
   applySettings: () => ipcRenderer.send('prefs:apply'),
   onQuickGen: (cb) => ipcRenderer.on('quick:gen', (_e, kind) => cb(kind)),
   notify: (title, body) => ipcRenderer.send('notify', title, body),
+  savePng: (name, dataUrl) => ipcRenderer.invoke('file:savePng', { name, dataUrl }),
 });

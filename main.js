@@ -32,7 +32,9 @@ function writeData() {
   fs.renameSync(tmp, dataFile);
 }
 
-const prefs = () => Object.assign({ tray: true, hotkey: true }, data['qb.settings'] || {});
+const prefs = () => Object.assign({ tray: true, hotkey: true, autostart: true }, data['qb.settings'] || {});
+// При автозапуске с Windows стартуем свёрнутыми в трей
+const startHidden = process.argv.includes('--hidden');
 
 ipcMain.on('store:all', (e) => { e.returnValue = data; });
 ipcMain.on('store:set', (e, key, value) => {
@@ -67,7 +69,9 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => {
+    if (!(startHidden && prefs().tray)) win.show();
+  });
   win.on('maximize', () => win.webContents.send('win:state', true));
   win.on('unmaximize', () => win.webContents.send('win:state', false));
   win.on('closed', () => { win = null; });
@@ -114,6 +118,9 @@ function applyPrefs() {
 
   globalShortcut.unregisterAll();
   if (p.hotkey) globalShortcut.register('CommandOrControl+Shift+Q', () => quickGen('password'));
+
+  // В dev-режиме не трогаем автозагрузку, иначе туда пропишется голый electron.exe
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!p.autostart, args: ['--hidden'] });
 }
 
 ipcMain.on('prefs:apply', applyPrefs);
@@ -137,6 +144,16 @@ ipcMain.handle('file:save', async (_e, { name, content }) => {
   });
   if (canceled || !filePath) return false;
   fs.writeFileSync(filePath, content, 'utf8');
+  return true;
+});
+
+ipcMain.handle('file:savePng', async (_e, { name, dataUrl }) => {
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    defaultPath: name,
+    filters: [{ name: 'PNG', extensions: ['png'] }],
+  });
+  if (canceled || !filePath) return false;
+  fs.writeFileSync(filePath, Buffer.from(String(dataUrl).split(',')[1], 'base64'));
   return true;
 });
 

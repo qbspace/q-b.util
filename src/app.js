@@ -30,7 +30,7 @@
     try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; }
   };
 
-  const settings = Object.assign({ autocopy: false, history: true, mask: false, theme: 'light', tray: true, hotkey: true }, load('qb.settings', {}));
+  const settings = Object.assign({ autocopy: false, history: true, mask: false, theme: 'light', tray: true, hotkey: true, autostart: true }, load('qb.settings', {}));
   const stats = Object.assign({ gen: 0, copied: 0 }, load('qb.stats', {}));
   let history = settings.history ? load('qb.history', []) : [];
   let session = 0;
@@ -140,6 +140,7 @@
             <div class="row-body"><div class="row-val">${esc(it.v)}</div></div>
             ${it.bits != null ? `<span class="meta">${it.bits} БИТ</span><span class="strength"><i style="width:${Math.min(100, it.bits / 1.28)}%;background:${strengthColor(it.bits)}"></i></span>` : ''}
             ${it.meta ? `<span class="meta">${esc(it.meta)}</span>` : ''}
+            <button class="qr-btn" title="QR-код"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"/></svg></button>
             <button class="copy-dot" title="Копировать"></button>
           </div>`).join('')}
       </div>`;
@@ -147,6 +148,8 @@
       const a = e.target.closest('[data-a]');
       if (a?.dataset.a === 'all') return copy(items.map((x) => x.v).join('\n'));
       if (a?.dataset.a === 'save') return save(exportName || 'q-b.util.txt', items.map((x) => x.v).join('\n'));
+      const qrb = e.target.closest('.qr-btn');
+      if (qrb) return showQR(items[qrb.closest('.row').dataset.i].v);
       const row = e.target.closest('.row');
       if (!row || window.getSelection().toString()) return;
       copy(items[row.dataset.i].v);
@@ -164,6 +167,7 @@
     identity: ['Личности', 'НАЗАД НА ДАШБОРД'],
     misc: ['Разное', 'НАЗАД НА ДАШБОРД'],
     tables: ['Тестовые таблицы', 'НАЗАД НА ДАШБОРД'],
+    plates: ['Номера РФ', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -418,6 +422,7 @@
             <div class="row-type">${esc(h.sub)} · ${new Date(h.ts).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
             <div class="row-val">${esc(mask(h))}</div>
           </div>
+          <button class="qr-btn" title="QR-код"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"/></svg></button>
           <button class="copy-dot" title="Копировать"></button>
         </div>`).join('')}</div>`
         : `<div class="empty"><div class="sparkle">✦</div><p>ПОКА ПУСТО</p></div>`}`;
@@ -427,6 +432,8 @@
       const a = e.target.closest('[data-a]');
       if (a?.dataset.a === 'save') return exportHistory();
       if (a?.dataset.a === 'clear') return clearHistory();
+      const qrb = e.target.closest('.qr-btn');
+      if (qrb) return showQR(list[qrb.closest('.row').dataset.i].v);
       const row = e.target.closest('.row');
       if (!row) return;
       copy(list[row.dataset.i].v);
@@ -557,6 +564,11 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '1.4.0': [
+      'Рулетка номеров РФ: крути барабаны и выбивай блатные номера — от «Обычного» до «Мифического»',
+      'QR-код для любого результата: кнопка в каждой строке, можно сохранить PNG',
+      'Автозапуск вместе с Windows — сразу в трей, Ctrl+Shift+Q работает с самого старта',
+    ],
     '1.3.0': [
       'Трей: иконка у часов с быстрым меню — пароль, UUID, почта, телефон в один клик',
       'Ctrl+Shift+Q — свежий пароль в буфер из любой программы',
@@ -715,15 +727,217 @@
     });
   }
 
+  /* ---------------- QR ---------------- */
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+  let qrValue = '';
+
+  function qrMatrix(text) {
+    const q = qrcode(0, 'M');
+    q.addData(text);
+    q.make();
+    return q;
+  }
+
+  function showQR(text) {
+    let q;
+    try {
+      q = qrMatrix(text);
+    } catch {
+      return toast('Слишком длинно для QR-кода');
+    }
+    qrValue = text;
+    const n = q.getModuleCount(), pad = 2, size = n + pad * 2;
+    let cells = '';
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (q.isDark(r, c)) cells += `<rect x="${c + pad}" y="${r + pad}" width="1.02" height="1.02" rx=".28"/>`;
+      }
+    }
+    $('#qr-box').innerHTML = `<svg viewBox="0 0 ${size} ${size}" shape-rendering="geometricPrecision"><rect width="${size}" height="${size}" fill="#fff" rx="2"/><g fill="#111">${cells}</g></svg>`;
+    $('#qr-text').textContent = text.length > 160 ? text.slice(0, 160) + '…' : text;
+    $('#qr-modal').hidden = false;
+  }
+
+  function qrPng(text, px = 768) {
+    const q = qrMatrix(text);
+    const n = q.getModuleCount(), pad = 3, cell = Math.floor(px / (n + pad * 2));
+    const c = document.createElement('canvas');
+    c.width = c.height = cell * (n + pad * 2);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#111';
+    for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+      if (q.isDark(r, col)) g.fillRect((col + pad) * cell, (r + pad) * cell, cell, cell);
+    }
+    return c.toDataURL('image/png');
+  }
+
+  const closeQR = () => { $('#qr-modal').hidden = true; };
+  $('#qr-close').onclick = closeQR;
+  $('#qr-modal').onclick = (e) => { if (e.target.id === 'qr-modal') closeQR(); };
+  $('#qr-copy').onclick = () => copy(qrValue);
+  $('#qr-save').onclick = async () => {
+    const url = qrPng(qrValue);
+    if (window.qb && window.qb.savePng) {
+      if (await window.qb.savePng('qr-code.png', url)) toast('QR сохранён');
+    } else {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'qr-code.png';
+      a.click();
+    }
+  };
+  $('#q-out').parentElement.addEventListener('dblclick', () => { if (qVal) showQR(qVal); });
+
+  /* ---------------- plates ---------------- */
+  const P = window.Plates;
+  const plState = Object.assign({ spins: 0, best: [] }, load('qb.plates', {}));
+  let plCurrent = null, plSpinning = false;
+
+  function fmtOdds(pr) {
+    if (pr >= 0.1) return `${Math.round(pr * 100)}%`;
+    return `1 из ${Math.round(1 / pr).toLocaleString('ru-RU')}`;
+  }
+
+  function renderOdds() {
+    $('#pl-odds').innerHTML = [...P.TIERS].reverse().map((t) => `
+      <div class="pl-odd" style="--t:${t.color}">
+        <i></i><span>${t.name}</span><b>${fmtOdds(P.ODDS[t.id])}</b>
+      </div>`).join('');
+  }
+
+  const plateHTML = (p) => `<span class="mini-plate"><b>${p.l1}${p.digits}${p.l2}</b><em>${p.region}</em></span>`;
+
+  function renderBest() {
+    $('#pl-spins').textContent = plState.spins.toLocaleString('ru-RU');
+    if (!plState.best.length) {
+      $('#pl-best').innerHTML = `<div class="feed-empty"><div class="sparkle">✦</div><br>ЛУЧШИЕ НОМЕРА БУДУТ ТУТ</div>`;
+      return;
+    }
+    $('#pl-best').innerHTML = plState.best.map((b, i) => {
+      const t = P.TIERS.find((x) => x.id === b.tier);
+      return `<div class="pl-best-row" data-i="${i}" style="--t:${t.color}" title="Нажми, чтобы скопировать">
+        ${plateHTML(b.p)}<span class="pl-best-tier">${t.name}</span><b>${b.total}</b></div>`;
+    }).join('');
+  }
+  $('#pl-best').onclick = (e) => {
+    const r = e.target.closest('.pl-best-row');
+    if (r) copy(P.format(plState.best[r.dataset.i].p));
+  };
+  $('#pl-reset').onclick = () => {
+    plState.best = [];
+    store('qb.plates', plState);
+    renderBest();
+    toast('Коллекция очищена');
+  };
+
+  // Строим барабан: много случайных символов, последний — выпавший
+  function spinReel(reel, finalSym, pool, steps, dur) {
+    const strip = $('.strip', reel);
+    const h = reel.clientHeight;
+    const cur = strip.lastElementChild ? strip.lastElementChild.textContent : finalSym;
+    const syms = [cur];
+    for (let i = 0; i < steps; i++) syms.push(pool());
+    syms.push(finalSym);
+    strip.style.transition = 'none';
+    strip.style.transform = 'translateY(0)';
+    strip.innerHTML = syms.map((x) => `<b>${x}</b>`).join('');
+    void strip.offsetHeight; // перезапуск анимации
+    reel.classList.add('moving');
+    strip.style.transition = `transform ${dur}ms cubic-bezier(.12, .78, .18, 1.04)`;
+    strip.style.transform = `translateY(-${(syms.length - 1) * h}px)`;
+    return new Promise((res) => setTimeout(() => {
+      reel.classList.remove('moving');
+      // оставляем в ленте только итоговый символ, чтобы DOM не рос
+      strip.style.transition = 'none';
+      strip.style.transform = 'translateY(0)';
+      strip.innerHTML = `<b>${finalSym}</b>`;
+      reel.classList.add('landed');
+      setTimeout(() => reel.classList.remove('landed'), 250);
+      res();
+    }, dur + 30));
+  }
+
+  function burst(color, count) {
+    const stage = $('#pl-card');
+    const rect = $('#plate').getBoundingClientRect(), base = stage.getBoundingClientRect();
+    const cx = rect.left - base.left + rect.width / 2, cy = rect.top - base.top + rect.height / 2;
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('i');
+      el.className = 'spark';
+      const ang = Math.random() * Math.PI * 2, dist = 120 + Math.random() * 260;
+      el.style.cssText = `left:${cx}px;top:${cy}px;--dx:${Math.cos(ang) * dist}px;--dy:${Math.sin(ang) * dist * .7}px;--c:${Math.random() < .5 ? color : '#fff'};--s:${4 + Math.random() * 7}px;animation-delay:${Math.random() * 120}ms`;
+      stage.appendChild(el);
+      setTimeout(() => el.remove(), 1400);
+    }
+  }
+
+  async function spinPlate() {
+    if (plSpinning) return;
+    plSpinning = true;
+    $('#pl-spin').disabled = true;
+    const card = $('#pl-card');
+    card.className = 'card plate-card spinning';
+    $('#pl-tier').hidden = true;
+    $('#pl-result').classList.remove('show');
+
+    const p = P.random();
+    const reels = $$('#plate .reel');
+    const finals = [p.l1, p.digits[0], p.digits[1], p.digits[2], p.l2[0], p.l2[1], p.region];
+    const pools = reels.map((r) => (r.classList.contains('l') ? () => G.rnd.pick(P.LETTERS)
+      : r.classList.contains('d') ? () => G.rnd.pick(P.DIGITS)
+        : () => G.rnd.pick(P.REGION_CODES)));
+    await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], 14 + i * 4, 900 + i * 210)));
+
+    const sc = P.score(p);
+    plCurrent = p;
+    plState.spins++;
+    const entry = { p, total: sc.total, tier: sc.tier.id, ts: Date.now() };
+    if (sc.total > 0) {
+      plState.best.push(entry);
+      plState.best.sort((a, b) => b.total - a.total || b.ts - a.ts);
+      plState.best = plState.best.slice(0, 15);
+    }
+    store('qb.plates', plState);
+    record('misc', 'Номер авто', [P.format(p)]);
+
+    const t = sc.tier;
+    card.className = `card plate-card tier-${t.id}`;
+    card.style.setProperty('--tier', t.color);
+    $('#pl-tier').hidden = false;
+    $('#pl-tier-name').textContent = t.name;
+    $('#pl-score').textContent = sc.total;
+    $('#pl-region').textContent = `Регион ${p.region} — ${P.REGIONS[p.region]}`;
+    $('#pl-reasons').innerHTML = sc.reasons.length
+      ? sc.reasons.map((r) => `<span class="pl-reason"><b>${r.label}</b>${r.text}${r.pts ? ` <em>+${r.pts}</em>` : ''}</span>`).join('')
+      : '<span class="pl-reason muted">Ничего особенного — обычный номер</span>';
+    void $('#pl-result').offsetWidth;
+    $('#pl-result').classList.add('show');
+
+    const order = P.TIERS.findIndex((x) => x.id === t.id);
+    if (order >= 2) burst(t.color, [0, 0, 18, 34, 60, 90][order]);
+    if (order >= 4) toast(`${t.name.toUpperCase()}: ${P.format(p)}!`);
+    renderBest();
+    plSpinning = false;
+    $('#pl-spin').disabled = false;
+  }
+
+  $('#pl-spin').onclick = spinPlate;
+  $('#pl-copy').onclick = () => (plCurrent ? copy(P.format(plCurrent)) : toast('Сначала крутани'));
+  $('#pl-qr').onclick = () => (plCurrent ? showQR(P.format(plCurrent)) : toast('Сначала крутани'));
+  renderOdds();
+  renderBest();
+
   /* ---------------- settings ---------------- */
-  [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask'], ['set-tray', 'tray'], ['set-hotkey', 'hotkey']].forEach(([id, key]) => {
+  [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask'], ['set-tray', 'tray'], ['set-hotkey', 'hotkey'], ['set-autostart', 'autostart']].forEach(([id, key]) => {
     const el = $('#' + id);
     el.checked = settings[key];
     el.onchange = () => {
       settings[key] = el.checked;
       persist();
       renderDash();
-      if ((key === 'tray' || key === 'hotkey') && window.qb && window.qb.applySettings) window.qb.applySettings();
+      if (['tray', 'hotkey', 'autostart'].includes(key) && window.qb && window.qb.applySettings) window.qb.applySettings();
     };
   });
   $('#set-clear').onclick = clearHistory;
@@ -861,12 +1075,17 @@
     $('.winctl').hidden = true;
   }
 
-  const GENS = { tables: () => genTable(), passwords: () => pwMode() !== 'check' && genPasswords(), keys: genKeys, emails: genEmails, phones: genPhones, identity: () => genIdentity(), misc: genMisc };
+  const GENS = { plates: () => spinPlate(), tables: () => genTable(), passwords: () => pwMode() !== 'check' && genPasswords(), keys: genKeys, emails: genEmails, phones: genPhones, identity: () => genIdentity(), misc: genMisc };
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement.tagName) && GENS[current]) {
       e.preventDefault();
       GENS[current]();
     }
+    if (e.code === 'Space' && current === 'plates' && !['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+      e.preventDefault();
+      spinPlate();
+    }
+    if (e.key === 'Escape') { $('#qr-modal').hidden = true; $('#whatsnew').hidden = true; }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);
   });
 
