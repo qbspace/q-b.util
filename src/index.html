@@ -62,6 +62,10 @@
         <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg>
         <span>Бизнес</span>
       </button>
+      <button class="nav-item" data-go="crypto">
+        <svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/><path d="M3 21h18"/></svg>
+        <span>Крипта</span>
+      </button>
       <button class="nav-item" data-go="history">
         <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
         <span>История</span>
@@ -443,6 +447,7 @@
                 </div>
               </div>
               <div class="pl-head-right">
+                <button class="pl-curse" id="pl-curse" hidden title="Порча: выплаты ×0.5. Нажми — бабка Зина снимет за кристаллы">💀 порча <span id="pl-curse-t"></span></button>
                 <div class="pl-happy" id="pl-happy"><b id="pl-happy-l">🔥 через</b> <span id="pl-happy-t">—</span></div>
                 <div class="pl-jackpot"><span>💎 ДЖЕКПОТ</span><b><i class="coin"></i><span id="pl-jp">500</span></b></div>
                 <button class="pl-daily" id="pl-daily" hidden>🎁 <span id="pl-daily-t">Бонус дня</span></button>
@@ -458,10 +463,12 @@
               <button class="pl-market-btn" id="pl-trade">🔁 Обмен</button>
               <button class="pl-market-btn" id="pl-profile">👤 Профиль</button>
               <button class="pl-market-btn" id="pl-album">🗺 Альбом</button>
+              <button class="pl-market-btn look" id="pl-look">🖼 Рамка</button>
             </div>
 
             <div class="plate-stage" id="pl-stage">
               <div class="plate-tilt" id="pl-tilt">
+              <i class="plate-photo"></i>
               <div class="plate-aura"></div>
               <i class="plate-glow"></i>
               <i class="plate-frame"></i>
@@ -480,6 +487,7 @@
                   <div class="plate-rus">RUS <i class="flag"></i></div>
                 </div>
               </div>
+              <span class="plate-cap"></span>
               </div>
               <div class="pl-win" id="pl-win"></div>
               <div class="pl-risk" id="pl-risk" hidden>
@@ -598,6 +606,37 @@
             <div class="note">Точки приносят доход каждую минуту, даже когда приложение закрыто (до 12 часов). Иногда налетают рейдеры — успей отбиться за 2 минуты, иначе точку закроют на 15 минут.</div>
           </div>
           <div class="card sand biz-side"><h3>Точки</h3><div class="biz-list" id="biz-list"></div></div>
+        </div>
+      </section>
+
+      <!-- ---------- CRYPTO ---------- -->
+      <section class="page" data-page="crypto">
+        <div class="casino-layout ldk-layout">
+          <div class="card casino-card">
+            <div class="casino-head">
+              <span class="cap">🪙 ЛАДАКОИН · LDK</span>
+              <div class="ldk-range" id="ldk-range"><button data-r="300000">5 мин</button><button data-r="3600000" class="on">1 час</button><button data-r="86400000">24 часа</button><button data-r="604800000">неделя</button></div>
+            </div>
+            <div class="ldk-price"><b id="ldk-price">—</b><span id="ldk-chg"></span></div>
+            <div class="ldk-news" id="ldk-news"></div>
+            <div class="cr-stage ldk-stage"><canvas id="ldk-canvas"></canvas></div>
+            <div class="note">Курс один на всех — у кентов он такой же, как у тебя. Комиссия биржи 2% на покупку и на продажу. Иногда ЛДК пампят, а иногда случается скам.</div>
+          </div>
+          <div class="card casino-card">
+            <div class="casino-head"><span class="cap">💼 КОШЕЛЁК</span><div class="pl-coins small"><i class="coin"></i><b id="ldk-coins">0</b></div></div>
+            <div class="ldk-bal">
+              <div><span>У тебя</span><b id="ldk-amt">0 LDK</b></div>
+              <div><span>Если продать</span><b id="ldk-val">0</b></div>
+              <div><span>Средняя цена</span><b id="ldk-avg">—</b></div>
+              <div><span>Прибыль</span><b id="ldk-pnl">—</b></div>
+            </div>
+            <span class="cap">КУПИТЬ НА СУММУ</span>
+            <div class="cr-bets ldk-presets" id="ldk-buy-p"><button data-lb="10000">10к</button><button data-lb="100000">100к</button><button data-lb="1000000">1М</button><button data-lb="10000000">10М</button><button data-lb="100000000">100М</button><button data-lb="half">½</button><button data-lb="max">ВСЁ</button></div>
+            <div class="ldk-buyrow"><input class="inp" id="ldk-sum" placeholder="Сумма, напр. 500к или 2м" autocomplete="off"><button class="cr-btn ldk-buy" id="ldk-buy">Купить</button></div>
+            <span class="cap">ПРОДАТЬ</span>
+            <div class="ldk-sell" id="ldk-sell"><button data-ls="0.25">25%</button><button data-ls="0.5">50%</button><button data-ls="1">Всё</button></div>
+            <div class="ldk-log" id="ldk-log"></div>
+          </div>
         </div>
       </section>
 
@@ -742,6 +781,38 @@
     <div class="seg small" id="tn-cats"></div>
     <div class="tn-grid" id="tn-grid"></div>
     <div class="note">Наведи на обвес — примерь бесплатно. В каждой категории можно надеть одну вещь. Стиль надетого даёт бонус к выплатам: каждые 5 стиля = +1%.</div>
+  </div>
+</div>
+
+<div class="curse-fx" id="curse-fx" hidden><b id="curse-title"></b><small id="curse-sub"></small></div>
+
+<div class="modal" id="look-modal" hidden>
+  <div class="modal-card dark-card look-card">
+    <div class="card-head"><span class="cap">🖼 СВОЯ РАМКА</span><button class="dots" id="look-close">✕</button></div>
+    <div class="tn-stage look-stage" id="look-stage"></div>
+    <div class="look-sec">
+      <div class="look-h"><b>✍️ Надпись на рамке</b><small>до 18 символов · видна тебе и кентам</small></div>
+      <div class="look-buy" id="look-cap-buy"></div>
+      <div class="look-row" id="look-cap-edit"><input class="inp" id="look-cap" maxlength="18" placeholder="БАЗА 777" autocomplete="off"><button class="btn-main" id="look-cap-save">Сохранить</button></div>
+    </div>
+    <div class="look-sec">
+      <div class="look-h"><b>📸 Фоторамка</b><small>твоя фотка вокруг номера · самая дорогая шмотка</small></div>
+      <div class="look-buy" id="look-ph-buy"></div>
+      <div id="look-ph-edit">
+        <div class="look-row">
+          <button class="pill pill-white" id="look-ph-pick">Выбрать фото…</button>
+          <label class="tgl small"><input type="checkbox" id="look-ph-on"><i></i>Показывать</label>
+          <input type="file" id="look-ph-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        </div>
+        <div class="look-sliders" id="look-sliders">
+          <label>Масштаб<input type="range" id="look-zoom" min="1" max="3" step="0.01"></label>
+          <label>Влево-вправо<input type="range" id="look-x" min="0" max="100" step="1"></label>
+          <label>Вверх-вниз<input type="range" id="look-y" min="0" max="100" step="1"></label>
+          <label>Затемнение<input type="range" id="look-dim" min="0" max="80" step="1"></label>
+        </div>
+        <button class="btn-main" id="look-ph-save">Сохранить фоторамку</button>
+      </div>
+    </div>
   </div>
 </div>
 

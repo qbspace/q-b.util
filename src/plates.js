@@ -440,6 +440,64 @@
   const LOTTERY_TICKET = 5000;
   const LOTTERY_MAX = 50;
 
+  /* ---------------- своя рамка ---------------- */
+  const CAPTION_PRICE = { coins: 25000000, gems: 40 };
+  const CAPTION_MAX = 18;
+  const PHOTO_FRAME_PRICE = { coins: 750000000, gems: 350 };
+
+  /* ---------------- проклятый номер 666 ---------------- */
+  const CURSE_CHANCE = 1 / 300; // плюс естественные 666
+  const CURSE_LEN = 10 * 60000;
+  const CURSE_MULT = 0.5;
+  const BLESS_MULT = 6;
+  const CURSE_CLEANSE_GEMS = 5;
+
+  /* ---------------- ЛАДАКОИН ---------------- */
+  // Курс — чистая функция времени: у всех кентов он один и тот же без сервера.
+  const LDK_BASE = 10000;
+  const LDK_FEE = 0.02;
+  const LDK_EVENT_LEN = 20 * 60000;
+  const hashU = (i, seed) => {
+    let x = Math.imul((i | 0) ^ Math.imul(seed, 0x9e3779b1), 0x85ebca6b);
+    x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16;
+    x = Math.imul(x ^ (i / 4294967296 | 0), 0x27d4eb2f); x ^= x >>> 15;
+    return (x >>> 0) / 4294967296;
+  };
+  const vnoise = (x, seed) => {
+    const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+    const a = hashU(i, seed), b = hashU(i + 1, seed);
+    return (a + (b - a) * u) * 2 - 1;
+  };
+  const LDK_OCT = [[172800000, 0.5, 11], [21600000, 0.3, 12], [3600000, 0.17, 13], [600000, 0.08, 14], [90000, 0.035, 15], [15000, 0.012, 16]];
+  const LDK_PUMP_NEWS = ['Илон Маск твитнул «LADA — топ»', 'ЛАДАКОИН залистили на бирже «Привоз»', 'Ашот скупает ЛАДАКОИН мешками', 'АвтоВАЗ принимает ЛАДАКОИН за запчасти', 'Блогер-миллионник назвал ЛДК «новым биткоином»'];
+  const LDK_SCAM_NEWS = ['Биржу «Привоз» взломали', 'Разработчик ЛАДАКОИНА улетел в Дубай', 'Киты сливают ЛДК', 'ЦБ пригрозил запретить ЛАДАКОИН', 'Кошелёк Ашота взломали — он всё продаёт'];
+  // событие окна: памп или скам, детерминированно
+  function ldkEvent(w) {
+    const r = hashU(w, 77);
+    if (r < 0.11) return { kind: 'pump', w, a: 0.35 + hashU(w, 78) * 0.75, news: LDK_PUMP_NEWS[Math.floor(hashU(w, 79) * LDK_PUMP_NEWS.length)] };
+    if (r < 0.17) return { kind: 'scam', w, a: 0.7 + hashU(w, 78) * 0.7, news: LDK_SCAM_NEWS[Math.floor(hashU(w, 79) * LDK_SCAM_NEWS.length)] };
+    return null;
+  }
+  // форма события внутри 20-минутного окна (в логарифме курса)
+  function ldkShape(ev, m) {
+    if (!ev) return 0;
+    if (ev.kind === 'pump') {
+      if (m < 2) return 0;
+      if (m < 7) return ev.a * ((m - 2) / 5) ** 1.6;
+      return ev.a * Math.max(0, 1 - (m - 7) / 12) ** 1.4;
+    }
+    if (m < 5) return 0;
+    if (m < 5.4) return -ev.a * ((m - 5) / 0.4);
+    return -ev.a * Math.max(0, 1 - (m - 5.4) / 14);
+  }
+  function ldkPrice(t) {
+    let lg = Math.log(LDK_BASE);
+    for (const [per, amp, seed] of LDK_OCT) lg += amp * vnoise(t / per, seed);
+    const w = Math.floor(t / LDK_EVENT_LEN);
+    lg += ldkShape(ldkEvent(w), (t - w * LDK_EVENT_LEN) / 60000);
+    return Math.exp(lg);
+  }
+
   /* ---------------- crash ---------------- */
   const CRASH_EDGE = 0.97; // 3% в пользу заведения
   const CRASH_K = 0.00011; // скорость роста множителя: ×1.8 за 5 с, ×3 за 10 с
@@ -482,6 +540,10 @@
     { id: 'crash10', name: 'Выйди из Crash на ×10 или выше', reward: 100000, done: (s) => (s.crashBest || 0) >= 10 },
     { id: 'lotto1', name: 'Выиграй лотерею', reward: 100000, done: (s) => (s.lottoWins || 0) >= 1 },
     { id: 'petrovich', name: 'Получи подарок от Петровича', reward: 50000, done: (s) => (s.keys || []).includes('whistle') },
+    { id: 'curse1', name: 'Выбей проклятый номер 666', reward: 66600, done: (s) => (s.curses || 0) >= 1 },
+    { id: 'ldk1', name: 'Купи ЛАДАКОИН', reward: 20000, done: (s) => ((s.ldk || {}).trades || 0) >= 1 },
+    { id: 'ldk2', name: 'Продай ЛАДАКОИН с прибылью ×2', reward: 500000, done: (s) => ((s.ldk || {}).bestX || 0) >= 2 },
+    { id: 'pframe1', name: 'Поставь свою фоторамку', reward: 100000, done: (s) => !!(s.pframe || {}).img },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 1200, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
     { id: 'rich2', name: 'Накопи 100 000 монет', reward: 10000, done: (s) => s.coins >= 100000, progress: (s) => [Math.min(s.coins, 100000), 100000] },
     { id: 'million', name: 'Миллионер: накопи 1 000 000', reward: 100000, done: (s) => s.coins >= 1000000, progress: (s) => [Math.min(s.coins, 1000000), 1000000] },
@@ -576,6 +638,8 @@
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
     SPIN_COST, PAYOUT, BETS, BET_UNLOCK, UPGRADES, SKINS, QUESTS,
     TUNING_CATS, TUNING, tuningStyle, STYLE_DIV,
+    CAPTION_PRICE, CAPTION_MAX, PHOTO_FRAME_PRICE, CURSE_CHANCE, CURSE_LEN, CURSE_MULT, BLESS_MULT, CURSE_CLEANSE_GEMS,
+    LDK_BASE, LDK_FEE, LDK_EVENT_LEN, ldkEvent, ldkPrice,
     OKRUGS, okrugReward, BUSINESSES, BIZ_MAX, bizIncome, bizUpgrade, LOTTERY_EVERY, LOTTERY_TICKET, LOTTERY_MAX, CRASH_EDGE, CRASH_K, CRASH_BOTS,
     DAILY_POOL, DAILY_REWARD, WEEKLY_REWARD, pickQuests, SEASON_LEVELS, SP_PER_LEVEL, seasonReward, CARS, CAR_COLLECTION_BONUS,
     MARKET_REROLL_GEMS, rerollPrice, GEM_RATE, GEM_SHOP, GEMS_FOR_TIER, questGems, AUCTION_EVERY, AUCTION_LEN, AUCTION_EXTEND, AUCTION_BOTS, fleetRent, collectionRent,

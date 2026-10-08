@@ -171,6 +171,7 @@
     plates: ['Номера РФ', 'НАЗАД НА ДАШБОРД'],
     casino: ['Казино', 'НАЗАД НА ДАШБОРД'],
     biz: ['Бизнес', 'НАЗАД НА ДАШБОРД'],
+    crypto: ['ЛАДАКОИН', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -186,6 +187,7 @@
     if (page === 'history') renderHistory();
     if (page === 'casino') { renderCrash(); renderLotto(); }
     if (page === 'biz') renderBiz();
+    if (page === 'crypto') requestAnimationFrame(renderLdk);
     if (page === 'dashboard') renderDash();
   }
 
@@ -569,6 +571,12 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.1.0': [
+      '🪙 ЛАДАКОИН — своя крипта с живым графиком: курс один на всех кентов, бывают пампы и скамы',
+      '✍️ Своя надпись на рамке номера — «БАЗА 777» и что угодно',
+      '📸 Фоторамка: вставь свою фотку вокруг номера, кенты увидят её в профиле',
+      '👁 Проклятый номер 666: благословение ×6 или порча на 10 минут',
+    ],
     '4.0.0': [
       '🚀 Казино: Crash — забери до взрыва ракеты, с автовыводом и ботами',
       '🎟 Лотерея раз в 15 минут — общая с кентами, банк растёт',
@@ -1362,6 +1370,7 @@
   function refreshPlates() {
     $('#plate').className = `plate skin-${plState.skin}`;
     applyTuning($('#pl-tilt'), plState.tuning.eq);
+    applyLook($('#pl-tilt'), myLook());
     renderWallet();
     renderOrders();
     renderShop();
@@ -1568,6 +1577,14 @@
       if (sc2.total > sc.total) { p = p2; sc = sc2; }
     }
 
+    // проклятый номер: иногда вместо цифр выпадает 666
+    let cursed = p.digits === '666';
+    if (!cursed && G.rnd.int(0, 99999) < P.CURSE_CHANCE * 100000) {
+      p = { ...p, digits: '666' };
+      sc = P.score(p);
+      cursed = true;
+    }
+
     const k = fast ? 0.45 : 1;
     const reels = $$('#plate .reel');
     const finals = [p.l1, p.digits[0], p.digits[1], p.digits[2], p.l2[0], p.l2[1], p.region];
@@ -1585,8 +1602,22 @@
     const t = sc.tier;
     const x3 = plState.x3Left > 0;
     if (x3) plState.x3Left--;
-    let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult() * (happyActive() ? 2 : 1) * (x3 ? 3 : 1));
+    const cursedNow = curseActive();
+    let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult() * (happyActive() ? 2 : 1) * (x3 ? 3 : 1) * (cursedNow ? P.CURSE_MULT : 1));
     const extras = [];
+    if (cursedNow) extras.push(`<span class="pl-reason cursechip"><b>💀</b>порча <em>×${P.CURSE_MULT}</em></span>`);
+    let blessed = false;
+    if (cursed) {
+      plState.curses = (plState.curses || 0) + 1;
+      blessed = G.rnd.int(0, 1) === 0;
+      if (blessed) {
+        win = Math.round(Math.max(win, spinCost()) * P.BLESS_MULT);
+        extras.push(`<span class="pl-reason blesschip"><b>😇</b>проклятый номер: благословение <em>×${P.BLESS_MULT}</em></span>`);
+      } else {
+        plState.curseUntil = Date.now() + P.CURSE_LEN;
+        extras.push(`<span class="pl-reason cursechip"><b>👁</b>проклятый номер: порча на ${P.CURSE_LEN / 60000} мин</span>`);
+      }
+    }
     const gemsWon = P.GEMS_FOR_TIER[t.id] || 0;
     if (gemsWon) {
       plState.gems = (plState.gems || 0) + gemsWon;
@@ -1646,7 +1677,7 @@
     $('#pl-result').classList.add('show');
 
     const order = P.TIERS.findIndex((x) => x.id === t.id);
-    resultChime(order);
+    if (cursed) { curseFx(blessed); curseTick(); } else resultChime(order);
     albumAdd(p.region);
     if (!plAuto) copCheck();
     qev('spin');
@@ -2781,14 +2812,14 @@
   const BADGES = {
     spin1: '🎰', spin100: '💯', spin1000: '🏭', rare: '🔷', epic: '🟣', legendary: '🟠', mythic: '🔴', s777: '7️⃣', elite: '🏛',
     word: '🔤', r77: '🏙', upgrade: '⬆️', skin: '🎨', bigwin: '💸', work: '💼', online1: '🌐', key1: '🔑', prestige1: '⭐',
-    tune1: '🔧', style50: '✨', auction1: '🔨', gems100: '💎', rich: '💰', rich2: '🏦', million: '🤑', car1: '🚘', trade1: '🤝', season10: '🏁',
+    curse1: '👁', ldk2: '🪙', pframe1: '📸', tune1: '🔧', style50: '✨', auction1: '🔨', gems100: '💎', rich: '💰', rich2: '🏦', million: '🤑', car1: '🚘', trade1: '🤝', season10: '🏁',
   };
   // краткая карточка — её же видят соперники в онлайне
   function myCard() {
     return {
       nick: profile.nick.trim() || 'Игрок', grad: profile.grad,
       title: P.titleFor(plState.level), prestige: plState.prestige || 0, level: plState.level,
-      skin: plState.skin, car: plState.car || null, plate: showPlate(),
+      skin: plState.skin, car: plState.car || null, plate: showPlate(), look: myLook(),
       style: styleNow(), season: (plState.season || {}).level || 0,
       stats: {
         spins: plState.spins, bestWin: plState.bestWin || 0, mythic: (plState.tiers || {}).mythic || 0,
@@ -2810,6 +2841,7 @@
       </div>
       <div class="pf-garage">${car ? carHTML(car, c.plate, c.skin) : `<div class="pf-nocar"><span class="mini-plate skin-${c.skin}"><b>${c.plate.l1}${c.plate.digits}${c.plate.l2}</b><em>${c.plate.region}</em></span><small>Пешком — тачки пока нет</small></div>`}
         ${car ? `<div class="pf-carname">${esc(car.name)}</div>` : ''}</div>
+      ${lookShowHTML(c)}
       <div class="pf-stats">
         ${stat(fmtShort(st.spins || 0), 'круток')}${stat(fmtShort(st.bestWin || 0), 'лучший выигрыш')}${stat(st.mythic || 0, 'мификов')}
         ${stat(st.duels || 0, 'побед над Ашотом')}${stat(st.online || 0, 'побед онлайн')}${stat(c.style || 0, 'стиля')}
@@ -2965,6 +2997,450 @@
   $('#pl-trade').onclick = () => { if (!TR.ch) { $('#tr-menu').hidden = false; $('#tr-room').hidden = true; } else renderTrade(); $('#trade-modal').hidden = false; };
   ['salon', 'profile', 'trade', 'season', 'album'].forEach((m) => { $(`#${m}-close`).onclick = () => { $(`#${m}-modal`).hidden = true; }; });
 
+  /* ======================= своя рамка: надпись и фоторамка ======================= */
+  if (!plState.cap) plState.cap = { owned: false, text: '' };
+  if (!plState.pframe) plState.pframe = { owned: false, on: true, src: '', img: '', zoom: 1, x: 50, y: 50, dim: 25 };
+  const okImg = (s) => typeof s === 'string' && s.length < 300000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s);
+  const myLook = () => ({
+    cap: plState.cap.owned ? plState.cap.text : '',
+    img: plState.pframe.owned && plState.pframe.on ? plState.pframe.img : '',
+    dim: plState.pframe.dim,
+  });
+
+  // надеваем надпись и фото на обёртку номера
+  function applyLook(wrap, look) {
+    if (!wrap) return;
+    const img = look && okImg(look.img) ? look.img : '';
+    if (img) {
+      wrap.dataset.photo = '1';
+      wrap.style.setProperty('--pf-img', `url("${img}")`);
+      wrap.style.setProperty('--pf-dim', (look.dim || 0) / 100);
+    } else {
+      delete wrap.dataset.photo;
+      wrap.style.removeProperty('--pf-img');
+    }
+    const txt = look && look.cap ? String(look.cap).slice(0, P.CAPTION_MAX) : '';
+    const cap = wrap.querySelector('.plate-cap');
+    if (cap) cap.textContent = txt;
+    if (txt) wrap.dataset.cap = '1';
+    else delete wrap.dataset.cap;
+  }
+
+  // витрина номера в профиле: фото, номер в скине, надпись
+  function lookShowHTML(c) {
+    const l = c.look || {};
+    const img = okImg(l.img) ? l.img : '';
+    const cap = l.cap ? String(l.cap).slice(0, P.CAPTION_MAX) : '';
+    if (!img && !cap) return '';
+    return `<div class="pf-show ${img ? 'has-img' : ''}" style="${img ? `--pf-img:url(&quot;${img}&quot;);--pf-dim:${(+l.dim || 0) / 100}` : ''}">
+      <span class="mini-plate skin-${esc(c.skin)}"><b>${esc(c.plate.l1 + c.plate.digits + c.plate.l2)}</b><em>${esc(c.plate.region)}</em></span>
+      ${cap ? `<span class="pf-show-cap">${esc(cap)}</span>` : ''}</div>`;
+  }
+
+  /* --- редактор --- */
+  const LK = { img: null, draft: null };
+  function loadImg(src) {
+    return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  }
+  function bakePhoto(im, zoom, x, y) {
+    const W = 720, H = 240, cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const ctx = cv.getContext('2d');
+    const s = Math.max(W / im.width, H / im.height) * zoom;
+    const dw = im.width * s, dh = im.height * s;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(im, (W - dw) * (x / 100), (H - dh) * (y / 100), dw, dh);
+    return cv.toDataURL('image/jpeg', 0.74);
+  }
+  function lookPreview() {
+    const clone = $('#pl-tilt').cloneNode(true);
+    clone.removeAttribute('id');
+    clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+    clone.style.removeProperty('--rx');
+    clone.style.removeProperty('--ry');
+    const d = LK.draft;
+    applyLook(clone, {
+      cap: plState.cap.owned ? $('#look-cap').value.trim() : '',
+      img: plState.pframe.owned && d.on ? d.img : '',
+      dim: d.dim,
+    });
+    const st = $('#look-stage');
+    st.innerHTML = '';
+    st.appendChild(clone);
+  }
+  const priceBtns = (pr, kind) => `
+    <button class="look-pay" data-buy="${kind}" data-cur="coins" ${plState.coins < pr.coins ? 'disabled' : ''}><i class="coin"></i>${fmtShort(pr.coins)}</button>
+    <span class="look-or">или</span>
+    <button class="look-pay gem" data-buy="${kind}" data-cur="gems" ${(plState.gems || 0) < pr.gems ? 'disabled' : ''}>💎 ${pr.gems}</button>`;
+  function renderLook() {
+    const capOwned = plState.cap.owned, phOwned = plState.pframe.owned;
+    $('#look-cap-buy').hidden = capOwned;
+    $('#look-cap-edit').hidden = !capOwned;
+    if (!capOwned) $('#look-cap-buy').innerHTML = priceBtns(P.CAPTION_PRICE, 'cap');
+    $('#look-ph-buy').hidden = phOwned;
+    $('#look-ph-edit').hidden = !phOwned;
+    if (!phOwned) $('#look-ph-buy').innerHTML = priceBtns(P.PHOTO_FRAME_PRICE, 'ph');
+    const d = LK.draft;
+    $('#look-ph-on').checked = d.on;
+    $('#look-zoom').value = d.zoom;
+    $('#look-x').value = d.x;
+    $('#look-y').value = d.y;
+    $('#look-dim').value = d.dim;
+    $('#look-sliders').classList.toggle('off', !LK.img);
+    $('#look-ph-save').disabled = !LK.img;
+    lookPreview();
+  }
+  async function openLook() {
+    const f = plState.pframe;
+    LK.draft = { src: f.src, img: f.img, zoom: f.zoom, x: f.x, y: f.y, dim: f.dim, on: f.on };
+    LK.img = null;
+    if (f.src) { try { LK.img = await loadImg(f.src); } catch (e) { LK.img = null; } }
+    $('#look-cap').value = plState.cap.text;
+    renderLook();
+    $('#look-modal').hidden = false;
+  }
+  $('#pl-look').onclick = openLook;
+  $('#look-close').onclick = () => { $('#look-modal').hidden = true; };
+  $('#look-modal').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-buy]');
+    if (!b) return;
+    const pr = b.dataset.buy === 'cap' ? P.CAPTION_PRICE : P.PHOTO_FRAME_PRICE;
+    if (b.dataset.cur === 'coins') {
+      if (plState.coins < pr.coins) return;
+      plState.coins -= pr.coins;
+    } else {
+      if ((plState.gems || 0) < pr.gems) return;
+      plState.gems -= pr.gems;
+    }
+    if (b.dataset.buy === 'cap') plState.cap.owned = true;
+    else plState.pframe.owned = true;
+    savePl();
+    renderWallet();
+    burst('#f0c552', 40);
+    toast(b.dataset.buy === 'cap' ? '✍️ Надпись куплена — придумай текст' : '📸 Фоторамка куплена — выбирай фотку');
+    renderLook();
+  });
+  $('#look-cap').addEventListener('input', lookPreview);
+  $('#look-cap-save').onclick = () => {
+    plState.cap.text = $('#look-cap').value.trim().slice(0, P.CAPTION_MAX);
+    savePl();
+    refreshPlates();
+    lookPreview();
+    toast(plState.cap.text ? `Надпись «${plState.cap.text}» на рамке` : 'Надпись убрана');
+  };
+  $('#look-ph-pick').onclick = () => $('#look-ph-file').click();
+  $('#look-ph-file').onchange = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file || !/^image\//.test(file.type)) return;
+    try {
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+      const raw = await loadImg(url);
+      // уменьшаем оригинал, чтобы не раздувать сохранение
+      const k = Math.min(1, 1400 / Math.max(raw.width, raw.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(raw.width * k);
+      cv.height = Math.round(raw.height * k);
+      cv.getContext('2d').drawImage(raw, 0, 0, cv.width, cv.height);
+      LK.draft.src = cv.toDataURL('image/jpeg', 0.85);
+      LK.img = await loadImg(LK.draft.src);
+      Object.assign(LK.draft, { zoom: 1, x: 50, y: 50, on: true });
+      LK.draft.img = bakePhoto(LK.img, 1, 50, 50);
+      renderLook();
+    } catch (err) {
+      toast('Не получилось открыть картинку');
+    }
+  };
+  const lookSlide = () => {
+    const d = LK.draft;
+    d.zoom = +$('#look-zoom').value;
+    d.x = +$('#look-x').value;
+    d.y = +$('#look-y').value;
+    d.dim = +$('#look-dim').value;
+    if (LK.img) d.img = bakePhoto(LK.img, d.zoom, d.x, d.y);
+    lookPreview();
+  };
+  ['#look-zoom', '#look-x', '#look-y', '#look-dim'].forEach((s) => $(s).addEventListener('input', lookSlide));
+  $('#look-ph-on').onchange = () => { LK.draft.on = $('#look-ph-on').checked; lookPreview(); };
+  $('#look-ph-save').onclick = () => {
+    const d = LK.draft;
+    Object.assign(plState.pframe, { src: d.src, img: d.img, zoom: d.zoom, x: d.x, y: d.y, dim: d.dim, on: d.on });
+    savePl();
+    refreshPlates();
+    toast('📸 Фоторамка сохранена — кенты увидят её в профиле');
+  };
+  $('#look-ph-on').addEventListener('change', () => {
+    if (!plState.pframe.img) return;
+    plState.pframe.on = LK.draft.on;
+    savePl();
+    refreshPlates();
+  });
+
+  /* ======================= проклятый номер ======================= */
+  const curseActive = () => Date.now() < (plState.curseUntil || 0);
+  function curseSound(blessed) {
+    const a = audio();
+    if (!a) return;
+    const t = a.currentTime;
+    // низкий гул с биением
+    [55, 58.3].forEach((f) => {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * (blessed ? 2 : 0.6), t + 2.6);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.09, t + 0.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+      o.connect(g).connect(master);
+      o.start(t);
+      o.stop(t + 3.05);
+    });
+    // три удара колокола: 6-6-6
+    for (let i = 0; i < 3; i++) {
+      const o = a.createOscillator(), g = a.createGain(), s = t + 0.35 + i * 0.55;
+      o.type = 'sine';
+      o.frequency.value = blessed ? [660, 880, 1320][i] : [233, 220, 207][i];
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.12, s + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 1.2);
+      o.connect(g).connect(master);
+      o.start(s);
+      o.stop(s + 1.25);
+    }
+  }
+  function curseFx(blessed) {
+    const fx = $('#curse-fx');
+    $('#curse-title').textContent = blessed ? '😇 БЛАГОСЛОВЕНИЕ' : '💀 ПОРЧА';
+    $('#curse-sub').textContent = blessed ? `Проклятый номер обернулся удачей — выплата ×${P.BLESS_MULT}` : `Выплаты ×${P.CURSE_MULT} на ${P.CURSE_LEN / 60000} минут. Бабка Зина снимет за 💎 ${P.CURSE_CLEANSE_GEMS}`;
+    fx.className = `curse-fx ${blessed ? 'bless' : 'curse'}`;
+    fx.hidden = false;
+    void fx.offsetWidth;
+    fx.classList.add('go');
+    curseSound(blessed);
+    clearTimeout(curseFx.t);
+    curseFx.t = setTimeout(() => { fx.hidden = true; }, 3600);
+  }
+  let cleanseArm = 0;
+  $('#pl-curse').onclick = () => {
+    if (!curseActive()) return;
+    if ((plState.gems || 0) < P.CURSE_CLEANSE_GEMS) { toast(`Бабке Зине нужно 💎 ${P.CURSE_CLEANSE_GEMS}, а у тебя меньше`); return; }
+    if (Date.now() > cleanseArm) {
+      cleanseArm = Date.now() + 4000;
+      toast(`Бабка Зина снимет порчу за 💎 ${P.CURSE_CLEANSE_GEMS} — нажми ещё раз`);
+      return;
+    }
+    plState.gems -= P.CURSE_CLEANSE_GEMS;
+    plState.curseUntil = 0;
+    savePl();
+    renderWallet();
+    curseTick();
+    toast('🧄 Порча снята. Бабка Зина плюнула через плечо');
+  };
+  function curseTick() {
+    const b = $('#pl-curse');
+    const on = curseActive();
+    b.hidden = !on;
+    $('#pl-card').classList.toggle('cursed-run', on);
+    if (!on) return;
+    const left = plState.curseUntil - Date.now();
+    $('#pl-curse-t').textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+  }
+  setInterval(curseTick, 1000);
+  curseTick();
+
+  /* ======================= ЛАДАКОИН ======================= */
+  if (!plState.ldk) plState.ldk = { amt: 0, cost: 0, trades: 0, bestX: 0, log: [] };
+  const LD = plState.ldk;
+  let ldkRange = 3600000, ldkSum = 0;
+  const ldkNow = () => P.ldkPrice(Date.now());
+  const fmtPrice = (v) => v.toLocaleString('ru-RU', { maximumFractionDigits: v < 100 ? 2 : 0 });
+  const fmtAmt = (v) => v.toLocaleString('ru-RU', { maximumFractionDigits: v < 10 ? 4 : 2 });
+
+  // текущее событие (памп/скам), если оно уже идёт
+  function ldkLive(t = Date.now()) {
+    const w = Math.floor(t / P.LDK_EVENT_LEN), ev = P.ldkEvent(w);
+    if (!ev) return null;
+    const m = (t - w * P.LDK_EVENT_LEN) / 60000;
+    if (ev.kind === 'pump' ? m < 2 : m < 5) return null;
+    return { ...ev, m };
+  }
+
+  function drawLdk() {
+    const cv = $('#ldk-canvas');
+    if (!cv.clientWidth) return;
+    const dpr = devicePixelRatio, ctx = cv.getContext('2d');
+    const w = (cv.width = cv.clientWidth * dpr), h = (cv.height = cv.clientHeight * dpr);
+    const now = Date.now(), N = 240, pts = [];
+    for (let i = 0; i <= N; i++) pts.push(P.ldkPrice(now - ldkRange + (ldkRange * i) / N));
+    let mn = Math.min(...pts), mx = Math.max(...pts);
+    if (LD.amt > 0) { const avg = LD.cost / LD.amt; mn = Math.min(mn, avg); mx = Math.max(mx, avg); }
+    const pad = (mx - mn) * 0.12 || 1;
+    mn -= pad;
+    mx += pad;
+    const X = (i) => 10 * dpr + (i / N) * (w - 20 * dpr), Y = (v) => h - 14 * dpr - ((v - mn) / (mx - mn)) * (h - 28 * dpr);
+    const up = pts[N] >= pts[0], col = up ? '#5fc2ae' : '#ff6b70';
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.06)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 5; i++) { const y = (h / 5) * i; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    const fill = ctx.createLinearGradient(0, 0, 0, h);
+    fill.addColorStop(0, up ? 'rgba(95,194,174,.28)' : 'rgba(255,107,112,.28)');
+    fill.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    pts.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+    ctx.lineTo(X(N), h);
+    ctx.lineTo(X(0), h);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.beginPath();
+    pts.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    // средняя цена покупки
+    if (LD.amt > 0) {
+      const y = Y(LD.cost / LD.amt);
+      ctx.setLineDash([6 * dpr, 6 * dpr]);
+      ctx.strokeStyle = 'rgba(240,197,82,.7)';
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#f0c552';
+      ctx.font = `${11 * dpr}px Inter Tight, sans-serif`;
+      ctx.fillText('твоя цена', 12 * dpr, y - 6 * dpr);
+    }
+    // точка «сейчас»
+    ctx.fillStyle = col;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 14 * dpr;
+    ctx.beginPath(); ctx.arc(X(N), Y(pts[N]), 5 * dpr, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    return pts;
+  }
+
+  function renderLdk() {
+    if (current !== 'crypto') return;
+    const pts = drawLdk() || [ldkNow()];
+    const price = pts[pts.length - 1], chg = (price / pts[0] - 1) * 100;
+    $('#ldk-price').innerHTML = `<i class="coin"></i>${fmtPrice(price)}`;
+    $('#ldk-chg').textContent = `${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%`;
+    $('#ldk-chg').className = chg >= 0 ? 'up' : 'down';
+    const ev = ldkLive();
+    const news = $('#ldk-news');
+    news.className = `ldk-news ${ev ? ev.kind : ''}`;
+    news.textContent = ev ? `${ev.kind === 'pump' ? '📈 ПАМП' : '📉 СКАМ'} · ${ev.news}` : '📰 На рынке спокойно. Ждём новостей…';
+    $('#ldk-coins').textContent = fmtShort(plState.coins);
+    $('#ldk-amt').textContent = `${fmtAmt(LD.amt)} LDK`;
+    const val = LD.amt * price * (1 - P.LDK_FEE);
+    $('#ldk-val').innerHTML = `<i class="coin"></i>${fmtShort(val)}`;
+    $('#ldk-avg').textContent = LD.amt > 0 ? fmtPrice(LD.cost / LD.amt) : '—';
+    const pnl = val - LD.cost;
+    $('#ldk-pnl').textContent = LD.amt > 0 ? `${pnl >= 0 ? '+' : '−'}${fmtShort(Math.abs(pnl))} (${pnl >= 0 ? '+' : '−'}${Math.abs((pnl / LD.cost) * 100).toFixed(1)}%)` : '—';
+    $('#ldk-pnl').className = LD.amt > 0 ? (pnl >= 0 ? 'up' : 'down') : '';
+    $$('#ldk-sell button').forEach((b) => (b.disabled = LD.amt <= 0));
+    const sum = ldkSum || parseStake($('#ldk-sum').value);
+    $('#ldk-buy').disabled = !(sum >= 100 && sum <= plState.coins);
+    $('#ldk-buy').textContent = sum >= 100 ? `Купить ≈ ${fmtAmt((sum * (1 - P.LDK_FEE)) / price)} LDK` : 'Купить';
+    $('#ldk-log').innerHTML = LD.log.length ? LD.log.slice(-8).reverse().map((l) => `<div class="${l.k}"><span>${l.k === 'buy' ? 'Купил' : 'Продал'} ${fmtAmt(l.a)} LDK по ${fmtPrice(l.p)}</span><b>${l.k === 'buy' ? '−' : '+'}${fmtShort(l.s)}</b></div>`).join('') : '<div class="note">Сделок пока нет</div>';
+  }
+
+  function ldkLog(k, a, p, s) {
+    LD.log.push({ k, a, p, s, t: Date.now() });
+    LD.log = LD.log.slice(-30);
+  }
+  function ldkBuy() {
+    const sum = Math.floor(ldkSum || parseStake($('#ldk-sum').value));
+    if (sum < 100 || sum > plState.coins) return;
+    const price = ldkNow(), a = (sum * (1 - P.LDK_FEE)) / price;
+    plState.coins -= sum;
+    LD.amt += a;
+    LD.cost += sum;
+    LD.trades++;
+    ldkLog('buy', a, price, sum);
+    savePl();
+    renderWallet();
+    coinClink();
+    toast(`🪙 +${fmtAmt(a)} LDK по ${fmtPrice(price)}`);
+    ldkSum = 0;
+    $('#ldk-sum').value = '';
+    renderLdk();
+  }
+  function ldkSell(frac) {
+    if (LD.amt <= 0) return;
+    const price = ldkNow(), a = frac >= 1 ? LD.amt : LD.amt * frac;
+    const net = Math.floor(a * price * (1 - P.LDK_FEE)), costPart = frac >= 1 ? LD.cost : LD.cost * frac;
+    const x = costPart > 0 ? net / costPart : 0;
+    LD.amt -= a;
+    LD.cost -= costPart;
+    if (frac >= 1 || LD.amt < 1e-9) { LD.amt = 0; LD.cost = 0; }
+    LD.bestX = Math.max(LD.bestX || 0, x);
+    LD.trades++;
+    plState.coins += net;
+    ldkLog('sell', a, price, net);
+    savePl();
+    renderWallet();
+    coinClink();
+    const profit = net - costPart;
+    toast(`${profit >= 0 ? '📈' : '📉'} Продал ${fmtAmt(a)} LDK: ${profit >= 0 ? '+' : '−'}${fmtShort(Math.abs(profit))}`);
+    if (x >= 1.5) burst('#5fc2ae', 40);
+    renderLdk();
+  }
+  function coinClink() {
+    const a = audio();
+    if (!a) return;
+    const t = a.currentTime;
+    [1568, 2093].forEach((f, i) => {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + i * 0.06);
+      g.gain.exponentialRampToValueAtTime(0.06, t + i * 0.06 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.06 + 0.3);
+      o.connect(g).connect(master);
+      o.start(t + i * 0.06);
+      o.stop(t + i * 0.06 + 0.32);
+    });
+  }
+
+  $('#ldk-range').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-r]');
+    if (!b) return;
+    ldkRange = +b.dataset.r;
+    $$('#ldk-range button').forEach((x) => x.classList.toggle('on', x === b));
+    renderLdk();
+  });
+  $('#ldk-buy-p').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lb]');
+    if (!b) return;
+    const v = b.dataset.lb;
+    ldkSum = v === 'max' ? plState.coins : v === 'half' ? Math.floor(plState.coins / 2) : +v;
+    ldkSum = Math.min(ldkSum, plState.coins);
+    $('#ldk-sum').value = fmt(ldkSum);
+    renderLdk();
+  });
+  $('#ldk-sum').addEventListener('input', () => { ldkSum = 0; renderLdk(); });
+  $('#ldk-sum').addEventListener('keydown', (e) => { if (e.key === 'Enter') ldkBuy(); });
+  $('#ldk-buy').onclick = ldkBuy;
+  $('#ldk-sell').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ls]');
+    if (b) ldkSell(+b.dataset.ls);
+  });
+  setInterval(() => {
+    renderLdk();
+    // памп или скам, пока у тебя есть монеты, — пуш
+    const ev = ldkLive();
+    if (ev && LD.amt > 0 && plState.notified && plState.notified.ldk !== ev.w) {
+      plState.notified.ldk = ev.w;
+      pushNote('ldk', ev.kind === 'pump' ? '📈 ЛАДАКОИН пампят!' : '📉 ЛАДАКОИН: скам!', `${ev.news}. Курс ${fmtPrice(ldkNow())}`);
+      if (current !== 'crypto') toast(ev.kind === 'pump' ? `📈 ЛАДАКОИН пампят: ${ev.news}` : `📉 ЛАДАКОИН летит вниз: ${ev.news}`);
+    }
+  }, 1000);
+  window.addEventListener('resize', () => renderLdk());
+
   /* ======================= уведомления Windows ======================= */
   // приходят, только когда окно свёрнуто или не в фокусе; клик ведёт в нужное место
   const NOTE_TYPES = {
@@ -2977,6 +3453,7 @@
     quests: '📅 Задание дня или недели выполнено',
     raid: '🚨 Рейдеры напали на твой бизнес',
     lotto: '🎟 Ты выиграл лотерею',
+    ldk: '🪙 Памп или скам ЛАДАКОИНА (если он у тебя есть)',
   };
   if (!plState.notified) plState.notified = {};
   const noteOn = (type) => settings.notify && settings.notify.on && settings.notify[type] !== false;
@@ -3039,6 +3516,7 @@
       if (tag === 'quests') $('#pl-tabs [data-v=quests]').click();
       if (tag === 'raid') go('biz');
       if (tag === 'lotto') go('casino');
+      if (tag === 'ldk') go('crypto');
     });
   }
 
@@ -4160,7 +4638,7 @@
       spinPlate();
     }
     if (e.key === 'Escape') {
-      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal', '#auction-modal', '#salon-modal', '#profile-modal', '#trade-modal', '#season-modal', '#album-modal'].forEach((m) => { $(m).hidden = true; });
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal', '#auction-modal', '#salon-modal', '#profile-modal', '#trade-modal', '#season-modal', '#album-modal', '#look-modal'].forEach((m) => { $(m).hidden = true; });
       stopJob();
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);
