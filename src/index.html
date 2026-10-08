@@ -436,13 +436,19 @@
               </div>
               <div class="pl-head-right">
                 <div class="pl-happy" id="pl-happy"><b id="pl-happy-l">🔥 через</b> <span id="pl-happy-t">—</span></div>
-                <button class="pl-market-btn" id="pl-market">🕶 Чёрный рынок</button>
-                <button class="pl-market-btn tune" id="pl-tune">🔧 Тюнинг</button>
-                <button class="pl-market-btn auction" id="pl-auction">🔨 Аукцион</button>
                 <div class="pl-jackpot"><span>💎 ДЖЕКПОТ</span><b><i class="coin"></i><span id="pl-jp">500</span></b></div>
                 <button class="pl-daily" id="pl-daily" hidden>🎁 <span id="pl-daily-t">Бонус дня</span></button>
                 <div class="pl-tier" id="pl-tier" hidden><i></i><span id="pl-tier-name">Обычный</span></div>
               </div>
+            </div>
+
+            <div class="pl-toolbar">
+              <button class="pl-market-btn" id="pl-market">🕶 Рынок</button>
+              <button class="pl-market-btn tune" id="pl-tune">🔧 Тюнинг</button>
+              <button class="pl-market-btn auction" id="pl-auction">🔨 Аукцион</button>
+              <button class="pl-market-btn salon" id="pl-salon">🚘 Салон</button>
+              <button class="pl-market-btn" id="pl-trade">🔁 Обмен</button>
+              <button class="pl-market-btn" id="pl-profile">👤 Профиль</button>
             </div>
 
             <div class="plate-stage" id="pl-stage">
@@ -665,6 +671,64 @@
     <div class="seg small" id="tn-cats"></div>
     <div class="tn-grid" id="tn-grid"></div>
     <div class="note">Наведи на обвес — примерь бесплатно. В каждой категории можно надеть одну вещь. Стиль надетого даёт бонус к выплатам: каждые 5 стиля = +1%.</div>
+  </div>
+</div>
+
+<div class="modal" id="salon-modal" hidden>
+  <div class="modal-card dark-card salon-card">
+    <div class="card-head"><span class="cap">🚘 АВТОСАЛОН</span><button class="dots" id="salon-close">✕</button></div>
+    <div class="note" id="salon-bonus"></div>
+    <div class="salon-grid" id="salon-grid"></div>
+    <div class="note">Буст даёт тачка, за рулём которой ты сидишь. Плюс за каждую тачку в гараже +0,5% ко всем выплатам. На тачке висит твой лучший номер в текущем скине.</div>
+  </div>
+</div>
+
+<div class="modal" id="profile-modal" hidden>
+  <div class="modal-card dark-card profile-card">
+    <div class="card-head"><span class="cap">👤 ПРОФИЛЬ ИГРОКА</span><button class="dots" id="profile-close">✕</button></div>
+    <div id="pf-body"></div>
+  </div>
+</div>
+
+<div class="modal" id="season-modal" hidden>
+  <div class="modal-card dark-card season-card">
+    <div class="card-head"><span class="cap">🏁 СЕЗОННЫЙ ПРОПУСК</span><button class="dots" id="season-close">✕</button></div>
+    <div class="note" id="season-info"></div>
+    <div class="season-grid" id="season-grid"></div>
+  </div>
+</div>
+
+<div class="modal" id="trade-modal" hidden>
+  <div class="modal-card dark-card trade-card">
+    <div class="card-head"><span class="cap">🔁 ОБМЕН С КЕНТОМ</span><button class="dots" id="trade-close">✕</button></div>
+    <div id="tr-menu" class="on-menu">
+      <button class="btn-main" id="tr-create">Создать обмен <i>›</i></button>
+      <div class="on-or"><span>или войди по коду кента</span></div>
+      <div class="on-join"><input class="inp" id="tr-code" placeholder="TR-XXXX" maxlength="7" spellcheck="false" autocomplete="off"><button class="pill pill-dark" id="tr-join">Войти</button></div>
+      <div class="note">Каждый кладёт в предложение монеты, кристаллы и до 3 вещей. Обмен проходит, только когда оба подтвердили. Если кто-то поменял предложение — подтверждения сбрасываются.</div>
+    </div>
+    <div id="tr-room" hidden>
+      <div class="on-codebar"><span>Код обмена</span><b id="tr-code-v">TR-XXXX</b><button class="pill pill-white" id="tr-copy">Копировать</button></div>
+      <div class="tr-cols">
+        <div class="tr-col">
+          <span class="cap">ТЫ ОТДАЁШЬ</span>
+          <div class="tr-list" id="tr-mine-list"></div>
+          <div class="tr-inputs">
+            <input class="inp" id="tr-coins" type="number" min="0" placeholder="Монеты">
+            <input class="inp" id="tr-gems" type="number" min="0" placeholder="Кристаллы">
+          </div>
+          <select class="inp" id="tr-item"></select>
+          <button class="pill pill-white" id="tr-clear">Очистить</button>
+        </div>
+        <div class="tr-col">
+          <span class="cap">ОТДАЁТ <b id="tr-opp-name">…</b></span>
+          <div class="tr-list" id="tr-their-list"></div>
+        </div>
+      </div>
+      <div class="duel-res" id="tr-status"></div>
+      <button class="btn-main" id="tr-ok">Подтверждаю обмен</button>
+      <button class="pill pill-white wide" id="tr-leave">Выйти из обмена</button>
+    </div>
   </div>
 </div>
 

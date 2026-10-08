@@ -182,6 +182,8 @@
     { id: 'amethyst', name: 'Аметист', price: 0, gems: 60 },
     { id: 'aurora', name: 'Северное сияние', price: 0, gems: 120 },
     { id: 'dragon', name: 'Золотой дракон', price: 0, gems: 300 },
+    // награда сезонного пропуска
+    { id: 'season', name: 'Чемпион сезона', price: 0, season: true },
   ];
 
   /* ---------------- чёрный рынок ---------------- */
@@ -300,9 +302,11 @@
     { id: 'a-fire', cat: 'aura', name: 'Пламя', price: 6000000 },
     { id: 'a-stars', cat: 'aura', name: 'Звездопад', price: 30000000 },
     { id: 'a-gold', cat: 'aura', name: 'Золотой дождь', price: 100000000 },
+    // только из сезонного пропуска
+    { id: 's-champ', cat: 'sticker', name: 'Чемпион', icon: '🏆', price: 0, style: 14, season: true },
   ];
   // Стиль растёт с ценой: 5к ≈ 2, 100М ≈ 23. Бонус к выплатам = стиль надетого / 5 %
-  const tuningStyle = (t) => Math.max(1, Math.round(Math.log10(t.price) * 5 - 17));
+  const tuningStyle = (t) => t.style || Math.max(1, Math.round(Math.log10(t.price) * 5 - 17));
   const STYLE_DIV = 5;
 
   /* ---------------- кристаллы ---------------- */
@@ -335,6 +339,69 @@
   const fleetRent = (total) => Math.round(total / 5);
   const collectionRent = (total) => total / 40;
 
+  /* ---------------- ежедневные и недельные задания ---------------- */
+  // type — событие, которое двигает прогресс; d / w — цель для дня и недели
+  // 1 крутка, 2 крутки, 5 круток
+  const plural = (n, one, few, many) => {
+    const a = n % 10, b = n % 100;
+    return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many;
+  };
+  const DAILY_POOL = [
+    { type: 'spin', name: (n) => `Сделай ${n} ${plural(n, 'крутку', 'крутки', 'круток')}`, d: 50, w: 400 },
+    { type: 'rare', name: (n) => `Выбей ${n} ${plural(n, 'номер', 'номера', 'номеров')} «Редкий» или выше`, d: 5, w: 40 },
+    { type: 'epic', name: (n) => `Выбей ${n} ${plural(n, 'номер', 'номера', 'номеров')} «Эпический» или выше`, d: 2, w: 15 },
+    { type: 'duel', name: (n) => `Обыграй Ашота ${n} ${plural(n, 'раз', 'раза', 'раз')}`, d: 3, w: 20 },
+    { type: 'job', name: (n) => `Отработай ${n} ${plural(n, 'смену', 'смены', 'смен')}`, d: 8, w: 50 },
+    { type: 'order', name: (n) => `Выполни ${n} ${plural(n, 'заказ', 'заказа', 'заказов')} клиентов`, d: 1, w: 6 },
+    { type: 'risk', name: (n) => `Угадай ${n} ${plural(n, 'раз', 'раза', 'раз')} в риске ×2`, d: 3, w: 20 },
+    { type: 'bet', name: (n) => `Поставь в сумме ${n.toLocaleString('ru-RU')} монет`, d: 20000, w: 500000 },
+    { type: 'auction', name: (n) => `Сделай ${n} ${plural(n, 'ставку', 'ставки', 'ставок')} на аукционе`, d: 2, w: 10 },
+    { type: 'market', name: (n) => `Купи ${n} ${plural(n, 'вещь', 'вещи', 'вещей')} на чёрном рынке`, d: 1, w: 5 },
+  ];
+  const DAILY_REWARD = { coins: 25000, sp: 100 };
+  const WEEKLY_REWARD = { coins: 250000, gems: 5, sp: 400 };
+
+  // одинаковый набор на день/неделю: перезапуск не перебрасывает задания
+  function pickQuests(seedStr, count) {
+    let h = 2166136261; // FNV-1a
+    for (const c of seedStr) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    const next = () => {
+      h = (h + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(h ^ (h >>> 15), h | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return (t ^ (t >>> 14)) >>> 0;
+    };
+    const pool = [...DAILY_POOL];
+    const out = [];
+    while (out.length < count && pool.length) out.push(pool.splice(next() % pool.length, 1)[0]);
+    return out;
+  }
+
+  /* ---------------- сезонный пропуск ---------------- */
+  const SEASON_LEVELS = 30, SP_PER_LEVEL = 500;
+  function seasonReward(lvl) {
+    if (lvl === 30) return { skin: 'season', label: 'Скин «Чемпион сезона»' };
+    if (lvl === 20) return { tuning: 's-champ', label: 'Наклейка 🏆 «Чемпион»' };
+    if (lvl === 10) return { gems: 50, label: '50 💎' };
+    if (lvl % 5 === 0) return { gems: 15, label: '15 💎' };
+    if (lvl % 3 === 0) return { item: 'x3', n: 1, label: 'Купон ×3' };
+    return { coins: 20000 * lvl, label: `${(20000 * lvl).toLocaleString('ru-RU')} монет` };
+  }
+
+  /* ---------------- автосалон ---------------- */
+  const CARS = [
+    { id: 'vaz', name: 'ВАЗ-2107 «Семёрка»', body: 'sedan', color: '#b7372b', price: 50000, boost: { pay: 1 } },
+    { id: 'priora', name: 'Лада Приора', body: 'sedan', color: '#2b2d31', price: 150000, boost: { garage: 10 } },
+    { id: 'logan', name: 'Логан в такси', body: 'sedan', color: '#f2c94c', price: 400000, boost: { work: 20 } },
+    { id: 'camry', name: 'Камри 3.5', body: 'sedan', color: '#e9e9e4', price: 2000000, boost: { pay: 3 } },
+    { id: 'm5', name: 'М5 «Компрессор»', body: 'sport', color: '#1f4fb5', price: 10000000, boost: { luck: 1, pay: 2 } },
+    { id: 'e63', name: 'Е63 «Ешка»', body: 'sport', color: '#5a6068', price: 25000000, boost: { pay: 5 } },
+    { id: 'g63', name: 'Гелик G63', body: 'suv', color: '#111214', price: 80000000, boost: { pay: 4, moscow: 2 } },
+    { id: 'maybach', name: 'Майбах', body: 'limo', color: '#3a3330', price: 250000000, boost: { pay: 8 } },
+    { id: 'aurus', name: 'Аурус Сенат', body: 'limo', color: '#0e1a2b', price: 1000000000, boost: { pay: 12, luck: 2 } },
+  ];
+  const CAR_COLLECTION_BONUS = 0.5; // % к выплатам за каждую тачку в гараже
+
   // Требование для престижа растёт: 1 млн, 2 млн, 3 млн…
   const prestigeNeed = (n) => 1000000 * (n + 1);
   const PRESTIGE_BONUS = 25;
@@ -364,6 +431,9 @@
     { id: 'style50', name: 'Набери 50 стиля', reward: 500000, done: (s) => (s.styleNow || 0) >= 50, progress: (s) => [Math.min(s.styleNow || 0, 50), 50] },
     { id: 'auction1', name: 'Выиграй аукцион', reward: 20000, done: (s) => (s.fleet || []).length >= 1 },
     { id: 'gems100', name: 'Накопи 100 кристаллов', reward: 50000, done: (s) => (s.gems || 0) >= 100, progress: (s) => [Math.min(s.gems || 0, 100), 100] },
+    { id: 'car1', name: 'Купи первую тачку в автосалоне', reward: 30000, done: (s) => (s.cars || []).length >= 1 },
+    { id: 'trade1', name: 'Соверши обмен с кентом', reward: 20000, done: (s) => (s.trades || 0) >= 1 },
+    { id: 'season10', name: 'Дойди до 10 уровня сезона', reward: 100000, done: (s) => ((s.season || {}).best || 0) >= 10 },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 1200, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
     { id: 'rich2', name: 'Накопи 100 000 монет', reward: 10000, done: (s) => s.coins >= 100000, progress: (s) => [Math.min(s.coins, 100000), 100000] },
     { id: 'million', name: 'Миллионер: накопи 1 000 000', reward: 100000, done: (s) => s.coins >= 1000000, progress: (s) => [Math.min(s.coins, 1000000), 1000000] },
@@ -458,6 +528,7 @@
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
     SPIN_COST, PAYOUT, BETS, BET_UNLOCK, UPGRADES, SKINS, QUESTS,
     TUNING_CATS, TUNING, tuningStyle, STYLE_DIV,
+    DAILY_POOL, DAILY_REWARD, WEEKLY_REWARD, pickQuests, SEASON_LEVELS, SP_PER_LEVEL, seasonReward, CARS, CAR_COLLECTION_BONUS,
     MARKET_REROLL_GEMS, rerollPrice, GEM_RATE, GEM_SHOP, GEMS_FOR_TIER, questGems, AUCTION_EVERY, AUCTION_LEN, AUCTION_EXTEND, AUCTION_BOTS, fleetRent, collectionRent,
     MARKET_RARITY, KEY_SLOTS, BOOST_TEXT, KEYCHAINS, CONSUMABLES, MARKET_PERIOD, MARKET_SLOTS, MARKET_REROLL, marketStock, prestigeNeed, PRESTIGE_BONUS,
     makeOrder, orderTest, ORDER_TTL, xpNeed, levelReward, titleFor, JACKPOT_SEED, JACKPOT_RATE, WHEEL,

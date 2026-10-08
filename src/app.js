@@ -564,6 +564,12 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '3.0.0': [
+      '📅 Задания дня и недели + 🏁 сезонный пропуск на 30 уровней с наградами',
+      '🚘 Автосалон: 9 тачек с твоим номером, каждая даёт свой буст',
+      '👤 Профиль игрока: тачка, номер, статистика, значки — его видят кенты в онлайне',
+      '🔁 Обмен с кентами: монеты, кристаллы, брелки, скины и номера из автопарка',
+    ],
     '2.5.0': [
       '🎲 Новые ставки ×250, ×500, ×1000 и ×2500 — дорогие уровни «Высоких ставок»',
       '⚡ Автокрутка ×20, ×40 и ×100 — новые уровни улучшения',
@@ -895,7 +901,9 @@
   const upg = (id) => P.UPGRADES.find((u) => u.id === id);
   // суммарный буст надетых брелков по типу
   const keySlots = () => P.KEY_SLOTS + (plState.extraSlots || 0);
-  const kb = (type) => plState.keyEq.reduce((sum, id) => sum + (((P.KEYCHAINS.find((k) => k.id === id) || {}).boost || {})[type] || 0), 0);
+  const kb = (type) => plState.keyEq.reduce((sum, id) => sum + (((P.KEYCHAINS.find((k) => k.id === id) || {}).boost || {})[type] || 0), 0)
+    + (((P.CARS.find((c) => c.id === plState.car) || {}).boost || {})[type] || 0)
+    + (type === 'pay' ? (plState.cars || []).length * P.CAR_COLLECTION_BONUS : 0);
   // стиль надетых обвесов тюнинга: каждые 5 очков = +1% к выплатам
   const styleNow = () => Object.values(plState.tuning.eq).reduce((sum, id) => {
     const t = P.TUNING.find((x) => x.id === id);
@@ -1259,7 +1267,7 @@
       const st = (q) => (plState.quests[q.id] ? 2 : q.done(plState) ? 0 : 1);
       return st(a) - st(b);
     });
-    $('#pl-quests').innerHTML = list.map((q) => {
+    $('#pl-quests').innerHTML = periodicHTML() + list.map((q) => {
       const done = q.done(plState), got = plState.quests[q.id];
       const pr = !done && q.progress ? q.progress(plState) : null;
       return `
@@ -1273,11 +1281,15 @@
               : `<span class="quest-reward"><i class="coin"></i>${fmtShort(q.reward)} · <i class="gem"></i>${P.questGems(q)}</span>`}
         </div>`;
     }).join('');
-    const n = claimable();
+    const n = claimable() + [...plState.dq.list, ...plState.wq.list].filter((q) => !q.claimed && q.progress >= q.target).length;
     $('#pl-qbadge').hidden = !n;
     $('#pl-qbadge').textContent = n;
   }
   $('#pl-quests').onclick = (e) => {
+    const dq = e.target.closest('[data-dq]'), wq = e.target.closest('[data-wq]');
+    if (dq) return claimPeriodic(false, +dq.dataset.dq);
+    if (wq) return claimPeriodic(true, +wq.dataset.wq);
+    if (e.target.closest('#pl-season-open')) { renderSeasonModal(); $('#season-modal').hidden = false; return; }
     const b = e.target.closest('[data-q]');
     if (!b) return;
     const q = P.QUESTS.find((x) => x.id === b.dataset.q);
@@ -1416,6 +1428,7 @@
     setTimeout(() => {
       riskStep++;
       if (res === side) {
+        qev('risk');
         riskPot = stake * 2;
         setCoins(riskPot);
         plState.won += stake;
@@ -1574,6 +1587,7 @@
     plState.orders = plState.orders.filter((o) => {
       if (!P.orderTest(o, p, sc)) return true;
       win += o.reward;
+      qev('order');
       extras.push(`<span class="pl-reason order-done"><b>📦</b>${o.client}: заказ выполнен <em>+${fmt(o.reward)}</em></span>`);
       toast(`Заказ «${o.text}» выполнен: +${fmt(o.reward)}`);
       return false;
@@ -1613,6 +1627,11 @@
 
     const order = P.TIERS.findIndex((x) => x.id === t.id);
     resultChime(order);
+    qev('spin');
+    qev('bet', cost);
+    if (order >= 2) qev('rare');
+    if (order >= 3) qev('epic');
+    addSP(1);
     floatWin(`+${fmt(win)}`, t.color);
     if (order >= 2) burst(t.color, [0, 0, 18, 34, 60, 90][order]);
     if (order >= 4) toast(`${t.name.toUpperCase()}: ${P.format(p)} · +${fmt(win)}`);
@@ -1721,6 +1740,7 @@
     if (c > 0) {
       setCoins(duelStake * 2);
       plState.duels.w++;
+      qev('duel');
       $('#duel-res').innerHTML = `Победа! +${fmt(duelStake * 2)} · ${G.rnd.pick(TAUNTS_WIN)}`;
       $('#duel-res').className = 'duel-res win';
     } else if (c < 0) {
@@ -1788,6 +1808,7 @@
   function payJob(base, label) {
     const pay = Math.round(base * workMult());
     plState.jobs = (plState.jobs || 0) + 1;
+    qev('job');
     if (G.rnd.int(0, 99) < 8) { plState.gems = (plState.gems || 0) + 1; toast('💎 +1 — премия от начальства'); }
     if (pay > 0) {
       setCoins(pay);
@@ -2065,6 +2086,7 @@
     const i = +b.dataset.buy, s = currentStock()[i], d = itemDef(s);
     if (plState.coins < s.price || owns(s) || (plState.market.bought[i] || 0) >= s.qty) return;
     plState.market.bought[i] = (plState.market.bought[i] || 0) + 1;
+    qev('market');
     if (s.kind === 'key') {
       plState.keys.push(s.id);
       if (plState.keyEq.length < keySlots()) plState.keyEq.push(s.id);
@@ -2506,6 +2528,7 @@
     setCoins(-amount);
     const nonce = G.uuid4();
     plState.auction.esc = { w: lot.w, amount, nonce, acked: false };
+    qev('auction');
     savePl();
     if (!aucCh || aucHost || !aucHall.length) {
       // ведущий — ты: ставка применяется сразу
@@ -2529,6 +2552,375 @@
   };
   $('#pl-auction').onclick = () => { renderAuction(); $('#auction-modal').hidden = false; };
   $('#au-close').onclick = () => { $('#auction-modal').hidden = true; };
+
+  /* ======================= 3.0: задания дня/недели, сезон, автосалон, профиль, обмен ======================= */
+
+  /* --- ежедневные и недельные задания --- */
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const dayId = () => { const d = new Date(); return `d-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+  const weekId = () => {
+    const d = new Date();
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return `w-${t.getUTCFullYear()}-${Math.ceil(((t - y0) / 864e5 + 1) / 7)}`;
+  };
+  const seasonId = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; };
+  const prestigeK = () => 1 + (plState.prestige || 0);
+
+  function ensurePeriodic() {
+    const make = (id, weekly) => ({
+      id,
+      list: P.pickQuests(id, 3).map((q) => ({ type: q.type, target: weekly ? q.w : q.d, progress: 0, claimed: false })),
+    });
+    if (!plState.dq || plState.dq.id !== dayId()) plState.dq = make(dayId(), false);
+    if (!plState.wq || plState.wq.id !== weekId()) plState.wq = make(weekId(), true);
+    if (!plState.season || plState.season.id !== seasonId()) {
+      plState.season = { id: seasonId(), sp: 0, level: 0, best: (plState.season && plState.season.best) || 0 };
+    }
+  }
+  ensurePeriodic();
+
+  // событие игры двигает прогресс заданий дня и недели
+  function qev(type, n = 1) {
+    ensurePeriodic();
+    let changed = false;
+    [plState.dq, plState.wq].forEach((g) => g.list.forEach((q) => {
+      if (q.type === type && !q.claimed && q.progress < q.target) {
+        q.progress = Math.min(q.target, q.progress + n);
+        changed = true;
+        if (q.progress >= q.target) toast(`📅 Задание готово: ${P.DAILY_POOL.find((x) => x.type === type).name(q.target)}`);
+      }
+    }));
+    if (changed) { savePl(); if (!$('#pl-quests').hidden) renderQuests(); }
+  }
+
+  // очки сезона и награды уровней
+  function addSP(n) {
+    ensurePeriodic();
+    const s = plState.season;
+    s.sp += n;
+    while (s.level < P.SEASON_LEVELS && s.sp >= (s.level + 1) * P.SP_PER_LEVEL) {
+      s.level++;
+      s.best = Math.max(s.best || 0, s.level);
+      const r = P.seasonReward(s.level);
+      if (r.coins) plState.coins += r.coins;
+      if (r.gems) plState.gems = (plState.gems || 0) + r.gems;
+      if (r.item) plState.items[r.item] = (plState.items[r.item] || 0) + r.n;
+      if (r.skin && !plState.skins.includes(r.skin)) plState.skins.push(r.skin);
+      if (r.tuning && !plState.tuning.owned.includes(r.tuning)) plState.tuning.owned.push(r.tuning);
+      toast(`🏁 Сезон: уровень ${s.level} · ${r.label}`);
+      if (s.level % 10 === 0) burst('#f0c552', 50);
+    }
+    savePl();
+  }
+
+  function periodicHTML() {
+    ensurePeriodic();
+    const s = plState.season, lvlSp = s.sp - s.level * P.SP_PER_LEVEL;
+    const group = (g, weekly) => g.list.map((q, i) => {
+      const done = q.progress >= q.target, name = P.DAILY_POOL.find((x) => x.type === q.type).name(q.target);
+      const r = weekly ? P.WEEKLY_REWARD : P.DAILY_REWARD;
+      const reward = `<i class="coin"></i>${fmtShort(r.coins * prestigeK())}${r.gems ? ` · <i class="gem"></i>${r.gems}` : ''} · ${r.sp} SP`;
+      return `
+        <div class="quest ${q.claimed ? 'got' : done ? 'ready' : ''}">
+          <div class="quest-body">
+            <div class="quest-name">${name}</div>
+            ${!q.claimed ? `<div class="quest-bar"><i style="width:${(q.progress / q.target) * 100}%"></i></div><small>${fmt(q.progress)} / ${fmt(q.target)}</small>` : ''}
+          </div>
+          ${q.claimed ? '<span class="quest-done">✓</span>' : done ? `<button class="shop-buy claim" data-${weekly ? 'wq' : 'dq'}="${i}">Забрать</button>` : `<span class="quest-reward">${reward}</span>`}
+        </div>`;
+    }).join('');
+    const msLeft = (() => { const d = new Date(); d.setHours(24, 0, 0, 0); return d - Date.now(); })();
+    return `
+      <div class="season-box">
+        <div class="season-top"><b>🏁 Сезон ${s.id}</b><span>уровень <b>${s.level}</b> / ${P.SEASON_LEVELS}</span></div>
+        <div class="quest-bar"><i style="width:${s.level >= P.SEASON_LEVELS ? 100 : (lvlSp / P.SP_PER_LEVEL) * 100}%"></i></div>
+        <small>${s.level >= P.SEASON_LEVELS ? 'Пропуск пройден! 🏆' : `${lvlSp} / ${P.SP_PER_LEVEL} SP до уровня ${s.level + 1} · награда: ${P.seasonReward(s.level + 1).label}`}</small>
+        <button class="shop-buy" id="pl-season-open">Все награды сезона</button>
+      </div>
+      <div class="q-head"><b>📅 Задания дня</b><span>обновятся через ${Math.floor(msLeft / 3600000)} ч ${Math.floor((msLeft % 3600000) / 60000)} мин</span></div>
+      ${group(plState.dq, false)}
+      <div class="q-head"><b>🗓 Задания недели</b><span>с понедельника — новые</span></div>
+      ${group(plState.wq, true)}
+      <div class="q-head"><b>🏅 Достижения</b><span>навсегда</span></div>`;
+  }
+
+  function claimPeriodic(weekly, i) {
+    const g = weekly ? plState.wq : plState.dq, q = g.list[i];
+    if (!q || q.claimed || q.progress < q.target) return;
+    q.claimed = true;
+    const r = weekly ? P.WEEKLY_REWARD : P.DAILY_REWARD;
+    if (r.gems) plState.gems = (plState.gems || 0) + r.gems;
+    setCoins(r.coins * prestigeK());
+    addSP(r.sp);
+    floatWin(`+${fmtShort(r.coins * prestigeK())}`, '#5fc2ae');
+    renderQuests();
+  }
+
+  function renderSeasonModal() {
+    const s = plState.season;
+    $('#season-grid').innerHTML = Array.from({ length: P.SEASON_LEVELS }, (_, k) => {
+      const l = k + 1, r = P.seasonReward(l), got = s.level >= l, special = r.skin || r.tuning || l % 10 === 0;
+      return `<div class="season-cell ${got ? 'got' : ''} ${special ? 'special' : ''}"><span>${l}</span><b>${r.label}</b>${got ? '<i>✓</i>' : ''}</div>`;
+    }).join('');
+    $('#season-info').textContent = `Уровень ${s.level} / ${P.SEASON_LEVELS} · ${s.sp} SP · очки: 1 за крутку, 100 за задание дня, 400 за задание недели`;
+  }
+
+  /* --- автосалон --- */
+  const carDef = (id) => P.CARS.find((c) => c.id === id);
+  if (!plState.cars) plState.cars = [];
+  if (plState.trades == null) plState.trades = 0;
+
+  // кузов рисуем SVG: седан, спорткар, внедорожник, лимузин
+  function carSVG(body, color) {
+    const shapes = {
+      sedan: 'M14 78 Q12 62 36 58 L74 38 Q84 32 104 32 L156 32 Q170 32 182 42 L204 56 Q230 58 234 70 L234 80 Q234 86 226 86 L20 86 Q14 86 14 80 Z',
+      sport: 'M12 80 Q12 66 34 62 L84 42 Q96 36 116 36 L150 36 Q168 38 186 50 L212 62 Q234 64 236 74 L236 82 Q236 86 228 86 L18 86 Q12 86 12 80 Z',
+      suv: 'M16 84 L16 50 Q16 42 26 40 L62 38 L82 18 Q86 14 94 14 L186 14 Q196 14 200 24 L208 40 L224 42 Q232 44 232 54 L232 84 Z',
+      limo: 'M8 78 Q8 62 30 58 L68 40 Q78 34 98 34 L182 34 Q196 34 208 44 L226 56 Q246 58 248 70 L248 80 Q248 86 240 86 L14 86 Q8 86 8 78 Z',
+    };
+    const win = {
+      sedan: 'M82 42 L104 37 L130 37 L130 56 L76 56 Z M136 37 L156 37 Q166 37 176 46 L184 56 L136 56 Z',
+      sport: 'M92 46 L116 41 L138 41 L138 58 L84 58 Z M144 41 L152 41 Q166 43 178 52 L182 58 L144 58 Z',
+      suv: 'M88 22 L134 22 L134 40 L72 40 Z M140 22 L184 22 Q190 22 193 30 L198 40 L140 40 Z',
+      limo: 'M76 44 L98 39 L130 39 L130 58 L70 58 Z M136 39 L176 39 L176 58 L136 58 Z M182 39 Q194 40 204 48 L210 58 L182 58 Z',
+    };
+    const wheelsX = body === 'limo' ? [50, 206] : body === 'suv' ? [60, 196] : [56, 194];
+    return `<svg viewBox="0 0 250 100" class="car-svg">
+      <ellipse cx="125" cy="92" rx="112" ry="6" fill="rgba(0,0,0,.35)"/>
+      <path d="${shapes[body]}" fill="${color}" stroke="rgba(255,255,255,.28)" stroke-width="1.5"/>
+      <path d="${shapes[body]}" fill="url(#shine)" opacity=".35"/>
+      <path d="${win[body]}" fill="#1b2633" opacity=".9"/>
+      <defs><linearGradient id="shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+      ${wheelsX.map((x) => `<circle cx="${x}" cy="84" r="15" fill="#121212"/><circle cx="${x}" cy="84" r="8" fill="#9aa0a6"/><circle cx="${x}" cy="84" r="3" fill="#333"/>`).join('')}
+      <rect x="${body === 'suv' ? 222 : 226}" y="62" width="8" height="5" rx="2" fill="#ffe9a8"/>
+    </svg>`;
+  }
+  const carBoostLine = (c) => Object.entries(c.boost).map(([k, v]) => P.BOOST_TEXT[k](v)).join(', ');
+  // номер на тачке: лучший из автопарка или коллекции
+  const showPlate = () => {
+    const all = [...plState.fleet, ...plState.best].sort((a, b) => b.total - a.total);
+    return all[0] ? all[0].p : { l1: 'А', digits: '001', l2: 'АА', region: '77' };
+  };
+  const carHTML = (c, plate, skin) => `<div class="car-wrap">${carSVG(c.body, c.color)}<span class="mini-plate car-plate skin-${skin}"><b>${plate.l1}${plate.digits}${plate.l2}</b><em>${plate.region}</em></span></div>`;
+
+  function renderSalon() {
+    $('#salon-bonus').textContent = `Тачек: ${plState.cars.length} · бонус гаража +${(plState.cars.length * P.CAR_COLLECTION_BONUS).toFixed(1)}% к выплатам${plState.car ? ` · выбрана: ${carDef(plState.car).name}` : ''}`;
+    $('#salon-grid').innerHTML = P.CARS.map((c) => {
+      const owned = plState.cars.includes(c.id), on = plState.car === c.id;
+      return `<div class="salon-card ${on ? 'on' : ''}">
+        ${carHTML(c, showPlate(), plState.skin)}
+        <b>${esc(c.name)}</b><small>${carBoostLine(c)}</small>
+        ${on ? '<span class="mk-owned">ВЫБРАНА</span>' : owned ? `<button class="tn-btn" data-car-sel="${c.id}">Сесть за руль</button>`
+          : `<button class="tn-btn buy" data-car-buy="${c.id}" ${plState.coins < c.price ? 'disabled' : ''}><i class="coin"></i>${fmtShort(c.price)}</button>`}
+      </div>`;
+    }).join('');
+  }
+  $('#salon-grid').onclick = (e) => {
+    const buy = e.target.closest('[data-car-buy]'), sel = e.target.closest('[data-car-sel]');
+    if (buy) {
+      const c = carDef(buy.dataset.carBuy);
+      if (plState.coins < c.price || plState.cars.includes(c.id)) return;
+      plState.cars.push(c.id);
+      plState.car = c.id;
+      setCoins(-c.price);
+      toast(`🚘 Новая тачка: ${c.name}!`);
+      burst('#f0c552', 40);
+    } else if (sel) plState.car = sel.dataset.carSel;
+    else return;
+    savePl();
+    renderSalon();
+    refreshPlates();
+  };
+
+  /* --- профиль игрока --- */
+  const BADGES = {
+    spin1: '🎰', spin100: '💯', spin1000: '🏭', rare: '🔷', epic: '🟣', legendary: '🟠', mythic: '🔴', s777: '7️⃣', elite: '🏛',
+    word: '🔤', r77: '🏙', upgrade: '⬆️', skin: '🎨', bigwin: '💸', work: '💼', online1: '🌐', key1: '🔑', prestige1: '⭐',
+    tune1: '🔧', style50: '✨', auction1: '🔨', gems100: '💎', rich: '💰', rich2: '🏦', million: '🤑', car1: '🚘', trade1: '🤝', season10: '🏁',
+  };
+  // краткая карточка — её же видят соперники в онлайне
+  function myCard() {
+    return {
+      nick: profile.nick.trim() || 'Игрок', grad: profile.grad,
+      title: P.titleFor(plState.level), prestige: plState.prestige || 0, level: plState.level,
+      skin: plState.skin, car: plState.car || null, plate: showPlate(),
+      style: styleNow(), season: (plState.season || {}).level || 0,
+      stats: {
+        spins: plState.spins, bestWin: plState.bestWin || 0, mythic: (plState.tiers || {}).mythic || 0,
+        duels: plState.duels.w, online: (plState.pvpStats || {}).wins || 0, fleet: plState.fleet.length, cars: plState.cars.length,
+      },
+      badges: Object.keys(plState.quests || {}).filter((id) => BADGES[id]),
+    };
+  }
+
+  function profileHTML(c, photo) {
+    const ava = photo ? `url("${photo}")` : GRADS[c.grad] || GRADS[0];
+    const car = c.car && carDef(c.car);
+    const st = c.stats || {};
+    const stat = (v, l) => `<div><b>${v}</b><span>${l}</span></div>`;
+    return `
+      <div class="pf-head">
+        <div class="on-ava ${photo ? 'photo-on' : ''}" style="--ava:${esc(ava)}">${esc(initials(c.nick))}</div>
+        <div><div class="pf-nick">${esc(c.nick)}</div><div class="pf-title">${c.prestige ? `★${c.prestige} ` : ''}${esc(c.title)} · ур. ${c.level} · сезон ${c.season}/${P.SEASON_LEVELS}</div></div>
+      </div>
+      <div class="pf-garage">${car ? carHTML(car, c.plate, c.skin) : `<div class="pf-nocar"><span class="mini-plate skin-${c.skin}"><b>${c.plate.l1}${c.plate.digits}${c.plate.l2}</b><em>${c.plate.region}</em></span><small>Пешком — тачки пока нет</small></div>`}
+        ${car ? `<div class="pf-carname">${esc(car.name)}</div>` : ''}</div>
+      <div class="pf-stats">
+        ${stat(fmtShort(st.spins || 0), 'круток')}${stat(fmtShort(st.bestWin || 0), 'лучший выигрыш')}${stat(st.mythic || 0, 'мификов')}
+        ${stat(st.duels || 0, 'побед над Ашотом')}${stat(st.online || 0, 'побед онлайн')}${stat(c.style || 0, 'стиля')}
+        ${stat(st.fleet || 0, 'в автопарке')}${stat(st.cars || 0, 'тачек')}
+      </div>
+      <div class="pf-badges">${(c.badges || []).map((b) => `<span title="${esc((P.QUESTS.find((q) => q.id === b) || {}).name || '')}">${BADGES[b]}</span>`).join('') || '<small>Значков пока нет — выполняй достижения</small>'}</div>`;
+  }
+  function openProfile(card, photo) {
+    $('#pf-body').innerHTML = profileHTML(card, photo);
+    $('#profile-modal').hidden = false;
+  }
+
+  /* --- обмен с кентами --- */
+  const TR = { ch: null, code: '', opp: null, mine: { coins: 0, gems: 0, items: [] }, theirs: null, myOk: false, theirOk: false, done: false };
+  const itemKey = (it) => `${it.kind}:${it.id || P.format(it.p)}`;
+  const itemLabel = (it) => (it.kind === 'key' ? `🔑 ${P.KEYCHAINS.find((k) => k.id === it.id).name}`
+    : it.kind === 'skin' ? `🎨 Скин «${P.SKINS.find((s) => s.id === it.id).name}»` : `🚗 ${P.format(it.p)} (${P.TIERS.find((t) => t.id === it.tier).name})`);
+  function myTradeables() {
+    return [
+      ...plState.keys.map((id) => ({ kind: 'key', id })),
+      ...plState.skins.filter((id) => id !== 'classic').map((id) => ({ kind: 'skin', id })),
+      ...plState.fleet.map((f) => ({ kind: 'fleet', p: f.p, total: f.total, tier: f.tier })),
+    ];
+  }
+  const trSig = (a, b) => JSON.stringify([a.coins, a.gems, a.items.map(itemKey).sort(), b.coins, b.gems, b.items.map(itemKey).sort()]);
+  const trSend = (event, payload = {}) => TR.ch && TR.ch.send({ type: 'broadcast', event, payload: { ...payload, from: aucId } });
+
+  function renderTrade() {
+    $('#tr-code-v').textContent = TR.code;
+    $('#tr-opp-name').textContent = TR.opp ? TR.opp.nick : 'ждём кента…';
+    const list = (o) => (o && (o.coins || o.gems || o.items.length)
+      ? [o.coins ? `<div><i class="coin"></i>${fmt(o.coins)}</div>` : '', o.gems ? `<div><i class="gem"></i>${fmt(o.gems)}</div>` : '', ...o.items.map((it) => `<div>${esc(itemLabel(it))}</div>`)].join('')
+      : '<div class="note">Пусто</div>');
+    $('#tr-mine-list').innerHTML = list(TR.mine);
+    $('#tr-their-list').innerHTML = list(TR.theirs);
+    const sel = $('#tr-item');
+    const chosen = new Set(TR.mine.items.map(itemKey));
+    sel.innerHTML = '<option value="">+ добавить вещь…</option>' + myTradeables().filter((it) => !chosen.has(itemKey(it))).map((it, i) => `<option value="${i}">${esc(itemLabel(it))}</option>`).join('');
+    $('#tr-ok').disabled = !TR.opp || !TR.theirs || TR.myOk || TR.done;
+    $('#tr-ok').textContent = TR.done ? 'Обмен выполнен ✓' : TR.myOk ? 'Ждём подтверждения кента…' : 'Подтверждаю обмен';
+    $('#tr-status').textContent = TR.done ? '🤝 Готово! Вещи и монеты переехали.' : TR.theirOk ? `${TR.opp.nick} подтвердил — твоя очередь` : TR.myOk ? 'Ты подтвердил' : 'Соберите предложения и подтвердите оба';
+  }
+  function trOfferChanged() {
+    TR.myOk = false;
+    TR.theirOk = false;
+    trSend('offer', { offer: TR.mine });
+    renderTrade();
+  }
+  $('#tr-coins').onchange = () => { TR.mine.coins = Math.max(0, Math.min(Math.floor(+$('#tr-coins').value || 0), Math.floor(plState.coins))); $('#tr-coins').value = TR.mine.coins; trOfferChanged(); };
+  $('#tr-gems').onchange = () => { TR.mine.gems = Math.max(0, Math.min(Math.floor(+$('#tr-gems').value || 0), plState.gems || 0)); $('#tr-gems').value = TR.mine.gems; trOfferChanged(); };
+  $('#tr-item').onchange = () => {
+    const v = $('#tr-item').value;
+    if (v === '') return;
+    if (TR.mine.items.length >= 3) { toast('Не больше 3 вещей за раз'); return renderTrade(); }
+    const chosen = new Set(TR.mine.items.map(itemKey));
+    TR.mine.items.push(myTradeables().filter((it) => !chosen.has(itemKey(it)))[+v]);
+    trOfferChanged();
+  };
+  $('#tr-clear').onclick = () => { TR.mine = { coins: 0, gems: 0, items: [] }; $('#tr-coins').value = ''; $('#tr-gems').value = ''; trOfferChanged(); };
+
+  function trExecute() {
+    if (TR.done) return;
+    const m = TR.mine, t = TR.theirs;
+    // проверяем, что всё своё ещё на месте
+    const have = myTradeables().map(itemKey);
+    if (plState.coins < m.coins || (plState.gems || 0) < m.gems || !m.items.every((it) => have.includes(itemKey(it)))) {
+      toast('Обмен отменён: у тебя уже нет части предложенного');
+      trSend('fail', {});
+      return trOfferChanged();
+    }
+    plState.coins += t.coins - m.coins;
+    plState.gems = (plState.gems || 0) + t.gems - m.gems;
+    m.items.forEach((it) => {
+      if (it.kind === 'key') { plState.keys = plState.keys.filter((x) => x !== it.id); plState.keyEq = plState.keyEq.filter((x) => x !== it.id); }
+      if (it.kind === 'skin') { plState.skins = plState.skins.filter((x) => x !== it.id); if (plState.skin === it.id) plState.skin = 'classic'; }
+      if (it.kind === 'fleet') { const i = plState.fleet.findIndex((f) => P.format(f.p) === P.format(it.p)); if (i >= 0) plState.fleet.splice(i, 1); }
+    });
+    t.items.forEach((it) => {
+      if (it.kind === 'key' && !plState.keys.includes(it.id)) plState.keys.push(it.id);
+      if (it.kind === 'skin' && !plState.skins.includes(it.id)) plState.skins.push(it.id);
+      if (it.kind === 'fleet') plState.fleet.push({ p: it.p, total: it.total, tier: it.tier, ts: Date.now() });
+    });
+    plState.trades = (plState.trades || 0) + 1;
+    TR.done = true;
+    savePl();
+    refreshPlates();
+    toast('🤝 Обмен выполнен!');
+    renderTrade();
+  }
+
+  async function trJoin(code) {
+    if (!aucSb) return toast('Обмен работает только онлайн');
+    await trLeave(true);
+    Object.assign(TR, { code, opp: null, mine: { coins: 0, gems: 0, items: [] }, theirs: null, myOk: false, theirOk: false, done: false });
+    $('#tr-coins').value = '';
+    $('#tr-gems').value = '';
+    const ch = aucSb.channel(`qb-trade-${code}`, { config: { broadcast: { self: false }, presence: { key: aucId } } });
+    TR.ch = ch;
+    ch.on('presence', { event: 'sync' }, () => {
+      const others = Object.keys(ch.presenceState()).filter((k) => k !== aucId);
+      if (others.length > 1) { toast('В этой комнате уже идёт обмен'); return trLeave(); }
+      if (!others.length && TR.opp) { toast(`${TR.opp.nick} вышел из обмена`); TR.opp = null; TR.theirs = null; TR.myOk = TR.theirOk = false; }
+      if (others.length && !TR.opp) trSend('hello', { nick: myNick(), offer: TR.mine });
+      renderTrade();
+    });
+    ch.on('broadcast', { event: 'hello' }, ({ payload }) => {
+      const first = !TR.opp;
+      TR.opp = { id: payload.from, nick: payload.nick };
+      TR.theirs = payload.offer;
+      if (first) trSend('hello', { nick: myNick(), offer: TR.mine });
+      renderTrade();
+    });
+    ch.on('broadcast', { event: 'offer' }, ({ payload }) => { TR.theirs = payload.offer; TR.myOk = false; TR.theirOk = false; TR.done = false; renderTrade(); });
+    ch.on('broadcast', { event: 'ok' }, ({ payload }) => {
+      if (payload.sig !== trSig(TR.theirs, TR.mine)) return;
+      TR.theirOk = true;
+      renderTrade();
+      if (TR.myOk) trExecute();
+    });
+    ch.on('broadcast', { event: 'fail' }, () => { toast('Кент не смог отдать предложенное — обмен отменён'); TR.myOk = TR.theirOk = false; renderTrade(); });
+    ch.subscribe(async (status) => {
+      if (status !== 'SUBSCRIBED') return;
+      await ch.track({ id: aucId });
+      $('#tr-menu').hidden = true;
+      $('#tr-room').hidden = false;
+      renderTrade();
+    });
+  }
+  async function trLeave(silent) {
+    if (TR.ch) { const ch = TR.ch; TR.ch = null; try { await ch.untrack(); await aucSb.removeChannel(ch); } catch {} }
+    if (!silent) { $('#tr-menu').hidden = false; $('#tr-room').hidden = true; }
+  }
+  $('#tr-ok').onclick = () => {
+    if (!TR.opp || !TR.theirs || TR.myOk) return;
+    TR.myOk = true;
+    trSend('ok', { sig: trSig(TR.mine, TR.theirs) });
+    renderTrade();
+    if (TR.theirOk) trExecute();
+  };
+  $('#tr-create').onclick = () => { let c = 'TR-'; for (let i = 0; i < 4; i++) c += G.rnd.pick('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'.split('')); trJoin(c); };
+  $('#tr-join').onclick = () => {
+    let c = $('#tr-code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (c.startsWith('TR')) c = c.slice(2);
+    if (c.length !== 4) return toast('Код — 4 символа, например TR-7K2M');
+    trJoin('TR-' + c);
+  };
+  $('#tr-copy').onclick = () => copy(TR.code);
+  $('#tr-leave').onclick = () => trLeave();
+
+  /* --- панель кнопок над номером --- */
+  $('#pl-salon').onclick = () => { renderSalon(); $('#salon-modal').hidden = false; };
+  $('#pl-profile').onclick = () => openProfile(myCard(), profile.photo);
+  $('#pl-trade').onclick = () => { if (!TR.ch) { $('#tr-menu').hidden = false; $('#tr-room').hidden = true; } else renderTrade(); $('#trade-modal').hidden = false; };
+  ['salon', 'profile', 'trade', 'season'].forEach((m) => { $(`#${m}-close`).onclick = () => { $(`#${m}-modal`).hidden = true; }; });
 
   tickGarage();
   setInterval(() => tickGarage(true), 15000);
@@ -2590,7 +2982,7 @@
     id: myId,
     nick: profile.nick.trim() || `Игрок ${myId.slice(0, 4).toUpperCase()}`,
     level: plState.level, title: P.titleFor(plState.level),
-    grad: profile.grad, photo: smallPhoto,
+    grad: profile.grad, photo: smallPhoto, card: myCard(),
   });
   const infoOf = (id) => (id === myId ? meInfo() : room.infos[id]);
   const nickOf = (id) => (infoOf(id) || {}).nick || 'Игрок';
@@ -2908,6 +3300,13 @@
     target.appendChild(el);
     setTimeout(() => el.remove(), 1600);
   }
+  // клик по игроку — его профиль
+  $('#on-grid').addEventListener('click', (e) => {
+    const slot = e.target.closest('.on-slot[data-id]');
+    if (!slot) return;
+    const info = infoOf(slot.dataset.id);
+    if (info && info.card) openProfile(info.card, info.photo);
+  });
   $('#on-emojis').onclick = (e) => {
     const b = e.target.closest('button');
     if (!b || room.players.length < 2) return;
@@ -3090,7 +3489,7 @@
       spinPlate();
     }
     if (e.key === 'Escape') {
-      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal', '#auction-modal'].forEach((m) => { $(m).hidden = true; });
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal', '#auction-modal', '#salon-modal', '#profile-modal', '#trade-modal', '#season-modal'].forEach((m) => { $(m).hidden = true; });
       stopJob();
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);

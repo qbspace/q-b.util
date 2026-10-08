@@ -1949,3 +1949,114 @@ kbd {
 #pl-bet .bet-max { font-size: 10px; letter-spacing: .06em; }
 #pl-bet .bet-cur { min-width: 120px; text-align: center; font-size: 14px; font-weight: 700; color: #fff; }
 #pl-bet .bet-cur small { font-size: 11px; font-weight: 500; color: #b9b8b2; }
+
+/* ================= 3.0 ================= */
+/* панель кнопок над номером */
+.pl-toolbar { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.pl-toolbar .pl-market-btn { height: 30px; padding: 0 12px; font-size: 11.5px; }
+.pl-market-btn.salon { background: linear-gradient(135deg, #12233a, #0a1220); border-color: rgba(91, 141, 239, .35); }
+.plate-stage { min-height: 140px; }
+
+/* тёмные модалки */
+.dark-card { color: #f2f2ee; background: radial-gradient(70% 50% at 50% 0%, rgba(91, 141, 239, .12), transparent 60%), #141413 !important; border: 1px solid rgba(255, 255, 255, .08); gap: 14px; max-height: calc(100vh - 40px); overflow: auto; }
+.dark-card .cap { color: #9a9a95; }
+.dark-card .cap b { color: #fff; }
+.dark-card .note { color: #8a8984; }
+.dark-card .dots { color: #f2f2ee; }
+
+/* машины */
+.car-wrap { position: relative; width: 100%; max-width: 250px; }
+.car-svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .45)); }
+.car-plate { position: absolute; right: 2%; bottom: 20%; font-size: 9px; border-width: 1.5px; border-radius: 3px; transform: perspective(200px) rotateY(-28deg); }
+.car-plate em { font-size: 7px; }
+.salon-card { width: min(860px, calc(100vw - 32px)); }
+.salon-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.salon-grid .salon-card {
+  width: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 12px; border-radius: 18px; text-align: center;
+  background: radial-gradient(80% 60% at 50% 30%, rgba(255, 255, 255, .06), transparent 70%), #1d1d1b; border: 1.5px solid rgba(255, 255, 255, .06);
+  transition: transform .2s, border-color .2s;
+}
+.salon-grid .salon-card:hover { transform: translateY(-3px); border-color: rgba(91, 141, 239, .5); }
+.salon-grid .salon-card.on { border-color: var(--accent); box-shadow: 0 0 22px rgba(228, 240, 126, .18); }
+.salon-grid b { font-size: 14px; }
+.salon-grid small { font-size: 11px; color: #8ed3c6; min-height: 28px; }
+
+/* профиль */
+.profile-card { width: min(560px, calc(100vw - 32px)); }
+.pf-head { display: flex; align-items: center; gap: 14px; }
+.pf-head .on-ava { width: 64px; height: 64px; border-radius: 18px; font-size: 22px; margin: 0; }
+.pf-nick { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
+.pf-title { font-size: 12px; color: #b9b8b2; margin-top: 2px; }
+.pf-garage {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px; border-radius: 20px;
+  background: radial-gradient(70% 70% at 50% 60%, rgba(91, 141, 239, .18), transparent 70%), linear-gradient(180deg, #1c1c1a, #121211);
+  border: 1px solid rgba(255, 255, 255, .06);
+}
+.pf-garage .car-wrap { max-width: 340px; }
+.pf-garage .car-plate { font-size: 12px; }
+.pf-garage .car-plate em { font-size: 9px; }
+.pf-carname { font-size: 13px; font-weight: 600; color: #f0c552; }
+.pf-nocar { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; }
+.pf-nocar .mini-plate { font-size: 26px; border-width: 2.5px; border-radius: 8px; }
+.pf-nocar small { color: #8a8984; }
+.pf-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pf-stats > div { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 14px; background: #1d1d1b; }
+.pf-stats b { font-size: 17px; font-weight: 600; }
+.pf-stats span { font-size: 10px; color: #8a8984; line-height: 1.25; }
+.pf-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-badges span { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 18px; background: #1d1d1b; border: 1px solid rgba(255, 255, 255, .08); }
+.pf-badges small { color: #8a8984; }
+.on-slot[data-id] .on-player { cursor: pointer; }
+
+/* задания дня / недели и сезон */
+.season-box {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 16px;
+  background: linear-gradient(135deg, rgba(91, 141, 239, .2), rgba(142, 211, 198, .14)); border: 1px solid rgba(91, 141, 239, .3);
+}
+.season-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.season-top b { font-size: 14px; }
+.season-top span { font-size: 11px; color: var(--ink-2); }
+.season-box small { font-size: 10.5px; color: var(--muted); }
+.season-box .shop-buy { align-self: flex-start; }
+.q-head { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 2px 0; }
+.q-head b { font-size: 13px; }
+.q-head span { font-size: 10.5px; color: var(--muted); }
+.season-card { width: min(760px, calc(100vw - 32px)); }
+.season-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.season-cell {
+  position: relative; display: flex; flex-direction: column; gap: 4px; padding: 10px 8px; border-radius: 14px; min-height: 78px;
+  background: #1d1d1b; border: 1.5px solid rgba(255, 255, 255, .06);
+}
+.season-cell span { font-size: 11px; font-weight: 800; color: #8a8984; }
+.season-cell b { font-size: 11px; font-weight: 500; line-height: 1.3; }
+.season-cell i { position: absolute; top: 8px; right: 8px; font-style: normal; color: var(--accent); font-weight: 800; }
+.season-cell.got { background: rgba(228, 240, 126, .1); border-color: rgba(228, 240, 126, .35); }
+.season-cell.special { border-color: rgba(240, 197, 82, .55); box-shadow: inset 0 0 18px rgba(240, 197, 82, .12); }
+
+/* обмен */
+.trade-card { width: min(640px, calc(100vw - 32px)); }
+#tr-room { display: flex; flex-direction: column; gap: 12px; }
+.tr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tr-col { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: #1b1b19; }
+.tr-list { display: flex; flex-direction: column; gap: 4px; min-height: 60px; }
+.tr-list > div { font-size: 12.5px; padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, .05); display: flex; align-items: center; }
+.tr-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dark-card .inp { background: #232321; border-color: rgba(255, 255, 255, .08); color: #f2f2ee; }
+.dark-card select.inp option { background: #1d1d1b; }
+.tr-col .pill { height: 32px; background: rgba(255, 255, 255, .08); color: #f2f2ee; box-shadow: none; }
+.trade-card .btn-main:disabled { opacity: .5; cursor: default; }
+.trade-card .pill.wide { background: rgba(255, 255, 255, .06); color: #c9c8c2; box-shadow: none; }
+.dark-card .on-codebar { background: rgba(255, 255, 255, .06); }
+.dark-card .on-or { color: #8a8984; }
+@media (max-width: 1100px) { .salon-grid { grid-template-columns: repeat(2, 1fr); } .season-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* компактнее, чтобы всё влезало по высоте */
+.plate-card { gap: 10px; padding: 18px 20px; overflow-y: auto; scrollbar-width: none; }
+.plate-card::-webkit-scrollbar { display: none; }
+.pl-result { gap: 6px; }
+.pl-score b { font-size: 36px; }
+@media (max-height: 940px) {
+  .plate-tilt { zoom: .86; }
+  .plate-stage { min-height: 120px; }
+  .pl-level { margin-top: 2px; }
+}
