@@ -54,6 +54,14 @@
         <svg viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M16 7v10"/><path d="M5.5 12h2M9 12h4"/></svg>
         <span>Номера</span>
       </button>
+      <button class="nav-item" data-go="casino">
+        <svg viewBox="0 0 24 24"><path d="M5 19c3-1 5-4 6-9l2-6 2 6c1 5 3 8 6 9"/><path d="M9 14h6"/><circle cx="12" cy="20" r="1.2"/></svg>
+        <span>Казино</span>
+      </button>
+      <button class="nav-item" data-go="biz">
+        <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg>
+        <span>Бизнес</span>
+      </button>
       <button class="nav-item" data-go="history">
         <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
         <span>История</span>
@@ -449,6 +457,7 @@
               <button class="pl-market-btn salon" id="pl-salon">🚘 Салон</button>
               <button class="pl-market-btn" id="pl-trade">🔁 Обмен</button>
               <button class="pl-market-btn" id="pl-profile">👤 Профиль</button>
+              <button class="pl-market-btn" id="pl-album">🗺 Альбом</button>
             </div>
 
             <div class="plate-stage" id="pl-stage">
@@ -532,6 +541,63 @@
               <div class="note">Выплата указана для текущей ставки с учётом «Перекупщика». Шансы — для одной обычной крутки.</div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ---------- CASINO ---------- -->
+      <section class="page" data-page="casino">
+        <div class="casino-layout">
+          <div class="card casino-card">
+            <div class="casino-head">
+              <span class="cap">🚀 CRASH</span>
+              <div class="pl-coins small"><i class="coin"></i><b id="cr-coins">0</b></div>
+            </div>
+            <div class="cr-hist" id="cr-hist"></div>
+            <div class="cr-stage">
+              <canvas id="cr-canvas"></canvas>
+              <div class="cr-mult" id="cr-mult">…</div>
+              <div class="cr-float" id="cr-float"></div>
+            </div>
+            <div class="cr-controls">
+              <div class="cr-bets" id="cr-bets">
+                <span>Ставка <b id="cr-bet-v">1 000</b></span>
+                <button data-crb="1000">1к</button><button data-crb="10000">10к</button><button data-crb="100000">100к</button><button data-crb="1000000">1М</button>
+                <button data-crb="half">½</button><button data-crb="x2">×2</button><button data-crb="max">MAX</button>
+              </div>
+              <input class="inp cr-auto" id="cr-auto" placeholder="Автовывод, напр. 2.5" autocomplete="off">
+            </div>
+            <button class="cr-btn" id="cr-btn">Поставить</button>
+            <div class="note">Пробел — поставить или забрать. Ракета может взорваться в любой момент, даже сразу.</div>
+            <div class="cr-players" id="cr-players"></div>
+          </div>
+          <div class="card casino-card lotto-card">
+            <div class="casino-head"><span class="cap">🎟 ЛОТЕРЕЯ · РАЗ В 15 МИНУТ</span><span class="lt-hall" id="lt-hall"></span></div>
+            <div class="lt-pot"><span>БАНК</span><b id="lt-pot">0</b></div>
+            <div class="lt-timer">Розыгрыш через <b id="lt-timer">—</b></div>
+            <div class="lt-mine" id="lt-mine"></div>
+            <div class="lt-buy">
+              <input class="inp" id="lt-n" type="number" min="1" max="50" value="5">
+              <button class="btn-main" id="lt-buy">Купить билеты · 5 000 шт.</button>
+            </div>
+            <div class="lt-list" id="lt-list"></div>
+            <div class="note" id="lt-last"></div>
+            <div class="note">Чем больше билетов, тем выше шанс. Чтобы забрать банк, будь в сети в момент розыгрыша — иначе деньги за билеты вернутся.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- BUSINESS ---------- -->
+      <section class="page" data-page="biz">
+        <div class="biz-layout">
+          <div class="card biz-map-card">
+            <div class="casino-head">
+              <span class="cap">🏙 БИЗНЕС В ГОРОДЕ</span>
+              <div class="biz-top"><div class="pl-coins small"><i class="coin"></i><b id="biz-coins">0</b></div><span class="biz-rate" id="biz-rate"></span></div>
+            </div>
+            <div class="biz-map" id="biz-map"></div>
+            <div class="note">Точки приносят доход каждую минуту, даже когда приложение закрыто (до 12 часов). Иногда налетают рейдеры — успей отбиться за 2 минуты, иначе точку закроют на 15 минут.</div>
+          </div>
+          <div class="card sand biz-side"><h3>Точки</h3><div class="biz-list" id="biz-list"></div></div>
         </div>
       </section>
 
@@ -676,6 +742,48 @@
     <div class="seg small" id="tn-cats"></div>
     <div class="tn-grid" id="tn-grid"></div>
     <div class="note">Наведи на обвес — примерь бесплатно. В каждой категории можно надеть одну вещь. Стиль надетого даёт бонус к выплатам: каждые 5 стиля = +1%.</div>
+  </div>
+</div>
+
+<div class="modal" id="album-modal" hidden>
+  <div class="modal-card dark-card album-card">
+    <div class="card-head"><span class="cap">🗺 АЛЬБОМ РЕГИОНОВ</span><button class="dots" id="album-close">✕</button></div>
+    <div class="album-sum" id="album-sum"></div>
+    <div class="quest-bar"><i id="album-bar"></i></div>
+    <div class="album-grid" id="album-grid"></div>
+    <div class="note">Регион закрашивается, когда ты выбиваешь его номер в рулетке. Собери весь округ — получи награду. Всю Россию — титул «Хозяин дорог» и скин «Атлас России».</div>
+  </div>
+</div>
+
+<div class="modal" id="def-modal" hidden>
+  <div class="modal-card dark-card def-card">
+    <span class="cap">🚨 РЕЙД</span>
+    <h2 id="def-title">Рейдеры</h2>
+    <button class="def-shield" id="def-shield">🛡️</button>
+    <div class="def-count" id="def-count">0 / 12</div>
+    <div class="au-bar"><i id="def-bar"></i></div>
+    <div class="note">Жми на щит как можно быстрее — 12 ударов за 6 секунд!</div>
+  </div>
+</div>
+
+<div class="cop-lights" id="cop-lights" hidden></div>
+<div class="modal" id="cop-modal" hidden>
+  <div class="modal-card dark-card cop-card">
+    <div class="cop-top">
+      <div class="cop-ava">👮</div>
+      <div><b>Сержант Петрович</b><small>ДПС · пост №7</small></div>
+    </div>
+    <div class="cop-bubble" id="cop-line"></div>
+    <div class="cop-opts" id="cop-opts">
+      <button data-cop="polite">🙂 «Здравствуйте, вот документы»<small>55% — отпустит и даже похвалит</small></button>
+      <button data-cop="bribe">💵 «Может, договоримся?» · <b id="cop-bribe"></b><small>80% — отпустит за денюжку</small></button>
+      <button data-cop="argue">🗣 «А на каком основании?»<small>35% — сдастся и даст 💎</small></button>
+      <button data-cop="run">🏎 Втопить и уехать<small>30% — уйдёшь от погони</small></button>
+    </div>
+    <div class="cop-res" id="cop-res" hidden>
+      <div id="cop-res-text"></div>
+      <button class="btn-main" id="cop-close">Поехали дальше</button>
+    </div>
   </div>
 </div>
 

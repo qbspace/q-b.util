@@ -184,6 +184,8 @@
     { id: 'dragon', name: 'Золотой дракон', price: 0, gems: 300 },
     // награда сезонного пропуска
     { id: 'season', name: 'Чемпион сезона', price: 0, season: true },
+    // награда за полный альбом регионов
+    { id: 'atlas', name: 'Атлас России', price: 0, season: true },
   ];
 
   /* ---------------- чёрный рынок ---------------- */
@@ -219,6 +221,8 @@
     { id: 'safe', name: 'Сейф', icon: '🧰', rarity: 'epic', price: 120000, boost: { garage: 50, work: 25 } },
     { id: 'crown', name: 'Корона', icon: '👑', rarity: 'legendary', price: 600000, boost: { pay: 12, luck: 2 } },
     { id: 'blackcard', name: 'Чёрная карта', icon: '💳', rarity: 'legendary', price: 500000, boost: { pay: 10, happy: 1 } },
+    // подарок инспектора — в продаже не бывает
+    { id: 'whistle', name: 'Свисток Петровича', icon: '📯', rarity: 'epic', price: 0, gift: true, boost: { luck: 2, pay: 3 } },
   ];
 
   // Расходники — копятся в рюкзаке, применяются кнопкой
@@ -248,7 +252,7 @@
       const rarity = pickW(MARKET_RARITY);
       const kindR = rnd01();
       const kind = kindR < 0.45 ? 'key' : kindR < 0.62 ? 'skin' : 'item';
-      const pool = kind === 'key' ? KEYCHAINS.filter((k) => k.rarity === rarity)
+      const pool = kind === 'key' ? KEYCHAINS.filter((k) => k.rarity === rarity && !k.gift)
         : kind === 'skin' ? SKINS.filter((s) => s.market === rarity)
           : CONSUMABLES.filter((c) => c.rarity === rarity);
       if (!pool.length) continue;
@@ -402,6 +406,45 @@
   ];
   const CAR_COLLECTION_BONUS = 0.5; // % к выплатам за каждую тачку в гараже
 
+  /* ---------------- альбом регионов ---------------- */
+  const OKRUGS = [
+    { id: 'cfo', name: 'Центральный', color: '#5b8def', regions: ['Москва', 'Московская обл.', 'Белгородская обл.', 'Брянская обл.', 'Владимирская обл.', 'Воронежская обл.', 'Ивановская обл.', 'Калужская обл.', 'Костромская обл.', 'Курская обл.', 'Липецкая обл.', 'Орловская обл.', 'Рязанская обл.', 'Смоленская обл.', 'Тамбовская обл.', 'Тверская обл.', 'Тульская обл.', 'Ярославская обл.'] },
+    { id: 'szfo', name: 'Северо-Западный', color: '#8ed3c6', regions: ['Санкт-Петербург', 'Ленинградская обл.', 'Карелия', 'Коми', 'Архангельская обл.', 'Вологодская обл.', 'Калининградская обл.', 'Мурманская обл.', 'Новгородская обл.', 'Псковская обл.'] },
+    { id: 'yufo', name: 'Южный', color: '#f0b35a', regions: ['Краснодарский край', 'Адыгея', 'Волгоградская обл.', 'Ростовская обл.', 'Крым', 'Севастополь'] },
+    { id: 'skfo', name: 'Северо-Кавказский', color: '#e2a6c6', regions: ['Ставропольский край', 'Чечня', 'Дагестан', 'Кабардино-Балкария'] },
+    { id: 'pfo', name: 'Приволжский', color: '#a06cf0', regions: ['Татарстан', 'Башкортостан', 'Марий Эл', 'Мордовия', 'Удмуртия', 'Чувашия', 'Кировская обл.', 'Нижегородская обл.', 'Оренбургская обл.', 'Пензенская обл.', 'Пермский край', 'Самарская обл.', 'Саратовская обл.', 'Ульяновская обл.'] },
+    { id: 'ufo', name: 'Уральский', color: '#cfe07a', regions: ['Курганская обл.', 'Свердловская обл.', 'Тюменская обл.', 'Челябинская обл.', 'ХМАО — Югра', 'ЯНАО'] },
+    { id: 'sfo', name: 'Сибирский', color: '#6bd3ff', regions: ['Алтайский край', 'Красноярский край', 'Иркутская обл.', 'Кемеровская обл.', 'Новосибирская обл.', 'Омская обл.', 'Томская обл.', 'Хакасия'] },
+    { id: 'dfo', name: 'Дальневосточный', color: '#ff7b6b', regions: ['Якутия', 'Приморский край', 'Хабаровский край', 'Забайкальский край', 'Бурятия'] },
+  ];
+  // награда за собранный округ: чем больше регионов, тем жирнее
+  const okrugReward = (o) => ({ coins: o.regions.length * 250000, gems: 5 + o.regions.length });
+
+  /* ---------------- бизнес ---------------- */
+  // доход в минуту на 1 уровне ≈ цена / 400 (окупается за ~7 часов)
+  const BUSINESSES = [
+    { id: 'wash', name: 'Автомойка «Чисто»', icon: '🧽', price: 100000, x: 18, y: 66 },
+    { id: 'tire', name: 'Шиномонтаж 24/7', icon: '🛞', price: 400000, x: 36, y: 30 },
+    { id: 'park', name: 'Стоянка у метро', icon: '🅿️', price: 1500000, x: 52, y: 72 },
+    { id: 'fuel', name: 'Заправка «Бензин»', icon: '⛽', price: 6000000, x: 70, y: 40 },
+    { id: 'service', name: 'Автосервис', icon: '🔧', price: 25000000, x: 84, y: 74 },
+    { id: 'dealer', name: 'Автосалон', icon: '🏎️', price: 120000000, x: 28, y: 48 },
+    { id: 'gibdd', name: 'Своё отделение ГИБДД', icon: '🚓', price: 600000000, x: 62, y: 18 },
+  ];
+  const BIZ_MAX = 10;
+  const bizIncome = (b, lvl) => (lvl ? (b.price / 400) * (1 + 0.7 * (lvl - 1)) : 0);
+  const bizUpgrade = (b, lvl) => Math.round((b.price * 1.7 ** lvl) / 1000) * 1000;
+
+  /* ---------------- лотерея ---------------- */
+  const LOTTERY_EVERY = 15 * 60000;
+  const LOTTERY_TICKET = 5000;
+  const LOTTERY_MAX = 50;
+
+  /* ---------------- crash ---------------- */
+  const CRASH_EDGE = 0.97; // 3% в пользу заведения
+  const CRASH_K = 0.00011; // скорость роста множителя: ×1.8 за 5 с, ×3 за 10 с
+  const CRASH_BOTS = ['Ашот', 'Гоша', 'Рустам', 'Тимур', 'Арсен', 'Михалыч', 'Жека', 'Валера', 'Серёга', 'Дэн'];
+
   // Требование для престижа растёт: 1 млн, 2 млн, 3 млн…
   const prestigeNeed = (n) => 1000000 * (n + 1);
   const PRESTIGE_BONUS = 25;
@@ -434,6 +477,11 @@
     { id: 'car1', name: 'Купи первую тачку в автосалоне', reward: 30000, done: (s) => (s.cars || []).length >= 1 },
     { id: 'trade1', name: 'Соверши обмен с кентом', reward: 20000, done: (s) => (s.trades || 0) >= 1 },
     { id: 'season10', name: 'Дойди до 10 уровня сезона', reward: 100000, done: (s) => ((s.season || {}).best || 0) >= 10 },
+    { id: 'album1', name: 'Собери целый федеральный округ', reward: 200000, done: (s) => Object.keys(s.albumDone || {}).length >= 1 },
+    { id: 'biz1', name: 'Открой первый бизнес', reward: 50000, done: (s) => Object.values(s.biz || {}).some((b) => b.lvl > 0) },
+    { id: 'crash10', name: 'Выйди из Crash на ×10 или выше', reward: 100000, done: (s) => (s.crashBest || 0) >= 10 },
+    { id: 'lotto1', name: 'Выиграй лотерею', reward: 100000, done: (s) => (s.lottoWins || 0) >= 1 },
+    { id: 'petrovich', name: 'Получи подарок от Петровича', reward: 50000, done: (s) => (s.keys || []).includes('whistle') },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 1200, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
     { id: 'rich2', name: 'Накопи 100 000 монет', reward: 10000, done: (s) => s.coins >= 100000, progress: (s) => [Math.min(s.coins, 100000), 100000] },
     { id: 'million', name: 'Миллионер: накопи 1 000 000', reward: 100000, done: (s) => s.coins >= 1000000, progress: (s) => [Math.min(s.coins, 1000000), 1000000] },
@@ -528,6 +576,7 @@
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
     SPIN_COST, PAYOUT, BETS, BET_UNLOCK, UPGRADES, SKINS, QUESTS,
     TUNING_CATS, TUNING, tuningStyle, STYLE_DIV,
+    OKRUGS, okrugReward, BUSINESSES, BIZ_MAX, bizIncome, bizUpgrade, LOTTERY_EVERY, LOTTERY_TICKET, LOTTERY_MAX, CRASH_EDGE, CRASH_K, CRASH_BOTS,
     DAILY_POOL, DAILY_REWARD, WEEKLY_REWARD, pickQuests, SEASON_LEVELS, SP_PER_LEVEL, seasonReward, CARS, CAR_COLLECTION_BONUS,
     MARKET_REROLL_GEMS, rerollPrice, GEM_RATE, GEM_SHOP, GEMS_FOR_TIER, questGems, AUCTION_EVERY, AUCTION_LEN, AUCTION_EXTEND, AUCTION_BOTS, fleetRent, collectionRent,
     MARKET_RARITY, KEY_SLOTS, BOOST_TEXT, KEYCHAINS, CONSUMABLES, MARKET_PERIOD, MARKET_SLOTS, MARKET_REROLL, marketStock, prestigeNeed, PRESTIGE_BONUS,

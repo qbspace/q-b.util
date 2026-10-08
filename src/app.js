@@ -169,6 +169,8 @@
     misc: ['Разное', 'НАЗАД НА ДАШБОРД'],
     tables: ['Тестовые таблицы', 'НАЗАД НА ДАШБОРД'],
     plates: ['Номера РФ', 'НАЗАД НА ДАШБОРД'],
+    casino: ['Казино', 'НАЗАД НА ДАШБОРД'],
+    biz: ['Бизнес', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -182,6 +184,8 @@
     $('#page-title').textContent = page === 'dashboard' ? greeting() : PAGES[page][0];
     $('#page-crumb').innerHTML = `${PAGES[page][1]} <i>›</i>`;
     if (page === 'history') renderHistory();
+    if (page === 'casino') { renderCrash(); renderLotto(); }
+    if (page === 'biz') renderBiz();
     if (page === 'dashboard') renderDash();
   }
 
@@ -565,6 +569,13 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.0.0': [
+      '🚀 Казино: Crash — забери до взрыва ракеты, с автовыводом и ботами',
+      '🎟 Лотерея раз в 15 минут — общая с кентами, банк растёт',
+      '🏙 Бизнес: 7 точек на карте города, прокачка до 10 уровня, доход даже офлайн, рейдеры',
+      '🗺 Альбом регионов: собирай номера всех регионов по округам, за всю Россию — титул и скин',
+      '👮 Инспектор Петрович тормозит с мигалками и сиреной — договаривайся или втопи',
+    ],
     '3.1.0': [
       '🔔 Уведомления Windows: аукцион, перебили, счастливый час, завоз, колесо, силы, задания',
       'Клик по уведомлению открывает нужное окно; настройка — в «Настройках»',
@@ -977,7 +988,7 @@
 
   /* --- гараж и аренда: пассивный доход, в том числе пока приложение закрыто --- */
   function tickGarage(silent) {
-    const rate = garageRate() + rentRate();
+    const rate = garageRate() + rentRate() + bizRate();
     const now = Date.now();
     if (!rate) { plState.garageTs = now; return 0; }
     const minutes = Math.min((now - plState.garageTs) / 60000, 720);
@@ -988,7 +999,7 @@
     plState.coins += gain;
     savePl();
     renderWallet();
-    if (!silent && gain >= 10) toast(`Гараж и аренда принесли +${fmt(gain)} монет`);
+    if (!silent && gain >= 10) toast(`Гараж, аренда и бизнес принесли +${fmtShort(gain)} монет`);
     return gain;
   }
 
@@ -1636,6 +1647,8 @@
 
     const order = P.TIERS.findIndex((x) => x.id === t.id);
     resultChime(order);
+    albumAdd(p.region);
+    if (!plAuto) copCheck();
     qev('spin');
     qev('bet', cost);
     if (order >= 2) qev('rare');
@@ -2950,7 +2963,7 @@
   $('#pl-salon').onclick = () => { renderSalon(); $('#salon-modal').hidden = false; };
   $('#pl-profile').onclick = () => openProfile(myCard(), profile.photo);
   $('#pl-trade').onclick = () => { if (!TR.ch) { $('#tr-menu').hidden = false; $('#tr-room').hidden = true; } else renderTrade(); $('#trade-modal').hidden = false; };
-  ['salon', 'profile', 'trade', 'season'].forEach((m) => { $(`#${m}-close`).onclick = () => { $(`#${m}-modal`).hidden = true; }; });
+  ['salon', 'profile', 'trade', 'season', 'album'].forEach((m) => { $(`#${m}-close`).onclick = () => { $(`#${m}-modal`).hidden = true; }; });
 
   /* ======================= уведомления Windows ======================= */
   // приходят, только когда окно свёрнуто или не в фокусе; клик ведёт в нужное место
@@ -2962,6 +2975,8 @@
     wheel: '🎡 Колесо фортуны доступно',
     energy: '⚡ Силы для работы восстановились',
     quests: '📅 Задание дня или недели выполнено',
+    raid: '🚨 Рейдеры напали на твой бизнес',
+    lotto: '🎟 Ты выиграл лотерею',
   };
   if (!plState.notified) plState.notified = {};
   const noteOn = (type) => settings.notify && settings.notify.on && settings.notify[type] !== false;
@@ -3022,8 +3037,542 @@
       if (tag === 'wheel' && !$('#pl-daily').hidden) $('#pl-daily').click();
       if (tag === 'energy') $('#pl-work').click();
       if (tag === 'quests') $('#pl-tabs [data-v=quests]').click();
+      if (tag === 'raid') go('biz');
+      if (tag === 'lotto') go('casino');
     });
   }
+
+  /* ======================= 4.0: альбом, бизнес, Crash, лотерея, Петрович ======================= */
+
+  /* --- альбом регионов --- */
+  if (!plState.album) plState.album = {};
+  if (!plState.albumDone) plState.albumDone = {};
+  const okrugOf = (name) => P.OKRUGS.find((o) => o.regions.includes(name));
+  function albumAdd(regionCode) {
+    const name = P.REGIONS[regionCode];
+    if (!name || plState.album[name]) return;
+    plState.album[name] = Date.now();
+    const o = okrugOf(name);
+    toast(`🗺 Новый регион в альбоме: ${name}`);
+    if (o && !plState.albumDone[o.id] && o.regions.every((r) => plState.album[r])) {
+      const r = P.okrugReward(o);
+      plState.albumDone[o.id] = Date.now();
+      plState.coins += r.coins;
+      plState.gems = (plState.gems || 0) + r.gems;
+      toast(`🏆 Собран ${o.name} округ! +${fmtShort(r.coins)} и 💎 ${r.gems}`);
+      burst(o.color, 60);
+    }
+    if (P.OKRUGS.every((ok) => plState.albumDone[ok.id]) && !plState.skins.includes('atlas')) {
+      plState.skins.push('atlas');
+      plState.atlasTitle = true;
+      toast('👑 Вся Россия собрана! Титул «Хозяин дорог» и скин «Атлас России»');
+      burst('#f0c552', 120);
+    }
+    savePl();
+  }
+  function renderAlbum() {
+    const total = P.OKRUGS.reduce((n, o) => n + o.regions.length, 0), got = Object.keys(plState.album).length;
+    $('#album-sum').innerHTML = `Собрано <b>${got}</b> из ${total} регионов · округов <b>${Object.keys(plState.albumDone).length}</b> из ${P.OKRUGS.length}${plState.atlasTitle ? ' · 👑 Хозяин дорог' : ''}`;
+    $('#album-bar').style.width = (got / total) * 100 + '%';
+    $('#album-grid').innerHTML = P.OKRUGS.map((o) => {
+      const n = o.regions.filter((r) => plState.album[r]).length, done = plState.albumDone[o.id], r = P.okrugReward(o);
+      return `<div class="okrug ${done ? 'done' : ''}" style="--oc:${o.color}">
+        <div class="okrug-head"><b>${o.name}</b><span>${n} / ${o.regions.length}</span></div>
+        <div class="okrug-tiles">${o.regions.map((reg) => `<span class="${plState.album[reg] ? 'on' : ''}" title="${esc(reg)}">${esc(reg.replace(' обл.', '').replace(' край', ' кр.'))}</span>`).join('')}</div>
+        <small>${done ? '✓ Награда получена' : `Награда: ${fmtShort(r.coins)} и 💎 ${r.gems}`}</small>
+      </div>`;
+    }).join('');
+  }
+  $('#pl-album').onclick = () => { renderAlbum(); $('#album-modal').hidden = false; };
+
+  /* --- бизнес на карте города --- */
+  if (!plState.biz) plState.biz = {};
+  const bizState = (id) => plState.biz[id] || (plState.biz[id] = { lvl: 0, closedUntil: 0, raidUntil: 0 });
+  // доход всех точек в минуту; закрытые после рейда не платят
+  const bizRate = () => P.BUSINESSES.reduce((sum, b) => {
+    const s = plState.biz[b.id];
+    if (!s || !s.lvl || Date.now() < s.closedUntil || Date.now() < s.raidUntil) return sum;
+    return sum + P.bizIncome(b, s.lvl);
+  }, 0);
+
+  function renderBiz() {
+    $('#biz-coins').textContent = fmtShort(plState.coins);
+    $('#biz-rate').textContent = `+${fmtShort(Math.round(bizRate()))}/мин`;
+    const now = Date.now();
+    $('#biz-map').innerHTML = `<div class="biz-roads"></div>` + P.BUSINESSES.map((b) => {
+      const s = bizState(b.id), raid = now < s.raidUntil, closed = now < s.closedUntil;
+      return `<button class="biz-pin ${s.lvl ? 'own' : ''} ${raid ? 'raid' : ''} ${closed ? 'closed' : ''}" data-biz="${b.id}" style="left:${b.x}%;top:${b.y}%">
+        <span class="biz-ico">${b.icon}</span>${s.lvl ? `<em>${s.lvl}</em>` : ''}${raid ? '<i class="biz-alert">!</i>' : ''}</button>`;
+    }).join('');
+    $('#biz-list').innerHTML = P.BUSINESSES.map((b) => {
+      const s = bizState(b.id), raid = now < s.raidUntil, closed = now < s.closedUntil;
+      const cost = s.lvl ? P.bizUpgrade(b, s.lvl) : b.price, max = s.lvl >= P.BIZ_MAX;
+      const status = raid ? '<span class="biz-st raid">🚨 РЕЙДЕРЫ!</span>' : closed ? `<span class="biz-st closed">🔒 закрыто ${Math.ceil((s.closedUntil - now) / 60000)} мин</span>` : '';
+      return `<div class="biz-row ${s.lvl ? 'own' : ''}">
+        <span class="biz-ico">${b.icon}</span>
+        <div class="biz-body"><b>${esc(b.name)}</b>
+          <small>${s.lvl ? `ур. ${s.lvl}/${P.BIZ_MAX} · +${fmtShort(Math.round(P.bizIncome(b, s.lvl)))}/мин${max ? '' : ` → ${fmtShort(Math.round(P.bizIncome(b, s.lvl + 1)))}`}` : `+${fmtShort(Math.round(P.bizIncome(b, 1)))}/мин`}</small>${status}</div>
+        ${raid ? `<button class="shop-buy raid-btn" data-defend="${b.id}">Отбиться</button>`
+          : max ? '<span class="shop-max">МАКС</span>'
+            : `<button class="shop-buy" data-bizbuy="${b.id}" ${plState.coins < cost ? 'disabled' : ''}>${s.lvl ? '⬆' : 'Купить'} <i class="coin"></i>${fmtShort(cost)}</button>`}
+      </div>`;
+    }).join('');
+  }
+  $('#biz-list').onclick = (e) => {
+    const buy = e.target.closest('[data-bizbuy]'), def = e.target.closest('[data-defend]');
+    if (def) return startDefense(def.dataset.defend);
+    if (!buy) return;
+    const b = P.BUSINESSES.find((x) => x.id === buy.dataset.bizbuy), s = bizState(b.id);
+    const cost = s.lvl ? P.bizUpgrade(b, s.lvl) : b.price;
+    if (plState.coins < cost || s.lvl >= P.BIZ_MAX) return;
+    tickGarage(true); // сначала забираем накопленное по старой ставке
+    s.lvl++;
+    setCoins(-cost);
+    toast(s.lvl === 1 ? `🏙 Открыт бизнес: ${b.name}` : `${b.name}: уровень ${s.lvl}`);
+    if (s.lvl === 1) burst('#8ed3c6', 30);
+    renderBiz();
+  };
+  $('#biz-map').onclick = (e) => {
+    const pin = e.target.closest('[data-biz]');
+    if (!pin) return;
+    const row = [...$$('#biz-list .biz-row')][P.BUSINESSES.findIndex((b) => b.id === pin.dataset.biz)];
+    if (row) { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 900); }
+  };
+
+  // рейдеры: изредка налетают на твою точку, пока приложение открыто
+  if (!plState.raidNext) plState.raidNext = Date.now() + G.rnd.int(20, 40) * 60000;
+  function raidTick() {
+    const now = Date.now();
+    P.BUSINESSES.forEach((b) => {
+      const s = plState.biz[b.id];
+      if (s && s.raidUntil && now >= s.raidUntil) {
+        // не отбился вовремя — точка закрыта на 15 минут
+        s.closedUntil = s.raidUntil + 15 * 60000;
+        s.raidUntil = 0;
+        toast(`🔒 Рейдеры закрыли «${b.name}» на 15 минут`);
+        savePl();
+      }
+    });
+    const owned = P.BUSINESSES.filter((b) => (plState.biz[b.id] || {}).lvl > 0 && now >= (plState.biz[b.id].closedUntil || 0));
+    if (owned.length && now >= plState.raidNext) {
+      const b = G.rnd.pick(owned), s = bizState(b.id);
+      tickGarage(true);
+      s.raidUntil = now + 2 * 60000;
+      plState.raidNext = now + G.rnd.int(30, 60) * 60000;
+      savePl();
+      toast(`🚨 Рейдеры на «${b.name}»! Отбейся за 2 минуты в разделе «Бизнес»`);
+      pushNote('raid', '🚨 Рейдеры!', `Наехали на «${b.name}» — отбейся за 2 минуты`);
+    }
+    if (current === 'biz') renderBiz();
+  }
+  setInterval(raidTick, 5000);
+
+  // мини-игра: успей нажать на щит 12 раз за 6 секунд
+  let defense = null;
+  function startDefense(id) {
+    const b = P.BUSINESSES.find((x) => x.id === id);
+    defense = { id, hits: 0, need: 12, ends: Date.now() + 6000 };
+    $('#def-title').textContent = `Рейдеры на «${b.name}»`;
+    $('#def-modal').hidden = false;
+    renderDefense();
+    const t = setInterval(() => {
+      if (!defense) return clearInterval(t);
+      if (Date.now() >= defense.ends) { clearInterval(t); finishDefense(false); }
+      else renderDefense();
+    }, 100);
+  }
+  function renderDefense() {
+    const left = Math.max(0, defense.ends - Date.now());
+    $('#def-count').textContent = `${defense.hits} / ${defense.need}`;
+    $('#def-bar').style.width = (left / 6000) * 100 + '%';
+    $('#def-shield').style.setProperty('--hp', `${(defense.hits / defense.need) * 100}%`);
+  }
+  $('#def-shield').onclick = () => {
+    if (!defense) return;
+    defense.hits++;
+    tone(220 + defense.hits * 30, 0, 0.08, 0.04, 'square');
+    $('#def-shield').classList.remove('hit');
+    void $('#def-shield').offsetWidth;
+    $('#def-shield').classList.add('hit');
+    if (defense.hits >= defense.need) finishDefense(true);
+    else renderDefense();
+  };
+  function finishDefense(ok) {
+    const b = P.BUSINESSES.find((x) => x.id === defense.id), s = bizState(defense.id);
+    defense = null;
+    if (ok) {
+      s.raidUntil = 0;
+      const bonus = Math.round(P.bizIncome(b, s.lvl) * 30);
+      plState.coins += bonus;
+      toast(`💪 Отбился! Рейдеры разбежались, бонус +${fmtShort(bonus)}`);
+      burst('#5fc2ae', 40);
+    } else toast('Не успел — попробуй ещё раз, пока рейдеры не закрыли точку');
+    savePl();
+    $('#def-modal').hidden = true;
+    renderBiz();
+    refreshPlates();
+  }
+
+  /* --- Crash --- */
+  const CR = { phase: 'wait', startAt: 0, crashAt: 1, m: 1, bet: 0, auto: 0, cashed: 0, bots: [], hist: [], nextAt: Date.now() + 4000 };
+  const crashPoint = () => {
+    const u = G.rnd.int(0, 999999) / 1e6;
+    return Math.min(1000, Math.max(1, Math.floor((P.CRASH_EDGE / (1 - u)) * 100) / 100));
+  };
+  const multAt = (ms) => Math.floor(Math.exp(P.CRASH_K * ms) * 100) / 100;
+  if (plState.crashBet == null) plState.crashBet = 1000;
+
+  function crashNewRound() {
+    CR.phase = 'bet';
+    CR.crashAt = crashPoint();
+    CR.cashed = 0;
+    CR.m = 1;
+    CR.nextAt = Date.now() + 6000; // 6 секунд на ставки
+    CR.bots = G.rnd.shuffle([...P.CRASH_BOTS]).slice(0, 5).map((name) => ({
+      name, bet: [500, 1000, 5000, 20000, 100000][G.rnd.int(0, 4)], target: Math.round((1.1 + Math.pow(G.rnd.int(1, 1000) / 1000, 3) * 12) * 100) / 100, out: 0,
+    }));
+  }
+  function crashTick() {
+    const now = Date.now();
+    if (CR.phase === 'wait' && now >= CR.nextAt) crashNewRound();
+    else if (CR.phase === 'bet' && now >= CR.nextAt) { CR.phase = 'fly'; CR.startAt = now; }
+    else if (CR.phase === 'fly') {
+      CR.m = multAt(now - CR.startAt);
+      CR.bots.forEach((b) => { if (!b.out && CR.m >= b.target && b.target < CR.crashAt) b.out = b.target; });
+      if (CR.bet && !CR.cashed && CR.auto >= 1.01 && CR.m >= CR.auto && CR.auto < CR.crashAt) crashCashout(CR.auto);
+      if (CR.m >= CR.crashAt) {
+        CR.m = CR.crashAt;
+        CR.phase = 'boom';
+        CR.nextAt = now + 3500;
+        CR.hist.unshift(CR.crashAt);
+        CR.hist = CR.hist.slice(0, 14);
+        if (CR.bet && !CR.cashed) { toast(`💥 Ракета взорвалась на ×${CR.crashAt.toFixed(2)} — ставка сгорела`); tone(110, 0, 0.5, 0.06, 'sawtooth'); }
+        CR.bet = 0;
+      }
+    } else if (CR.phase === 'boom' && now >= CR.nextAt) { CR.phase = 'wait'; CR.nextAt = now; }
+    if (current === 'casino') renderCrash();
+  }
+  setInterval(crashTick, 50);
+
+  function crashCashout(at) {
+    if (!CR.bet || CR.cashed || CR.phase !== 'fly') return;
+    const m = at || CR.m;
+    CR.cashed = m;
+    const win = Math.floor(CR.bet * m);
+    setCoins(win);
+    plState.crashBest = Math.max(plState.crashBest || 0, m);
+    savePl();
+    floatCrash(`+${fmtShort(win)} (×${m.toFixed(2)})`);
+    tone(880, 0, 0.2, 0.04);
+    tone(1320, 0.08, 0.25, 0.03);
+  }
+  function floatCrash(text) {
+    const el = $('#cr-float');
+    el.textContent = text;
+    el.classList.remove('go');
+    void el.offsetWidth;
+    el.classList.add('go');
+  }
+
+  function drawCrash() {
+    const cv = $('#cr-canvas'), ctx = cv.getContext('2d');
+    const w = (cv.width = cv.clientWidth * devicePixelRatio), h = (cv.height = cv.clientHeight * devicePixelRatio);
+    ctx.clearRect(0, 0, w, h);
+    const flying = CR.phase === 'fly' || CR.phase === 'boom';
+    const elapsed = flying ? (CR.phase === 'fly' ? Date.now() - CR.startAt : Math.log(CR.crashAt) / P.CRASH_K) : 0;
+    const maxT = Math.max(8000, elapsed * 1.15), maxM = Math.max(2, multAt(maxT) * 1.05);
+    const X = (t) => 30 * devicePixelRatio + (t / maxT) * (w - 60 * devicePixelRatio);
+    const Y = (m) => h - 24 * devicePixelRatio - ((m - 1) / (maxM - 1)) * (h - 48 * devicePixelRatio);
+    // сетка
+    ctx.strokeStyle = 'rgba(255,255,255,.06)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 5; i++) { const y = (h / 5) * i; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    if (!flying) return;
+    const boom = CR.phase === 'boom';
+    const grad = ctx.createLinearGradient(0, h, w, 0);
+    grad.addColorStop(0, boom ? '#e5484d' : '#8ed3c6');
+    grad.addColorStop(1, boom ? '#ff9a3c' : '#e4f07e');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 4 * devicePixelRatio;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    let lx = 0, ly = 0;
+    for (let t = 0; t <= elapsed; t += Math.max(30, elapsed / 200)) { lx = X(t); ly = Y(multAt(t)); if (t === 0) ctx.moveTo(lx, ly); else ctx.lineTo(lx, ly); }
+    lx = X(elapsed); ly = Y(CR.m);
+    ctx.lineTo(lx, ly);
+    ctx.stroke();
+    ctx.lineTo(lx, h - 24 * devicePixelRatio);
+    ctx.lineTo(X(0), h - 24 * devicePixelRatio);
+    ctx.fillStyle = boom ? 'rgba(229,72,77,.12)' : 'rgba(142,211,198,.1)';
+    ctx.fill();
+    ctx.font = `${30 * devicePixelRatio}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(boom ? '💥' : '🚀', lx, ly);
+  }
+
+  function renderCrash() {
+    $('#cr-coins').textContent = fmtShort(plState.coins);
+    const m = $('#cr-mult');
+    m.className = 'cr-mult ' + CR.phase;
+    m.textContent = CR.phase === 'bet' ? `Старт через ${Math.ceil((CR.nextAt - Date.now()) / 1000)}` : CR.phase === 'wait' ? '…' : `×${CR.m.toFixed(2)}`;
+    if (CR.phase === 'boom') m.textContent = `💥 ×${CR.crashAt.toFixed(2)}`;
+    const btn = $('#cr-btn');
+    if (CR.phase === 'fly' && CR.bet && !CR.cashed) { btn.textContent = `Забрать ${fmtShort(Math.floor(CR.bet * CR.m))}`; btn.className = 'cr-btn cash'; btn.disabled = false; }
+    else if (CR.phase === 'bet' && !CR.bet) { btn.textContent = `Поставить ${fmtShort(plState.crashBet)}`; btn.className = 'cr-btn'; btn.disabled = plState.coins < plState.crashBet; }
+    else if (CR.phase === 'bet' && CR.bet) { btn.textContent = 'Ставка принята — ждём старт'; btn.className = 'cr-btn wait'; btn.disabled = true; }
+    else { btn.textContent = CR.cashed ? `Забрал на ×${CR.cashed.toFixed(2)} ✓` : 'Ждём следующий раунд'; btn.className = 'cr-btn wait'; btn.disabled = true; }
+    $('#cr-hist').innerHTML = CR.hist.map((x) => `<span class="${x >= 10 ? 'big' : x >= 2 ? 'mid' : 'low'}">×${x.toFixed(2)}</span>`).join('');
+    $('#cr-players').innerHTML = [
+      ...(CR.bet || CR.cashed ? [{ name: 'Ты', bet: CR.bet || 0, out: CR.cashed, me: true }] : []),
+      ...CR.bots,
+    ].map((b) => {
+      const st = b.out ? `<b class="ok">×${b.out.toFixed(2)} · +${fmtShort(Math.floor(b.bet * b.out))}</b>`
+        : CR.phase === 'boom' ? '<b class="bad">сгорел</b>' : CR.phase === 'fly' ? '<b>в игре…</b>' : '<b>ставка</b>';
+      return `<div class="${b.me ? 'me' : ''}"><span>${b.me ? '😎 Ты' : esc(b.name)}</span><small>${fmtShort(b.bet)}</small>${st}</div>`;
+    }).join('');
+    drawCrash();
+  }
+
+  $('#cr-btn').onclick = () => {
+    if (CR.phase === 'fly') return crashCashout();
+    if (CR.phase !== 'bet' || CR.bet) return;
+    const bet = plState.crashBet;
+    if (plState.coins < bet) return toast('Не хватает монет');
+    CR.bet = bet;
+    CR.auto = parseFloat(String($('#cr-auto').value).replace(',', '.')) || 0;
+    setCoins(-bet);
+    qev('bet', bet);
+    tone(660, 0, 0.12, 0.03);
+  };
+  $('#cr-bets').onclick = (e) => {
+    const b = e.target.closest('[data-crb]');
+    if (!b) return;
+    const v = b.dataset.crb;
+    plState.crashBet = v === 'x2' ? plState.crashBet * 2 : v === 'half' ? Math.max(10, Math.floor(plState.crashBet / 2)) : v === 'max' ? Math.floor(plState.coins) : +v;
+    plState.crashBet = Math.max(10, Math.min(plState.crashBet, Math.max(10, Math.floor(plState.coins))));
+    savePl();
+    $('#cr-bet-v').textContent = fmt(plState.crashBet);
+  };
+  $('#cr-bet-v').textContent = fmt(plState.crashBet);
+  document.addEventListener('keydown', (e) => {
+    if (current === 'casino' && e.code === 'Space' && !['INPUT', 'TEXTAREA', 'BUTTON'].includes(document.activeElement.tagName)) {
+      e.preventDefault();
+      $('#cr-btn').click();
+    }
+  });
+
+  /* --- лотерея: общий розыгрыш раз в 15 минут --- */
+  const lotRound = () => Math.floor(Date.now() / P.LOTTERY_EVERY);
+  if (!plState.lotto) plState.lotto = { round: 0, mine: 0, paid: 0 };
+  const LT = { ch: null, hall: [], host: false, joinedAt: Date.now(), ledger: {}, round: lotRound(), last: null, drawing: false };
+
+  // боты покупают билеты одинаково у всех (из номера розыгрыша)
+  async function lotBots(round) {
+    const rng = seededRnd(await aucSha(`qb-lotto-${round}`));
+    const names = [...P.AUCTION_BOTS];
+    return Array.from({ length: 4 }, () => {
+      const name = names.splice(rng.int(0, names.length - 1), 1)[0];
+      return { id: 'bot:' + name, nick: name, n: rng.int(3, 30), bot: true };
+    });
+  }
+  async function lotEntries() {
+    const bots = await lotBots(LT.round);
+    return [...bots, ...Object.values(LT.ledger)];
+  }
+  const ltSend = (event, payload) => LT.ch && LT.ch.send({ type: 'broadcast', event, payload: { ...payload, from: aucId } });
+
+  async function lotDraw() {
+    // ведущий тянет победителя среди тех, кто в зале, и ботов
+    const present = new Set(LT.hall.map((h) => h.id));
+    const entries = (await lotEntries()).filter((e) => e.bot || present.has(e.id) || e.id === aucId);
+    const total = entries.reduce((s, e) => s + e.n, 0);
+    const rng = seededRnd(await aucSha(`qb-lotto-draw-${LT.round}-${JSON.stringify(entries.map((e) => [e.id, e.n]))}`));
+    let pick = rng.int(1, total), win = entries[0];
+    for (const e of entries) { if ((pick -= e.n) <= 0) { win = e; break; } }
+    const result = { round: LT.round, winner: win.id, nick: win.nick, pot: total * P.LOTTERY_TICKET, players: entries.filter((e) => !e.bot).map((e) => e.id) };
+    ltSend('lt-result', { result });
+    applyLotResult(result);
+  }
+  function applyLotResult(res) {
+    if (LT.last && LT.last.round === res.round) return;
+    LT.last = res;
+    const L = plState.lotto;
+    if (L.round === res.round && L.mine) {
+      if (res.winner === aucId) {
+        setCoins(res.pot);
+        plState.lottoWins = (plState.lottoWins || 0) + 1;
+        toast(`🎟 Ты выиграл лотерею: +${fmtShort(res.pot)}!`);
+        pushNote('lotto', '🎟 Ты выиграл лотерею!', `+${fmtShort(res.pot)}`);
+        burst('#f0c552', 90);
+      } else if (!res.players.includes(aucId)) {
+        setCoins(L.paid); // тебя не было в зале на розыгрыше — деньги за билеты вернулись
+        toast('🎟 Тебя не было на розыгрыше — деньги за билеты вернулись');
+      } else toast(`🎟 Лотерею выиграл ${res.nick}: ${fmtShort(res.pot)}`);
+      plState.lotto = { round: 0, mine: 0, paid: 0 };
+      savePl();
+    }
+    if (current === 'casino') renderLotto();
+  }
+
+  function joinLottoHall() {
+    if (!aucSb) return;
+    LT.ch = aucSb.channel('qb-lottery-hall', { config: { broadcast: { self: false }, presence: { key: aucId } } });
+    LT.ch.on('presence', { event: 'sync' }, () => {
+      LT.hall = Object.values(LT.ch.presenceState()).map((a) => a[0]).filter(Boolean).sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
+      LT.host = LT.hall.length > 0 && LT.hall[0].id === aucId;
+      if (LT.host) ltSend('lt-ledger', { round: LT.round, ledger: LT.ledger });
+    });
+    LT.ch.on('broadcast', { event: 'lt-buy' }, ({ payload }) => {
+      if (payload.round !== LT.round) return;
+      LT.ledger[payload.from] = { id: payload.from, nick: payload.nick, n: payload.n };
+      if (LT.host) ltSend('lt-ledger', { round: LT.round, ledger: LT.ledger });
+      if (current === 'casino') renderLotto();
+    });
+    LT.ch.on('broadcast', { event: 'lt-ledger' }, ({ payload }) => {
+      if (LT.host || payload.round !== LT.round) return;
+      LT.ledger = { ...payload.ledger, ...(LT.ledger[aucId] ? { [aucId]: LT.ledger[aucId] } : {}) };
+      if (current === 'casino') renderLotto();
+    });
+    LT.ch.on('broadcast', { event: 'lt-result' }, ({ payload }) => applyLotResult(payload.result));
+    LT.ch.on('broadcast', { event: 'lt-sync' }, () => { if (LT.host) ltSend('lt-ledger', { round: LT.round, ledger: LT.ledger }); });
+    LT.ch.subscribe(async (st) => {
+      if (st !== 'SUBSCRIBED') return;
+      await LT.ch.track({ id: aucId, t: LT.joinedAt });
+      ltSend('lt-sync', {});
+    });
+  }
+
+  async function lotTick() {
+    if (LT.drawing) return; // розыгрыш ещё идёт — не тянем второй раз
+    const r = lotRound();
+    if (r !== LT.round) {
+      LT.drawing = true;
+      try { if (!LT.ch || LT.host || !LT.hall.length) await lotDraw(); } finally { LT.round = r; LT.ledger = {}; LT.drawing = false; }
+    }
+    // билеты прошлых розыгрышей без итога — вернуть
+    const L = plState.lotto;
+    if (L.mine && L.round < lotRound() - 1) {
+      setCoins(L.paid);
+      plState.lotto = { round: 0, mine: 0, paid: 0 };
+      savePl();
+      toast('🎟 Итог прошлой лотереи не дошёл — деньги за билеты вернулись');
+    }
+    if (current === 'casino') renderLotto();
+  }
+  setInterval(lotTick, 1000);
+  joinLottoHall();
+
+  async function renderLotto() {
+    const entries = await lotEntries();
+    const total = entries.reduce((s, e) => s + e.n, 0), mine = plState.lotto.round === LT.round ? plState.lotto.mine : 0;
+    const left = (LT.round + 1) * P.LOTTERY_EVERY - Date.now();
+    $('#lt-pot').innerHTML = `<i class="coin"></i>${fmtShort(total * P.LOTTERY_TICKET)}`;
+    $('#lt-timer').textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+    $('#lt-mine').textContent = mine ? `${mine} билет(ов) · шанс ${((mine / total) * 100).toFixed(1)}%` : 'У тебя пока нет билетов';
+    $('#lt-hall').textContent = LT.ch ? `👥 В зале: ${Math.max(1, LT.hall.length)}` : '📴 Офлайн: только боты';
+    $('#lt-list').innerHTML = entries.sort((a, b) => b.n - a.n).map((e) => `<div class="${e.id === aucId ? 'me' : ''}"><span>${e.id === aucId ? 'Ты' : esc(e.nick)}${e.bot ? ' 🤖' : e.id === aucId ? '' : ' 👤'}</span><b>${e.n} 🎟</b></div>`).join('');
+    $('#lt-last').innerHTML = LT.last ? `Прошлый розыгрыш: <b>${esc(LT.last.winner === aucId ? 'ты' : LT.last.nick)}</b> забрал ${fmtShort(LT.last.pot)}` : '';
+    $('#lt-buy').disabled = mine >= P.LOTTERY_MAX;
+  }
+  $('#lt-buy').onclick = () => {
+    const n = Math.max(1, Math.min(+$('#lt-n').value || 1, P.LOTTERY_MAX));
+    const L = plState.lotto;
+    const have = L.round === LT.round ? L.mine : 0;
+    const add = Math.min(n, P.LOTTERY_MAX - have), cost = add * P.LOTTERY_TICKET;
+    if (!add) return toast(`Максимум ${P.LOTTERY_MAX} билетов на розыгрыш`);
+    if (plState.coins < cost) return toast('Не хватает монет');
+    setCoins(-cost);
+    plState.lotto = { round: LT.round, mine: have + add, paid: (L.round === LT.round ? L.paid : 0) + cost };
+    LT.ledger[aucId] = { id: aucId, nick: myNick(), n: plState.lotto.mine };
+    savePl();
+    ltSend('lt-buy', { round: LT.round, nick: myNick(), n: plState.lotto.mine });
+    toast(`🎟 Куплено билетов: ${add}`);
+    renderLotto();
+  };
+
+  /* --- инспектор Петрович --- */
+  if (!plState.copNext) plState.copNext = Date.now() + G.rnd.int(10, 20) * 60000;
+  // двухтональная сирена: воет 3 секунды
+  function siren() {
+    const a = audio();
+    if (!a) return;
+    const t = a.currentTime, o = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+    o.type = 'sawtooth';
+    lp.type = 'lowpass';
+    lp.frequency.value = 1800;
+    for (let i = 0; i < 6; i++) {
+      o.frequency.setValueAtTime(650, t + i * 0.5);
+      o.frequency.linearRampToValueAtTime(980, t + i * 0.5 + 0.25);
+      o.frequency.linearRampToValueAtTime(650, t + i * 0.5 + 0.5);
+    }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.045, t + 0.1);
+    g.gain.setValueAtTime(0.045, t + 2.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+    o.connect(lp).connect(g).connect(master);
+    o.start(t);
+    o.stop(t + 3.05);
+  }
+  const fineOf = (p) => Math.max(500, Math.min(5000000, Math.round(plState.coins * p)));
+  const COP_LINES = ['Сержант Петрович, ДПС. Документики предъявляем.', 'Нарушаем, гражданин? Номерок у вас интересный…', 'Стоять. Проверка документов. Куда торопимся?'];
+
+  function copCheck() {
+    if (Date.now() < plState.copNext || !$('#cop-modal').hidden) return false;
+    plState.copNext = Date.now() + G.rnd.int(20, 40) * 60000;
+    savePl();
+    setTimeout(openCop, 1200);
+    return true;
+  }
+  function openCop() {
+    $('#cop-lights').hidden = false;
+    siren();
+    $('#cop-line').textContent = G.rnd.pick(COP_LINES);
+    $('#cop-opts').hidden = false;
+    $('#cop-res').hidden = true;
+    $('#cop-bribe').textContent = fmtShort(fineOf(0.03));
+    setTimeout(() => { $('#cop-modal').hidden = false; }, 500);
+  }
+  function copResult(text, good) {
+    $('#cop-opts').hidden = true;
+    $('#cop-res').hidden = false;
+    $('#cop-res-text').innerHTML = text;
+    $('#cop-res').className = 'cop-res ' + (good ? 'good' : 'bad');
+    $('#cop-lights').hidden = true;
+    savePl();
+    refreshPlates();
+  }
+  $('#cop-opts').onclick = (e) => {
+    const b = e.target.closest('[data-cop]');
+    if (!b) return;
+    const roll = G.rnd.int(1, 100);
+    // редкий случай: Петрович в духе и дарит свисток
+    if (G.rnd.int(1, 100) <= 4 && !plState.keys.includes('whistle')) {
+      plState.keys.push('whistle');
+      if (plState.keyEq.length < keySlots()) plState.keyEq.push('whistle');
+      burst('#f0c552', 60);
+      return copResult('«Эх, хороший ты парень. Держи свисток на память — пригодится». <b>📯 Свисток Петровича</b> (+2% удачи, +3% к выплатам)', true);
+    }
+    const act = b.dataset.cop;
+    if (act === 'polite') {
+      if (roll <= 55) { const g = fineOf(0.02); plState.coins += g; return copResult(`«Всё в порядке, счастливого пути». Сказал спасибо за вежливость: <b>+${fmtShort(g)}</b>`, true); }
+      const f = fineOf(0.01); plState.coins -= f; return copResult(`«Аптечка просрочена». Штраф <b>−${fmtShort(f)}</b>`, false);
+    }
+    if (act === 'bribe') {
+      const br = fineOf(0.03);
+      if (roll <= 80) { plState.coins -= br; return copResult(`«Ладно, езжай, и чтоб я тебя не видел». Отдал <b>${fmtShort(br)}</b>`, true); }
+      const f = fineOf(0.06); plState.coins -= f; return copResult(`«Ты что, подкупать вздумал?!» Штраф <b>−${fmtShort(f)}</b>`, false);
+    }
+    if (act === 'argue') {
+      if (roll <= 35) { const g = G.rnd.int(5, 15); plState.gems = (plState.gems || 0) + g; return copResult(`«Ладно, умник, езжай». Петрович сдался — <b>💎 +${g}</b> за наглость`, true); }
+      const f = fineOf(0.04); plState.coins -= f; return copResult(`«Поспорь мне тут». Штраф <b>−${fmtShort(f)}</b>`, false);
+    }
+    if (act === 'run') {
+      if (roll <= 30) { plState.items.x3 = (plState.items.x3 || 0) + 1; return copResult('Втопил — и ушёл! Адреналин зашкаливает: <b>🔥 Купон ×3</b> в рюкзак', true); }
+      const f = fineOf(0.08); plState.coins -= f; return copResult(`Погоня, перехват… Штраф <b>−${fmtShort(f)}</b>`, false);
+    }
+  };
+  $('#cop-close').onclick = () => { $('#cop-modal').hidden = true; $('#cop-lights').hidden = true; };
 
   tickGarage();
   setInterval(() => tickGarage(true), 15000);
@@ -3611,7 +4160,7 @@
       spinPlate();
     }
     if (e.key === 'Escape') {
-      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal', '#auction-modal', '#salon-modal', '#profile-modal', '#trade-modal', '#season-modal'].forEach((m) => { $(m).hidden = true; });
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal', '#auction-modal', '#salon-modal', '#profile-modal', '#trade-modal', '#season-modal', '#album-modal'].forEach((m) => { $(m).hidden = true; });
       stopJob();
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);

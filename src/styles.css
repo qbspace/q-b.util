@@ -2090,3 +2090,191 @@ kbd {
 .tgl.small input:checked + i::after { transform: translateX(12px); }
 .tgl.small input:disabled + i { opacity: .4; }
 #set-notify-test { align-self: flex-start; height: 34px; }
+
+/* ================= 4.0 ================= */
+/* меню стало длиннее — на невысоких экранах прячем промо-карточку */
+@media (max-height: 960px) { .sidebar .promo { display: none; } }
+.nav-item { padding-top: 8px; padding-bottom: 8px; }
+
+.pl-coins.small { font-size: 20px; }
+.pl-coins.small .coin { width: 18px; height: 18px; margin-right: 6px; }
+.casino-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+/* казино */
+.casino-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; height: 100%; }
+.casino-card {
+  display: flex; flex-direction: column; gap: 12px; color: #f2f2ee; min-height: 0; overflow: auto;
+  background: radial-gradient(60% 50% at 0% 0%, #2a2a27, transparent 70%), linear-gradient(180deg, #1a1a18, #0f0f0e);
+}
+.casino-card .cap { color: #9a9a95; }
+.casino-card .note { color: #8a8984; }
+.cr-hist { display: flex; gap: 6px; flex-wrap: wrap; min-height: 24px; }
+.cr-hist span { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 8px; background: rgba(255, 255, 255, .06); }
+.cr-hist .low { color: #ff6b70; }
+.cr-hist .mid { color: #8ed3c6; }
+.cr-hist .big { color: #f0c552; background: rgba(240, 197, 82, .14); }
+.cr-stage { position: relative; height: 260px; border-radius: 18px; background: radial-gradient(70% 80% at 30% 100%, rgba(142, 211, 198, .08), transparent 70%), #121211; border: 1px solid rgba(255, 255, 255, .06); overflow: hidden; }
+#cr-canvas { width: 100%; height: 100%; display: block; }
+.cr-mult { position: absolute; inset: 0; display: grid; place-items: center; font-size: 56px; font-weight: 700; letter-spacing: -.03em; pointer-events: none; text-shadow: 0 0 30px rgba(0, 0, 0, .6); }
+.cr-mult.fly { color: #e4f07e; }
+.cr-mult.boom { color: #ff5a5f; animation: shake .5s; }
+.cr-mult.bet, .cr-mult.wait { font-size: 26px; color: #b9b8b2; }
+.cr-float { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); font-size: 26px; font-weight: 700; color: #5fc2ae; opacity: 0; pointer-events: none; text-shadow: 0 0 20px #5fc2ae; }
+.cr-float.go { animation: winfloat 1.6s cubic-bezier(.2, .7, .2, 1) forwards; }
+.cr-controls { display: flex; flex-direction: column; gap: 8px; }
+.cr-bets { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cr-bets span { margin-right: auto; font-size: 13px; color: #c9c8c2; }
+.cr-bets span b { color: #fff; font-family: var(--mono); }
+.cr-bets button { height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, .08); color: #f2f2ee; font-size: 12px; font-weight: 600; }
+.cr-bets button:hover { background: rgba(255, 255, 255, .15); }
+.casino-card .inp { background: #232321; border-color: rgba(255, 255, 255, .08); color: #f2f2ee; }
+.cr-btn {
+  height: 58px; border-radius: 999px; font-size: 16px; font-weight: 800; letter-spacing: .04em; color: #111;
+  background: linear-gradient(135deg, #e4f07e, #8ed3c6); box-shadow: 0 12px 30px rgba(228, 240, 126, .2); transition: transform .15s;
+}
+.cr-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.cr-btn.cash { background: linear-gradient(135deg, #f0c552, #ff9a3c); animation: pulse 1s infinite; }
+.cr-btn.wait, .cr-btn:disabled { background: rgba(255, 255, 255, .08); color: #9a9a95; box-shadow: none; cursor: default; }
+.cr-players { display: flex; flex-direction: column; gap: 4px; }
+.cr-players > div { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 7px 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); font-size: 12.5px; }
+.cr-players > div.me { background: rgba(142, 211, 198, .14); }
+.cr-players small { font-family: var(--mono); color: #9a9a95; }
+.cr-players b { font-weight: 600; font-size: 12px; color: #b9b8b2; }
+.cr-players b.ok { color: #5fc2ae; }
+.cr-players b.bad { color: #ff6b70; }
+
+.lotto-card { background: radial-gradient(70% 50% at 50% 0%, rgba(240, 197, 82, .14), transparent 70%), linear-gradient(180deg, #1a1a18, #0f0f0e); }
+.lt-hall { font-size: 11px; color: #9a9a95; }
+.lt-pot { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px; border-radius: 20px; background: rgba(240, 197, 82, .08); border: 1px solid rgba(240, 197, 82, .25); }
+.lt-pot span { font-size: 10px; font-weight: 800; letter-spacing: .12em; color: #f0c552; }
+.lt-pot b { font-size: 40px; font-weight: 700; letter-spacing: -.03em; display: flex; align-items: center; text-shadow: 0 0 24px rgba(240, 197, 82, .4); }
+.lt-pot b .coin { width: 30px; height: 30px; margin-right: 10px; }
+.lt-timer { text-align: center; font-size: 13px; color: #c9c8c2; }
+.lt-timer b { font-family: var(--mono); color: #fff; font-size: 16px; }
+.lt-mine { text-align: center; font-size: 13px; color: #8ed3c6; min-height: 18px; }
+.lt-buy { display: grid; grid-template-columns: 80px 1fr; gap: 8px; }
+.lt-buy .btn-main { margin: 0; height: 44px; }
+.lt-list { display: flex; flex-direction: column; gap: 4px; }
+.lt-list > div { display: flex; justify-content: space-between; padding: 7px 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); font-size: 12.5px; }
+.lt-list > div.me { background: rgba(142, 211, 198, .14); }
+
+/* бизнес */
+.biz-layout { display: grid; grid-template-columns: 1fr minmax(300px, 380px); gap: 12px; height: 100%; }
+.biz-map-card { display: flex; flex-direction: column; gap: 12px; color: #f2f2ee; background: linear-gradient(180deg, #1a1a18, #0f0f0e); }
+.biz-map-card .cap { color: #9a9a95; }
+.biz-map-card .note { color: #8a8984; }
+.biz-top { display: flex; align-items: center; gap: 12px; }
+.biz-rate { font-size: 13px; font-weight: 600; color: #5fc2ae; }
+.biz-map {
+  position: relative; flex: 1; min-height: 340px; border-radius: 20px; overflow: hidden;
+  background:
+    radial-gradient(30% 25% at 20% 30%, rgba(95, 194, 174, .18), transparent 70%),
+    radial-gradient(25% 20% at 78% 65%, rgba(95, 194, 174, .14), transparent 70%),
+    radial-gradient(40% 20% at 50% 100%, rgba(91, 141, 239, .2), transparent 70%),
+    #191a18;
+}
+.biz-roads { position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 calc(25% - 6px), #2a2b28 calc(25% - 6px) calc(25% + 6px), transparent calc(25% + 6px)),
+    linear-gradient(90deg, transparent 0 calc(58% - 6px), #2a2b28 calc(58% - 6px) calc(58% + 6px), transparent calc(58% + 6px)),
+    linear-gradient(180deg, transparent 0 calc(55% - 6px), #2a2b28 calc(55% - 6px) calc(55% + 6px), transparent calc(55% + 6px)),
+    linear-gradient(180deg, transparent 0 calc(24% - 5px), #262724 calc(24% - 5px) calc(24% + 5px), transparent calc(24% + 5px)),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(240, 197, 82, .35) 18px 30px) 0 calc(55% - 1px) / 100% 2px no-repeat;
+}
+.biz-pin {
+  position: absolute; transform: translate(-50%, -50%); width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center;
+  background: #262624; border: 2px dashed rgba(255, 255, 255, .18); opacity: .7; transition: transform .2s, opacity .2s;
+}
+.biz-pin:hover { transform: translate(-50%, -55%); opacity: 1; }
+.biz-pin .biz-ico { font-size: 28px; filter: grayscale(.8); }
+.biz-pin.own { opacity: 1; border: 2px solid #5fc2ae; background: radial-gradient(circle, rgba(95, 194, 174, .25), #1f2a27); box-shadow: 0 0 22px rgba(95, 194, 174, .3); }
+.biz-pin.own .biz-ico { filter: none; }
+.biz-pin em { position: absolute; bottom: -8px; right: -8px; min-width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800; background: #5fc2ae; color: #111; }
+.biz-pin.raid { border-color: #e5484d; animation: raidpulse .8s ease-in-out infinite; }
+.biz-pin.closed { border-color: #6b6b67; filter: grayscale(1); }
+.biz-alert { position: absolute; top: -10px; left: -10px; width: 22px; height: 22px; border-radius: 50%; background: #e5484d; color: #fff; font-style: normal; font-weight: 800; display: grid; place-items: center; }
+@keyframes raidpulse { 50% { box-shadow: 0 0 30px #e5484d; } }
+.biz-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.biz-list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.biz-row { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; background: rgba(255, 255, 255, .45); transition: box-shadow .3s; }
+.biz-row.flash { box-shadow: 0 0 0 2px #5fc2ae; }
+.biz-row .biz-ico { font-size: 26px; width: 40px; text-align: center; }
+.biz-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.biz-body b { font-size: 13px; }
+.biz-body small { font-size: 11px; color: var(--ink-2); }
+.biz-st { font-size: 10.5px; font-weight: 700; }
+.biz-st.raid { color: #e5484d; }
+.biz-st.closed { color: var(--muted); }
+.raid-btn { background: #e5484d !important; color: #fff !important; animation: pulse 1s infinite; }
+:root[data-theme="dark"] .biz-row { background: rgba(255, 255, 255, .05); }
+
+/* оборона от рейдеров */
+.def-card { width: min(380px, calc(100vw - 32px)); align-items: center; text-align: center; }
+.def-card h2 { font-size: 22px; }
+.def-shield {
+  --hp: 0%; width: 140px; height: 140px; border-radius: 50%; font-size: 70px; display: grid; place-items: center;
+  background: conic-gradient(#5fc2ae var(--hp), rgba(255, 255, 255, .08) 0); box-shadow: 0 0 30px rgba(95, 194, 174, .3); transition: transform .08s;
+}
+.def-shield.hit { animation: hit .12s ease-out; }
+@keyframes hit { 50% { transform: scale(.9); } }
+.def-count { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+.def-card .au-bar { width: 100%; }
+
+/* альбом */
+.album-card { width: min(920px, calc(100vw - 32px)); }
+.album-sum { font-size: 14px; color: #c9c8c2; }
+.album-sum b { color: #fff; }
+#album-bar { display: block; height: 100%; background: linear-gradient(90deg, #5b8def, #8ed3c6, #f0c552); transition: width .5s; }
+.album-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.okrug { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: #1b1b19; border: 1.5px solid rgba(255, 255, 255, .06); }
+.okrug.done { border-color: var(--oc); box-shadow: inset 0 0 24px color-mix(in srgb, var(--oc) 18%, transparent); }
+.okrug-head { display: flex; justify-content: space-between; align-items: baseline; }
+.okrug-head b { font-size: 13px; color: var(--oc); }
+.okrug-head span { font-family: var(--mono); font-size: 12px; color: #9a9a95; }
+.okrug-tiles { display: flex; flex-wrap: wrap; gap: 4px; }
+.okrug-tiles span { font-size: 10.5px; padding: 4px 7px; border-radius: 8px; background: rgba(255, 255, 255, .04); color: #6f6e6a; border: 1px solid rgba(255, 255, 255, .05); }
+.okrug-tiles span.on { background: color-mix(in srgb, var(--oc) 28%, transparent); color: #fff; border-color: color-mix(in srgb, var(--oc) 60%, transparent); }
+.okrug small { font-size: 10.5px; color: #8a8984; }
+
+/* скин «Атлас России» */
+.plate.skin-atlas, .mini-plate.skin-atlas {
+  color: #2b1d0a; text-shadow: 0 1px 0 rgba(255, 255, 255, .5);
+  background:
+    radial-gradient(40% 60% at 25% 40%, rgba(95, 140, 90, .35), transparent 70%),
+    radial-gradient(35% 50% at 70% 60%, rgba(160, 120, 70, .35), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(60, 40, 10, .08) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(90deg, rgba(60, 40, 10, .08) 0 1px, transparent 1px 14px),
+    linear-gradient(135deg, #f3e3bd, #d8bf88);
+}
+.plate.skin-atlas, .plate.skin-atlas .plate-region, .mini-plate.skin-atlas, .mini-plate.skin-atlas em { border-color: #6b4a14; }
+
+/* инспектор */
+/* мигалки — обычный полупрозрачный слой под окном: режим смешивания ломал порядок слоёв */
+.cop-lights { position: fixed; inset: 0; z-index: 90; pointer-events: none; animation: coplights .5s steps(1) infinite; }
+@keyframes coplights {
+  0% { background: radial-gradient(60% 80% at 0% 0%, rgba(255, 40, 40, .55), transparent 60%), radial-gradient(50% 70% at 100% 100%, rgba(40, 90, 255, .25), transparent 60%); }
+  50% { background: radial-gradient(60% 80% at 100% 0%, rgba(40, 90, 255, .6), transparent 60%), radial-gradient(50% 70% at 0% 100%, rgba(255, 40, 40, .25), transparent 60%); }
+}
+.cop-card { width: min(480px, calc(100vw - 32px)); background: radial-gradient(70% 50% at 50% 0%, rgba(40, 90, 255, .18), transparent 60%), #141413 !important; }
+.cop-top { display: flex; align-items: center; gap: 14px; }
+.cop-ava {
+  width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-size: 38px;
+  background: linear-gradient(180deg, #1f3c8a, #10214d); border: 2px solid #f0c552; box-shadow: 0 0 20px rgba(40, 90, 255, .4);
+}
+.cop-top b { font-size: 18px; display: block; }
+.cop-top small { font-size: 11px; color: #9a9a95; }
+.cop-bubble { position: relative; padding: 14px 16px; border-radius: 16px; background: #23232a; font-size: 14px; line-height: 1.45; }
+.cop-bubble::before { content: ''; position: absolute; top: -8px; left: 28px; border: 8px solid transparent; border-bottom-color: #23232a; border-top: 0; }
+.cop-opts { display: flex; flex-direction: column; gap: 6px; }
+.cop-opts button {
+  text-align: left; padding: 12px 14px; border-radius: 14px; background: #1d1d1b; color: #f2f2ee; font-size: 14px; border: 1px solid rgba(255, 255, 255, .06);
+  display: flex; flex-direction: column; gap: 3px; transition: background .2s, transform .15s;
+}
+.cop-opts button:hover { background: #26262f; transform: translateX(3px); }
+.cop-opts small { font-size: 11px; color: #8a8984; }
+.cop-opts b { color: #f0c552; }
+.cop-res { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 16px; font-size: 14px; line-height: 1.5; }
+.cop-res.good { background: rgba(95, 194, 174, .14); }
+.cop-res.bad { background: rgba(229, 72, 77, .14); }
+.cop-res b { color: #fff; }
+@media (max-width: 1150px) { .casino-layout, .biz-layout { grid-template-columns: 1fr; } .album-grid { grid-template-columns: 1fr; } }
