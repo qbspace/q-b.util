@@ -564,6 +564,11 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '1.7.0': [
+      'Работа: три мини-игры за монеты — оператор камеры, проверка номеров и мойка',
+      'Силы восстанавливаются сами, даже когда приложение закрыто',
+      'Без денег кнопка «Крутить» сразу ведёт на работу',
+    ],
     '1.6.0': [
       'Заказы клиентов: выбей нужный номер — получи награду сверху',
       'Уровни и звания от «Пешехода» до «Смотрящего за ГИБДД»',
@@ -957,6 +962,8 @@
     $('#pl-cost').innerHTML = `<i class="coin"></i>${fmt(spinCost())}`;
     const broke = plState.coins < spinCost();
     $('#pl-spin').classList.toggle('broke', broke);
+    $('#pl-spin span').textContent = broke ? '💼 РАБОТАТЬ' : 'КРУТИТЬ';
+    $('#pl-cost').hidden = broke;
     $('#pl-batya').hidden = !(plState.coins < P.SPIN_COST);
     $('#pl-auto').hidden = !lvl('auto');
     renderBets();
@@ -1265,7 +1272,7 @@
     showRiskBtn();
     const cost = spinCost();
     if (plState.coins < cost) {
-      toast(plState.coins < P.SPIN_COST ? 'Монеты кончились — займи у бати или подожди гараж' : 'Не хватает на эту ставку');
+      toast(plState.coins < P.SPIN_COST ? 'Монеты кончились — сходи на работу 💼' : 'Не хватает на эту ставку — снизь ставку или поработай');
       return false;
     }
     plSpinning = true;
@@ -1454,7 +1461,212 @@
     refreshPlates();
   };
 
-  $('#pl-spin').onclick = () => spinPlate();
+  /* --- работа: мини-игры за монеты, ограничены силами --- */
+  const ENERGY_MAX = 10, ENERGY_REGEN = 90000;
+  if (plState.energy == null) { plState.energy = ENERGY_MAX; plState.energyTs = Date.now(); plState.jobs = 0; }
+  const workMult = () => Math.min(2, 1 + 0.03 * (plState.level - 1));
+  let workTimer = null, workKey = null;
+
+  function regenEnergy() {
+    const now = Date.now();
+    if (plState.energy >= ENERGY_MAX) { plState.energyTs = now; return; }
+    const gained = Math.floor((now - plState.energyTs) / ENERGY_REGEN);
+    if (gained > 0) {
+      plState.energy = Math.min(ENERGY_MAX, plState.energy + gained);
+      plState.energyTs = plState.energy >= ENERGY_MAX ? now : plState.energyTs + gained * ENERGY_REGEN;
+      savePl();
+    }
+  }
+
+  function renderEnergy() {
+    regenEnergy();
+    $('#work-energy-bar').style.width = (plState.energy / ENERGY_MAX) * 100 + '%';
+    let t = `${plState.energy} / ${ENERGY_MAX}`;
+    if (plState.energy < ENERGY_MAX) {
+      const left = ENERGY_REGEN - ((Date.now() - plState.energyTs) % ENERGY_REGEN);
+      t += ` · +1 через ${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+    }
+    $('#work-energy-t').textContent = t;
+    $$('#work-menu [data-job]').forEach((b) => { b.disabled = plState.energy < 1; });
+  }
+
+  function openWork() {
+    stopJob();
+    $('#work-menu').hidden = false;
+    $('#work-game').hidden = true;
+    $('#work-mult').textContent = `×${workMult().toFixed(2)} за уровень`;
+    renderEnergy();
+    $('#work-modal').hidden = false;
+  }
+  function stopJob() {
+    clearInterval(workTimer);
+    workTimer = null;
+    if (workKey) document.removeEventListener('keydown', workKey);
+    workKey = null;
+  }
+  $('#pl-work').onclick = openWork;
+  $('#work-close').onclick = () => { stopJob(); $('#work-modal').hidden = true; };
+  setInterval(() => { if (!$('#work-modal').hidden) renderEnergy(); }, 1000);
+
+  function payJob(base, label) {
+    const pay = Math.round(base * workMult());
+    plState.jobs = (plState.jobs || 0) + 1;
+    if (pay > 0) {
+      setCoins(pay);
+      floatWin(`+${pay}`, '#5fc2ae');
+    }
+    savePl();
+    refreshPlates();
+    return pay > 0 ? `${label} <b class="work-pay"><i class="coin"></i>+${pay}</b>` : label;
+  }
+
+  function jobEnd(html) {
+    stopJob();
+    $('#work-game').innerHTML = `
+      <div class="work-result">${html}</div>
+      <div class="btn-row">
+        <button class="pill pill-dark" data-again>Ещё раз <i>›</i></button>
+        <button class="pill pill-white" data-back>Другая работа</button>
+      </div>`;
+  }
+  $('#work-game').addEventListener('click', (e) => {
+    if (e.target.closest('[data-back]')) openWork();
+    if (e.target.closest('[data-again]')) startJob($('#work-game').dataset.job);
+  });
+
+  function startJob(job) {
+    regenEnergy();
+    if (plState.energy < 1) { toast('Нет сил — отдохни немного'); return openWork(); }
+    plState.energy--;
+    if (plState.energy === ENERGY_MAX - 1) plState.energyTs = Date.now();
+    savePl();
+    stopJob();
+    $('#work-menu').hidden = true;
+    const g = $('#work-game');
+    g.onclick = null;
+    g.hidden = false;
+    g.dataset.job = job;
+    ({ camera: jobCamera, check: jobCheck, wash: jobWash })[job](g);
+  }
+  $('#work-menu').onclick = (e) => {
+    const b = e.target.closest('[data-job]');
+    if (b && !b.disabled) startJob(b.dataset.job);
+  };
+
+  function timerBar(g, ms, onEnd) {
+    const t0 = Date.now(), bar = $('.work-timer i', g);
+    workTimer = setInterval(() => {
+      const left = Math.max(0, 1 - (Date.now() - t0) / ms);
+      bar.style.width = left * 100 + '%';
+      if (left <= 0) { clearInterval(workTimer); workTimer = null; onEnd(); }
+    }, 50);
+    return () => Math.max(0, 1 - (Date.now() - t0) / ms);
+  }
+
+  const bigPlate = (p, cls = '') => `<span class="mini-plate work-plate ${cls}"><b>${p.l1}${p.digits}${p.l2}</b><em>${p.region}</em></span>`;
+
+  // 1. Оператор камеры: перепечатать номер с «камеры»
+  const LAT = { A: 'А', B: 'В', E: 'Е', K: 'К', M: 'М', H: 'Н', O: 'О', P: 'Р', C: 'С', T: 'Т', Y: 'У', X: 'Х' };
+  const normPlate = (s) => s.toUpperCase().replace(/[A-Z]/g, (c) => LAT[c] || c).replace(/[^А-ЯЁ0-9]/g, '');
+  function jobCamera(g) {
+    const p = P.random();
+    const tilt = G.rnd.int(-7, 7), skew = G.rnd.int(-12, 12);
+    g.innerHTML = `
+      <div class="work-task">📷 Перепечатай номер с камеры</div>
+      <div class="work-cam"><div class="cam-noise"></div>${bigPlate(p, 'cam')}<span class="cam-rec">● REC</span></div>
+      <div class="work-timer"><i></i></div>
+      <input class="inp work-input" id="cam-in" placeholder="Например: А777МР77" autocomplete="off" spellcheck="false">
+      <div class="note">Enter — отправить. Можно латиницей: A, B, E, K, M, H, O, P, C, T, Y, X.</div>`;
+    $('.work-plate', g).style.transform = `rotate(${tilt}deg) skewX(${skew}deg)`;
+    const inp = $('#cam-in');
+    inp.focus();
+    const left = timerBar(g, 8000, () => jobEnd(`⏱ Не успел. Это был <b>${P.format(p)}</b> ${payJob(0, '')}`));
+    inp.onkeydown = (e) => {
+      if (e.key !== 'Enter') return;
+      const ok = normPlate(inp.value) === P.format(p);
+      const l = left();
+      stopJob();
+      if (ok) jobEnd(payJob(6 + 6 * l, `✅ Верно${l > 0.6 ? ', и быстро!' : '!'}`));
+      else jobEnd(`❌ Мимо. Было <b>${P.format(p)}</b>, ты ввёл <b>${esc(inp.value || '—')}</b> ${payJob(0, '')}`);
+    };
+  }
+
+  // 2. Проверка: настоящий номер или фейк
+  const BAD_LETTERS = 'БГДЖЗИЛПФЦЧШЩЭЮЯ'.split('');
+  const BAD_REGIONS = ['00', '840', '999', '555', '20', '80'];
+  function makeCheckPlate() {
+    const p = P.random();
+    if (G.rnd.int(0, 1)) return { p, real: true };
+    const kind = G.rnd.int(0, 2);
+    if (kind === 0) {
+      const i = G.rnd.int(0, 2), bad = G.rnd.pick(BAD_LETTERS);
+      if (i === 0) p.l1 = bad; else p.l2 = i === 1 ? bad + p.l2[1] : p.l2[0] + bad;
+    } else if (kind === 1) p.digits = '000';
+    else p.region = G.rnd.pick(BAD_REGIONS);
+    return { p, real: false };
+  }
+  function jobCheck(g) {
+    const items = Array.from({ length: 8 }, makeCheckPlate);
+    let i = 0, correct = 0;
+    const show = () => {
+      if (i >= items.length) return jobEnd(payJob(correct * 1.6, `Проверено: <b>${correct} из 8</b> верно`));
+      g.innerHTML = `
+        <div class="work-task">🔍 Настоящий номер или фейк? <span class="work-count">${i + 1} / 8 · верно ${correct}</span></div>
+        <div class="work-check">${bigPlate(items[i].p)}</div>
+        <div class="work-timer"><i></i></div>
+        <div class="btn-row check-btns">
+          <button class="pill pill-white" data-ans="fake">← Фейк</button>
+          <button class="pill pill-dark" data-ans="real">Настоящий →</button>
+        </div>
+        <div class="note">Фейки: буквы не из А В Е К М Н О Р С Т У Х, цифры 000 или несуществующий регион.</div>`;
+      timerBar(g, 3500, () => answer(null));
+    };
+    const answer = (ans) => {
+      clearInterval(workTimer);
+      workTimer = null;
+      const ok = ans === (items[i].real ? 'real' : 'fake');
+      if (ok) correct++;
+      const plate = $('.work-plate', g);
+      if (plate) plate.classList.add(ok ? 'good' : 'bad');
+      i++;
+      setTimeout(show, 380);
+    };
+    g.onclick = (e) => {
+      const b = e.target.closest('[data-ans]');
+      if (b && workTimer) answer(b.dataset.ans);
+    };
+    workKey = (e) => {
+      if (!workTimer) return;
+      if (e.key === 'ArrowLeft') answer('fake');
+      if (e.key === 'ArrowRight') answer('real');
+    };
+    document.addEventListener('keydown', workKey);
+    show();
+  }
+
+  // 3. Мойка: кликай по грязи
+  function jobWash(g) {
+    const p = P.random();
+    const N = 10;
+    const spots = Array.from({ length: N }, () => `<i class="mud" style="left:${G.rnd.int(4, 88)}%;top:${G.rnd.int(8, 70)}%;--s:${G.rnd.int(26, 44)}px;--r:${G.rnd.int(0, 360)}deg"></i>`).join('');
+    g.innerHTML = `
+      <div class="work-task">🧽 Отмой номер — кликай по грязи <span class="work-count" id="wash-c">0 / ${N}</span></div>
+      <div class="work-wash">${bigPlate(p)}${spots}</div>
+      <div class="work-timer"><i></i></div>`;
+    let cleaned = 0;
+    const finish = () => jobEnd(payJob((cleaned / N) * 8 + (cleaned === N ? 2 : 0), cleaned === N ? '✨ Как новенький!' : `Отмыто ${cleaned} из ${N}`));
+    timerBar(g, 6000, finish);
+    $('.work-wash', g).onclick = (e) => {
+      const m = e.target.closest('.mud');
+      if (!m || m.classList.contains('gone') || !workTimer) return;
+      m.classList.add('gone');
+      cleaned++;
+      $('#wash-c').textContent = `${cleaned} / ${N}`;
+      if (cleaned === N) { stopJob(); setTimeout(finish, 250); }
+    };
+  }
+
+  $('#pl-spin').onclick = () => (plState.coins < spinCost() ? openWork() : spinPlate());
   $('#pl-auto').onclick = () => (plAuto ? (plAuto = false) : autoSpin());
   $('#pl-copy').onclick = () => (plCurrent ? copy(P.format(plCurrent)) : toast('Сначала крутани'));
   $('#pl-qr').onclick = () => (plCurrent ? showQR(P.format(plCurrent)) : toast('Сначала крутани'));
@@ -1620,7 +1832,10 @@
       e.preventDefault();
       spinPlate();
     }
-    if (e.key === 'Escape') ['#qr-modal', '#whatsnew', '#duel-modal'].forEach((m) => { $(m).hidden = true; });
+    if (e.key === 'Escape') {
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal'].forEach((m) => { $(m).hidden = true; });
+      stopJob();
+    }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);
   });
 

@@ -484,6 +484,7 @@
               <button class="pl-spin" id="pl-spin"><span>КРУТИТЬ</span><em id="pl-cost"><i class="coin"></i>10</em></button>
               <button class="pill pill-white" id="pl-auto" hidden>×10</button>
               <button class="pill pill-white pl-risk-btn" id="pl-risk-btn" hidden></button>
+              <button class="pill pill-white" id="pl-work">💼 Работа</button>
               <button class="pill pill-white" id="pl-duel">⚔️ Батл</button>
               <button class="pill pill-white icon" id="pl-copy" title="Копировать номер">⧉</button>
               <button class="pill pill-white icon" id="pl-qr" title="QR-код номера">QR</button>
@@ -635,6 +636,23 @@
     <div class="wheel-streak" id="wheel-streak"></div>
     <div class="wheel-res" id="wheel-res"></div>
     <button class="btn-main" id="wheel-go">Крутить колесо <i>›</i></button>
+  </div>
+</div>
+
+<div class="modal" id="work-modal" hidden>
+  <div class="modal-card work-card">
+    <div class="card-head"><span class="cap">💼 РАБОТА</span><button class="dots" id="work-close">✕</button></div>
+    <div class="work-energy">
+      <div class="work-energy-top"><span>⚡ Силы</span><small id="work-energy-t"></small></div>
+      <div class="work-energy-track"><i id="work-energy-bar"></i></div>
+    </div>
+    <div id="work-menu" class="work-menu">
+      <button class="job" data-job="camera"><em>📷</em><b>Оператор камеры</b><span>Перепечатай размытый номер за 8 секунд</span><small>до 12 <i class="coin"></i></small></button>
+      <button class="job" data-job="check"><em>🔍</em><b>Проверка номеров</b><span>8 номеров: настоящий или фейк? Стрелки ← →</span><small>до 13 <i class="coin"></i></small></button>
+      <button class="job" data-job="wash"><em>🧽</em><b>Мойка номеров</b><span>Отмой грязь кликами за 6 секунд</span><small>до 10 <i class="coin"></i></small></button>
+      <div class="note">Каждое задание тратит 1 силу. Оплата растёт с уровнем: <b id="work-mult">×1.00</b></div>
+    </div>
+    <div id="work-game" class="work-game" hidden></div>
   </div>
 </div>
 

@@ -173,6 +173,7 @@
     { id: 'upgrade', name: 'Купи первое улучшение', reward: 50, done: (s) => Object.values(s.upgrades || {}).some((l) => l > 0) },
     { id: 'skin', name: 'Купи скин номера', reward: 100, done: (s) => (s.skins || []).length > 1 },
     { id: 'bigwin', name: 'Выиграй 1 000 за одну крутку', reward: 500, done: (s) => (s.bestWin || 0) >= 1000 },
+    { id: 'work', name: 'Отработай 20 заданий', reward: 100, done: (s) => (s.jobs || 0) >= 20, progress: (s) => [Math.min(s.jobs || 0, 20), 20] },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 400, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
   ];
 
