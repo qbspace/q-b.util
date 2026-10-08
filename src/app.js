@@ -564,6 +564,12 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.2.0': [
+      '🔧 Тюнинг номера: рамки, подсветка, наклейки, болты и ауры — с бесплатной примеркой',
+      'Стиль обвесов даёт бонус к выплатам — до +19% на полном топе',
+      'Обвесы от 5 тысяч до 100 миллионов — есть на что копить',
+      'Скины «Военный», «СССР» и «Лёд» перерисованы',
+    ],
     '2.1.1': [
       'Ставки у Ашота и в онлайне до миллиона и любая своя сумма',
       'У Ашота кнопка «Ва-банк» — поставить всё',
@@ -848,6 +854,7 @@
     garageTs: Date.now(), batyaTs: 0, bet: 1,
     xp: 0, level: 1, orders: [], jackpot: P.JACKPOT_SEED, hist: [], duels: { w: 0, l: 0 },
     happyUntil: 0, happyNext: 0,
+    tuning: { owned: [], eq: {} }, styleNow: 0,
     keys: [], keyEq: [], items: {}, prestige: 0, market: { w: 0, bought: {}, rerolls: 0 }, talonActive: false, x3Left: 0,
   };
   const plSaved = load('qb.plates', null);
@@ -869,9 +876,14 @@
   const upg = (id) => P.UPGRADES.find((u) => u.id === id);
   // суммарный буст надетых брелков по типу
   const kb = (type) => plState.keyEq.reduce((sum, id) => sum + (((P.KEYCHAINS.find((k) => k.id === id) || {}).boost || {})[type] || 0), 0);
+  // стиль надетых обвесов тюнинга: каждые 5 очков = +1% к выплатам
+  const styleNow = () => Object.values(plState.tuning.eq).reduce((sum, id) => {
+    const t = P.TUNING.find((x) => x.id === id);
+    return sum + (t ? P.tuningStyle(t) : 0);
+  }, 0);
   const luckChance = () => (lvl('luck') * upg('luck').per + kb('luck')) / 100;
   const moscowChance = () => (lvl('moscow') * upg('moscow').per + kb('moscow')) / 100;
-  const payMult = () => 1 + (lvl('collector') * upg('collector').per + kb('pay') + plState.prestige * P.PRESTIGE_BONUS) / 100;
+  const payMult = () => 1 + (lvl('collector') * upg('collector').per + kb('pay') + plState.prestige * P.PRESTIGE_BONUS + styleNow() / P.STYLE_DIV) / 100;
   const spinCost = () => P.SPIN_COST * plState.bet;
   // Оценка отдачи по результатам симуляций (на 1 млн круток)
   // оценка отдачи по симуляциям: база 123%, удача и Москва поднимают шанс редких номеров
@@ -1267,6 +1279,7 @@
 
   function refreshPlates() {
     $('#plate').className = `plate skin-${plState.skin}`;
+    applyTuning($('#pl-tilt'), plState.tuning.eq);
     renderWallet();
     renderOrders();
     renderShop();
@@ -1960,6 +1973,113 @@
     checkHappy();
   };
 
+  /* --- тюнинг: рамки, подсветка, наклейки, болты, аура --- */
+  const tDef = (id) => P.TUNING.find((t) => t.id === id);
+  let tnCat = 'frame', tnTry = null;
+  // цвет плитки в списке обвесов
+  const SW = {
+    'f-chrome': 'linear-gradient(135deg,#9ea3a8,#f6f7f8,#7d8287)', 'f-carbon': 'repeating-linear-gradient(45deg,#1b1b1b 0 4px,#333 4px 8px)',
+    'f-gold': 'linear-gradient(135deg,#fbeab6,#d9ab4f,#b98a31)', 'f-neon': 'linear-gradient(135deg,#2bf0ff,#ff2bd6)',
+    'f-diamond': 'conic-gradient(#e9f6ff,#c9e7ff,#fff,#d7c9ff,#e9f6ff)', 'f-rainbow': 'linear-gradient(90deg,#ff6b6b,#ffd36b,#8ef08e,#6bd3ff,#b48cff)',
+    'g-blue': 'radial-gradient(#3d8bff,#0b1a3a)', 'g-red': 'radial-gradient(#ff3d3d,#3a0b0b)', 'g-green': 'radial-gradient(#7dff3d,#123a0b)',
+    'g-rgb': 'conic-gradient(#ff3d3d,#ffd33d,#3dff7d,#3dd3ff,#b03dff,#ff3d3d)', 'g-void': 'radial-gradient(#000 30%,#6b2bff 70%,#000)',
+    'b-gold': 'radial-gradient(circle at 35% 35%,#fff6c9,#f0c552 55%,#8a6414)', 'b-black': 'radial-gradient(circle at 35% 35%,#888,#111 60%)',
+    'b-ruby': 'radial-gradient(circle at 35% 35%,#ffb3b3,#d3142c 55%,#5a0010)', 'b-diamond': 'radial-gradient(circle at 35% 35%,#fff,#bfe6ff 50%,#6aa8d6)',
+    'a-sparks': 'radial-gradient(#ffd36b 10%,#3a2a0b 70%)', 'a-smoke': 'radial-gradient(#bbb,#333)', 'a-lightning': 'linear-gradient(135deg,#0b1a3a,#7df9ff,#0b1a3a)',
+    'a-fire': 'linear-gradient(0deg,#ff3d00,#ffb300,#fff3b0)', 'a-stars': 'radial-gradient(#fff 5%,#1a1240 40%)', 'a-gold': 'linear-gradient(180deg,#fff2b0,#f0c552,#8a6414)',
+  };
+
+  // надеваем обвесы на любую обёртку номера (основную или превью в окне)
+  function applyTuning(wrap, eq) {
+    P.TUNING_CATS.forEach((c) => {
+      const id = eq[c.id];
+      if (id) wrap.dataset[c.id] = id;
+      else delete wrap.dataset[c.id];
+    });
+    const st = wrap.querySelector('.plate-sticker');
+    if (st) st.textContent = eq.sticker ? P.TUNING.find((t) => t.id === eq.sticker).icon : '';
+  }
+
+  function renderTuneStage() {
+    const eq = { ...plState.tuning.eq };
+    if (tnTry) eq[tDef(tnTry).cat] = tnTry; // примерка
+    const clone = $('#pl-tilt').cloneNode(true);
+    clone.removeAttribute('id');
+    clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+    clone.style.removeProperty('--rx');
+    clone.style.removeProperty('--ry');
+    applyTuning(clone, eq);
+    const stage = $('#tn-stage');
+    stage.innerHTML = '';
+    stage.appendChild(clone);
+    stage.classList.toggle('trying', !!tnTry);
+  }
+
+  function renderTune() {
+    const style = styleNow();
+    $('#tn-style').textContent = style;
+    $('#tn-style-bar').style.width = Math.min(100, (style / 96) * 100) + '%';
+    $('#tn-bonus').textContent = `+${(style / P.STYLE_DIV).toFixed(1)}% к выплатам`;
+    $('#tn-cats').innerHTML = P.TUNING_CATS.map((c) => `<button data-v="${c.id}" class="${c.id === tnCat ? 'on' : ''}">${c.icon} ${c.name}</button>`).join('');
+    $('#tn-grid').innerHTML = P.TUNING.filter((t) => t.cat === tnCat).map((t) => {
+      const owned = plState.tuning.owned.includes(t.id), on = plState.tuning.eq[t.cat] === t.id;
+      const btn = on ? `<button class="tn-btn off" data-off="${t.cat}">Снять</button>`
+        : owned ? `<button class="tn-btn" data-eq="${t.id}">Надеть</button>`
+          : `<button class="tn-btn buy" data-buyt="${t.id}" ${plState.coins < t.price ? 'disabled' : ''}><i class="coin"></i>${fmtShort(t.price)}</button>`;
+      return `
+        <div class="tn-item ${on ? 'on' : ''} ${owned ? 'owned' : ''}" data-try="${t.id}">
+          <div class="tn-swatch" style="--sw:${SW[t.id] || '#444'}">${t.icon ? `<span>${t.icon}</span>` : '<i></i>'}</div>
+          <b>${esc(t.name)}</b>
+          <small>+${P.tuningStyle(t)} стиля</small>
+          ${btn}
+        </div>`;
+    }).join('');
+    renderTuneStage();
+  }
+
+  $('#pl-tune').onclick = () => {
+    tnTry = null;
+    renderTune();
+    $('#tune-modal').hidden = false;
+  };
+  $('#tn-close').onclick = () => { tnTry = null; $('#tune-modal').hidden = true; };
+  $('#tn-cats').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    tnCat = b.dataset.v;
+    tnTry = null;
+    renderTune();
+  };
+  // примерка при наведении
+  $('#tn-grid').addEventListener('mouseover', (e) => {
+    const it = e.target.closest('[data-try]');
+    if (!it || tnTry === it.dataset.try) return;
+    tnTry = it.dataset.try;
+    renderTuneStage();
+  });
+  $('#tn-grid').addEventListener('mouseleave', () => { tnTry = null; renderTuneStage(); });
+  $('#tn-grid').onclick = (e) => {
+    const buy = e.target.closest('[data-buyt]'), eqB = e.target.closest('[data-eq]'), off = e.target.closest('[data-off]');
+    if (buy) {
+      const t = tDef(buy.dataset.buyt);
+      if (plState.coins < t.price || plState.tuning.owned.includes(t.id)) return;
+      plState.tuning.owned.push(t.id);
+      plState.tuning.eq[t.cat] = t.id;
+      setCoins(-t.price);
+      toast(`Поставлено: ${t.name} · +${P.tuningStyle(t)} стиля`);
+      if (t.price >= 1000000) burst('#f0c552', 50);
+    } else if (eqB) {
+      const t = tDef(eqB.dataset.eq);
+      plState.tuning.eq[t.cat] = t.id;
+    } else if (off) {
+      delete plState.tuning.eq[off.dataset.off];
+    } else return;
+    plState.styleNow = styleNow();
+    savePl();
+    renderTune();
+    refreshPlates();
+  };
+
   tickGarage();
   setInterval(() => tickGarage(true), 15000);
   if (!plState.hist.length) plState.hist.push(plState.coins);
@@ -2520,7 +2640,7 @@
       spinPlate();
     }
     if (e.key === 'Escape') {
-      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal'].forEach((m) => { $(m).hidden = true; });
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal', '#market-modal', '#tune-modal'].forEach((m) => { $(m).hidden = true; });
       stopJob();
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);

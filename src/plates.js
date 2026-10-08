@@ -255,6 +255,47 @@
     return stock;
   }
 
+  /* ---------------- тюнинг номера ---------------- */
+  const TUNING_CATS = [
+    { id: 'frame', name: 'Рамка', icon: '🖼️' },
+    { id: 'glow', name: 'Подсветка', icon: '💡' },
+    { id: 'sticker', name: 'Наклейка', icon: '🏷️' },
+    { id: 'bolts', name: 'Болты', icon: '🔩' },
+    { id: 'aura', name: 'Аура', icon: '✨' },
+  ];
+  const TUNING = [
+    { id: 'f-chrome', cat: 'frame', name: 'Хромированная', price: 10000 },
+    { id: 'f-carbon', cat: 'frame', name: 'Карбоновая', price: 40000 },
+    { id: 'f-gold', cat: 'frame', name: 'Золотая', price: 150000 },
+    { id: 'f-neon', cat: 'frame', name: 'Неоновая', price: 600000 },
+    { id: 'f-diamond', cat: 'frame', name: 'Бриллиантовая', price: 3000000 },
+    { id: 'f-rainbow', cat: 'frame', name: 'Радужная', price: 15000000 },
+    { id: 'g-blue', cat: 'glow', name: 'Синяя', price: 20000 },
+    { id: 'g-red', cat: 'glow', name: 'Красная', price: 60000 },
+    { id: 'g-green', cat: 'glow', name: 'Кислотная', price: 150000 },
+    { id: 'g-rgb', cat: 'glow', name: 'RGB-перелив', price: 1200000 },
+    { id: 'g-void', cat: 'glow', name: 'Чёрная дыра', price: 10000000 },
+    { id: 's-fire', cat: 'sticker', name: 'Огонёк', icon: '🔥', price: 5000 },
+    { id: 's-skull', cat: 'sticker', name: 'Череп', icon: '💀', price: 15000 },
+    { id: 's-dragon', cat: 'sticker', name: 'Дракон', icon: '🐉', price: 60000 },
+    { id: 's-crown', cat: 'sticker', name: 'Корона', icon: '👑', price: 400000 },
+    { id: 's-gem', cat: 'sticker', name: 'Алмаз', icon: '💎', price: 2500000 },
+    { id: 's-galaxy', cat: 'sticker', name: 'Галактика', icon: '🌌', price: 20000000 },
+    { id: 'b-gold', cat: 'bolts', name: 'Золотые', price: 8000 },
+    { id: 'b-black', cat: 'bolts', name: 'Чёрный хром', price: 30000 },
+    { id: 'b-ruby', cat: 'bolts', name: 'Рубиновые', price: 500000 },
+    { id: 'b-diamond', cat: 'bolts', name: 'Бриллиантовые', price: 5000000 },
+    { id: 'a-sparks', cat: 'aura', name: 'Искры', price: 100000 },
+    { id: 'a-smoke', cat: 'aura', name: 'Дым', price: 300000 },
+    { id: 'a-lightning', cat: 'aura', name: 'Молнии', price: 1500000 },
+    { id: 'a-fire', cat: 'aura', name: 'Пламя', price: 6000000 },
+    { id: 'a-stars', cat: 'aura', name: 'Звездопад', price: 30000000 },
+    { id: 'a-gold', cat: 'aura', name: 'Золотой дождь', price: 100000000 },
+  ];
+  // Стиль растёт с ценой: 5к ≈ 2, 100М ≈ 23. Бонус к выплатам = стиль надетого / 5 %
+  const tuningStyle = (t) => Math.max(1, Math.round(Math.log10(t.price) * 5 - 17));
+  const STYLE_DIV = 5;
+
   // Требование для престижа растёт: 1 млн, 2 млн, 3 млн…
   const prestigeNeed = (n) => 1000000 * (n + 1);
   const PRESTIGE_BONUS = 25;
@@ -280,6 +321,8 @@
     { id: 'online1', name: 'Выиграй онлайн-батл', reward: 450, done: (s) => ((s.pvpStats || {}).wins || 0) >= 1 },
     { id: 'key1', name: 'Купи первый брелок на чёрном рынке', reward: 3000, done: (s) => (s.keys || []).length >= 1 },
     { id: 'prestige1', name: 'Первый престиж', reward: 50000, done: (s) => (s.prestige || 0) >= 1 },
+    { id: 'tune1', name: 'Купи первый обвес в тюнинге', reward: 5000, done: (s) => ((s.tuning || {}).owned || []).length >= 1 },
+    { id: 'style50', name: 'Набери 50 стиля', reward: 500000, done: (s) => (s.styleNow || 0) >= 50, progress: (s) => [Math.min(s.styleNow || 0, 50), 50] },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 1200, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
     { id: 'rich2', name: 'Накопи 100 000 монет', reward: 10000, done: (s) => s.coins >= 100000, progress: (s) => [Math.min(s.coins, 100000), 100000] },
     { id: 'million', name: 'Миллионер: накопи 1 000 000', reward: 100000, done: (s) => s.coins >= 1000000, progress: (s) => [Math.min(s.coins, 1000000), 1000000] },
@@ -373,6 +416,7 @@
   window.Plates = {
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
     SPIN_COST, PAYOUT, BETS, BET_UNLOCK, UPGRADES, SKINS, QUESTS,
+    TUNING_CATS, TUNING, tuningStyle, STYLE_DIV,
     MARKET_RARITY, KEY_SLOTS, BOOST_TEXT, KEYCHAINS, CONSUMABLES, MARKET_PERIOD, MARKET_SLOTS, MARKET_REROLL, marketStock, prestigeNeed, PRESTIGE_BONUS,
     makeOrder, orderTest, ORDER_TTL, xpNeed, levelReward, titleFor, JACKPOT_SEED, JACKPOT_RATE, WHEEL,
   };
