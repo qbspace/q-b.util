@@ -128,10 +128,13 @@
   const ODDS = { common: 0.719, uncommon: 0.214, rare: 0.0366, epic: 0.0279, legendary: 0.00152, mythic: 0.000273 };
 
   /* ---------------- экономика ---------------- */
-  // Выплата за редкость при ставке 10. Базовая отдача ~93%, с полной прокачкой ~108%
+  // Выплата за редкость при ставке 10. Базовая отдача ~123%, с полной прокачкой ~146% —
+  // крутить выгодно, баланс растёт, а ставки ×25…×100 разгоняют его ещё быстрее
   const SPIN_COST = 10;
-  const PAYOUT = { common: 2, uncommon: 13, rare: 45, epic: 75, legendary: 500, mythic: 2000 };
-  const BETS = [1, 2, 5, 10];
+  const PAYOUT = { common: 3, uncommon: 17, rare: 58, epic: 98, legendary: 650, mythic: 2600 };
+  const BETS = [1, 2, 5, 10, 25, 50, 100];
+  // какие ставки открывает каждый уровень «Высоких ставок»
+  const BET_UNLOCK = [2, 10, 50, 100];
 
   const UPGRADES = [
     { id: 'luck', name: 'Связи в ГИБДД', icon: '🤝', per: 1.5, prices: [200, 500, 1200, 2500, 5000],
@@ -140,12 +143,12 @@
       desc: (v) => `${v}% шанс, что выпадет московский регион` },
     { id: 'collector', name: 'Перекупщик', icon: '💼', per: 2, prices: [300, 1200, 4000],
       desc: (v) => `+${v}% ко всем выплатам` },
-    { id: 'garage', name: 'Гараж', icon: '🚗', per: 1, prices: [150, 400, 1000, 2500, 6000],
-      desc: (v) => `+${v} монет в минуту, даже когда приложение закрыто (до 6 ч)` },
+    { id: 'garage', name: 'Гараж', icon: '🚗', values: [2, 5, 10, 20, 40], prices: [150, 600, 2500, 10000, 40000],
+      desc: (v) => `+${v} монет в минуту, даже когда приложение закрыто (до 12 ч)` },
     { id: 'auto', name: 'Автокрутка ×10', icon: '⚡', per: 1, prices: [600],
       desc: () => 'Кнопка «×10»: десять круток подряд, стоп на легендарке' },
-    { id: 'highroller', name: 'Высокие ставки', icon: '🎲', per: 1, prices: [1000],
-      desc: () => 'Открывает ставки ×5 и ×10 — больше риск, больше куш' },
+    { id: 'highroller', name: 'Высокие ставки', icon: '🎲', values: ['×5 и ×10', '×25 и ×50', '×100'], prices: [1000, 15000, 100000],
+      desc: (v) => `Открывает ставки ${v}` },
   ];
 
   // Скины — чистая косметика, на баланс не влияют
@@ -160,32 +163,31 @@
   const TIER_INDEX = Object.fromEntries(TIERS.map((t, i) => [t.id, i]));
   const atLeast = (st, tier) => Object.entries(st.tiers || {}).some(([id, n]) => n > 0 && TIER_INDEX[id] >= TIER_INDEX[tier]);
   const QUESTS = [
-    { id: 'spin1', name: 'Первая крутка', reward: 20, done: (s) => s.spins >= 1 },
-    { id: 'spin100', name: '100 круток', reward: 200, done: (s) => s.spins >= 100, progress: (s) => [s.spins, 100] },
-    { id: 'spin1000', name: '1000 круток', reward: 1500, done: (s) => s.spins >= 1000, progress: (s) => [s.spins, 1000] },
-    { id: 'rare', name: 'Выбей «Редкий» или выше', reward: 50, done: (s) => atLeast(s, 'rare') },
-    { id: 'epic', name: 'Выбей «Эпический» или выше', reward: 120, done: (s) => atLeast(s, 'epic') },
-    { id: 'legendary', name: 'Выбей «Легендарный» или выше', reward: 600, done: (s) => atLeast(s, 'legendary') },
-    { id: 'mythic', name: 'Выбей «Мифический»', reward: 2500, done: (s) => atLeast(s, 'mythic') },
-    { id: 's777', name: 'Три семёрки', reward: 300, done: (s) => !!(s.flags || {}).s777 },
-    { id: 'elite', name: 'Любая блатная серия (АМР, ЕКХ…)', reward: 300, done: (s) => !!(s.flags || {}).elite },
-    { id: 'word', name: 'Номер-слово', reward: 80, done: (s) => !!(s.flags || {}).word },
-    { id: 'r77', name: 'Регион 77', reward: 40, done: (s) => !!(s.flags || {}).r77 },
-    { id: 'upgrade', name: 'Купи первое улучшение', reward: 50, done: (s) => Object.values(s.upgrades || {}).some((l) => l > 0) },
-    { id: 'skin', name: 'Купи скин номера', reward: 100, done: (s) => (s.skins || []).length > 1 },
-    { id: 'bigwin', name: 'Выиграй 1 000 за одну крутку', reward: 500, done: (s) => (s.bestWin || 0) >= 1000 },
-    { id: 'work', name: 'Отработай 20 заданий', reward: 100, done: (s) => (s.jobs || 0) >= 20, progress: (s) => [Math.min(s.jobs || 0, 20), 20] },
-    { id: 'case1', name: 'Открой первый кейс', reward: 30, done: (s) => (s.casesOpened || 0) >= 1 },
-    { id: 'case50', name: 'Открой 50 кейсов', reward: 400, done: (s) => (s.casesOpened || 0) >= 50, progress: (s) => [Math.min(s.casesOpened || 0, 50), 50] },
-    { id: 'caseGold', name: 'Выбей ★ из кейса', reward: 1500, done: (s) => !!(s.flags || {}).caseGold },
-    { id: 'online1', name: 'Выиграй онлайн-батл', reward: 150, done: (s) => ((s.pvpStats || {}).wins || 0) >= 1 },
-    { id: 'rich', name: 'Накопи 5 000 монет', reward: 400, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
+    { id: 'spin1', name: 'Первая крутка', reward: 60, done: (s) => s.spins >= 1 },
+    { id: 'spin100', name: '100 круток', reward: 600, done: (s) => s.spins >= 100, progress: (s) => [s.spins, 100] },
+    { id: 'spin1000', name: '1000 круток', reward: 4500, done: (s) => s.spins >= 1000, progress: (s) => [s.spins, 1000] },
+    { id: 'rare', name: 'Выбей «Редкий» или выше', reward: 150, done: (s) => atLeast(s, 'rare') },
+    { id: 'epic', name: 'Выбей «Эпический» или выше', reward: 360, done: (s) => atLeast(s, 'epic') },
+    { id: 'legendary', name: 'Выбей «Легендарный» или выше', reward: 1800, done: (s) => atLeast(s, 'legendary') },
+    { id: 'mythic', name: 'Выбей «Мифический»', reward: 7500, done: (s) => atLeast(s, 'mythic') },
+    { id: 's777', name: 'Три семёрки', reward: 900, done: (s) => !!(s.flags || {}).s777 },
+    { id: 'elite', name: 'Любая блатная серия (АМР, ЕКХ…)', reward: 900, done: (s) => !!(s.flags || {}).elite },
+    { id: 'word', name: 'Номер-слово', reward: 240, done: (s) => !!(s.flags || {}).word },
+    { id: 'r77', name: 'Регион 77', reward: 120, done: (s) => !!(s.flags || {}).r77 },
+    { id: 'upgrade', name: 'Купи первое улучшение', reward: 150, done: (s) => Object.values(s.upgrades || {}).some((l) => l > 0) },
+    { id: 'skin', name: 'Купи скин номера', reward: 300, done: (s) => (s.skins || []).length > 1 },
+    { id: 'bigwin', name: 'Выиграй 1 000 за одну крутку', reward: 1500, done: (s) => (s.bestWin || 0) >= 1000 },
+    { id: 'work', name: 'Отработай 20 заданий', reward: 300, done: (s) => (s.jobs || 0) >= 20, progress: (s) => [Math.min(s.jobs || 0, 20), 20] },
+    { id: 'online1', name: 'Выиграй онлайн-батл', reward: 450, done: (s) => ((s.pvpStats || {}).wins || 0) >= 1 },
+    { id: 'rich', name: 'Накопи 5 000 монет', reward: 1200, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
+    { id: 'rich2', name: 'Накопи 100 000 монет', reward: 10000, done: (s) => s.coins >= 100000, progress: (s) => [Math.min(s.coins, 100000), 100000] },
+    { id: 'million', name: 'Миллионер: накопи 1 000 000', reward: 100000, done: (s) => s.coins >= 1000000, progress: (s) => [Math.min(s.coins, 1000000), 1000000] },
   ];
 
 
   /* ---------------- заказы, уровни, колесо ---------------- */
   // Награда за заказ ≈ 0.15 / вероятность: в среднем заказ добавляет ~1.5% отдачи на ставке ×1
-  const ORDER_K = 0.15, ORDER_MIN = 15;
+  const ORDER_K = 0.45, ORDER_MIN = 45;
   const pickL = () => rnd.pick(LETTERS);
   const regionGroups = (() => {
     const g = {};
@@ -255,21 +257,21 @@
 
   // Уровни: опыт за крутку 1 + 2×редкость, награда за уровень небольшая
   const xpNeed = (lvl) => 40 + 20 * (lvl - 1);
-  const levelReward = (lvl) => 6 + 3 * lvl;
+  const levelReward = (lvl) => 20 + 10 * lvl;
   const TITLES = [
     [1, 'Пешеход'], [3, 'Таксист'], [6, 'Бомбила'], [10, 'Перекупщик'], [15, 'Блатной'],
     [22, 'Авторитет'], [30, 'Вор в законе'], [40, 'Смотрящий за ГИБДД'],
   ];
   const titleFor = (lvl) => [...TITLES].reverse().find(([l]) => lvl >= l)[1];
 
-  const JACKPOT_SEED = 500, JACKPOT_RATE = 0.03;
-  const WHEEL = [30, 50, 75, 100, 50, 150, 30, 300];
+  const JACKPOT_SEED = 2500, JACKPOT_RATE = 0.05;
+  const WHEEL = [150, 250, 400, 500, 250, 1000, 150, 2500];
 
   const format = (p) => `${p.l1}${p.digits}${p.l2}${p.region}`;
 
   window.Plates = {
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
-    SPIN_COST, PAYOUT, BETS, UPGRADES, SKINS, QUESTS,
+    SPIN_COST, PAYOUT, BETS, BET_UNLOCK, UPGRADES, SKINS, QUESTS,
     makeOrder, orderTest, ORDER_TTL, xpNeed, levelReward, titleFor, JACKPOT_SEED, JACKPOT_RATE, WHEEL,
   };
 })();

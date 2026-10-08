@@ -168,7 +168,6 @@
     misc: ['Разное', 'НАЗАД НА ДАШБОРД'],
     tables: ['Тестовые таблицы', 'НАЗАД НА ДАШБОРД'],
     plates: ['Номера РФ', 'НАЗАД НА ДАШБОРД'],
-    cases: ['Кейсы', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -182,7 +181,6 @@
     $('#page-title').textContent = page === 'dashboard' ? greeting() : PAGES[page][0];
     $('#page-crumb').innerHTML = `${PAGES[page][1]} <i>›</i>`;
     if (page === 'history') renderHistory();
-    if (page === 'cases') { renderCaseList(); renderInv(); }
     if (page === 'dashboard') renderDash();
   }
 
@@ -566,9 +564,16 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.0.0': [
+      'Новая экономика: выплаты выросли, крутить номера выгодно — баланс растёт',
+      'Ставки ×25, ×50 и ×100 через «Высокие ставки»',
+      '🔥 Счастливый час: раз в 20–40 минут все выплаты ×2',
+      'Гараж до 40 монет в минуту, работа платит в 4 раза больше',
+      'Колесо до 2 500, заказы, уровни и задания щедрее, задания на 100 000 и миллион',
+      'Кейсы убраны — инвентарь продан, всем подарок +1 000',
+    ],
     '1.9.0': [
       'Онлайн-батл до 4 игроков: банк = ставка × игроки, забирает самый блатной номер',
-      'Кейсы как в CS: три кейса, лента со щелчками, износ, StatTrak™ и инвентарь',
       '3D-наклон номера за курсором с бликом и северное сияние цвета редкости',
     ],
     '1.8.0': [
@@ -824,12 +829,25 @@
   /* ---------------- plates ---------------- */
   const P = window.Plates;
   const PL_DEFAULT = {
-    spins: 0, best: [], coins: 100, upgrades: {}, skins: ['classic'], skin: 'classic', quests: {},
+    spins: 0, best: [], coins: 500, upgrades: {}, skins: ['classic'], skin: 'classic', quests: {},
     tiers: {}, flags: {}, bestWin: 0, won: 0, spent: 0, daily: { last: '', streak: 0 },
     garageTs: Date.now(), batyaTs: 0, bet: 1,
     xp: 0, level: 1, orders: [], jackpot: P.JACKPOT_SEED, hist: [], duels: { w: 0, l: 0 },
+    happyUntil: 0, happyNext: 0,
   };
-  const plState = Object.assign({}, PL_DEFAULT, load('qb.plates', {}));
+  const plSaved = load('qb.plates', null);
+  const plState = Object.assign({}, PL_DEFAULT, plSaved || {});
+  if (!plSaved) plState.econ2 = true; // новым игрокам подарок за переход не нужен
+  // Переход на новую экономику: кейсы убраны — инвентарь продаём, плюс подарок
+  if (!plState.econ2) {
+    const inv = (plState.inv || []).reduce((sum, x) => sum + (x.value || 0), 0);
+    plState.coins += inv + 1000;
+    plState.inv = [];
+    plState.econ2 = true;
+    if (plState.jackpot < P.JACKPOT_SEED) plState.jackpot = P.JACKPOT_SEED;
+    store('qb.plates', plState);
+    setTimeout(() => toast(`Экономика обновлена: подарок +1 000${inv ? ` и инвентарь продан за ${inv.toLocaleString('ru-RU')}` : ''}`), 1500);
+  }
   let plCurrent = null, plSpinning = false, plAuto = false, riskPot = 0, riskStep = 0;
 
   const lvl = (id) => plState.upgrades[id] || 0;
@@ -839,7 +857,38 @@
   const payMult = () => 1 + lvl('collector') * upg('collector').per / 100;
   const spinCost = () => P.SPIN_COST * plState.bet;
   // Оценка отдачи по результатам симуляций (на 1 млн круток)
-  const rtp = () => Math.round(93 + lvl('luck') * 1.4 + lvl('moscow') * 2.7 + lvl('collector') * 2);
+  const rtp = () => Math.round(123 + lvl('luck') * 1.8 + lvl('moscow') * 3.5 + lvl('collector') * 2.6);
+  // значение улучшения на уровне l: таблица values или шаг per
+  const upVal = (u, l) => (u.values ? u.values[l - 1] : +(l * u.per).toFixed(1));
+
+  /* --- счастливый час: раз в 20–40 минут на 3 минуты выплаты ×2 --- */
+  const HAPPY_LEN = 3 * 60000;
+  const happyActive = () => Date.now() < plState.happyUntil;
+  function checkHappy() {
+    const now = Date.now();
+    if (!plState.happyNext) plState.happyNext = now + G.rnd.int(5, 15) * 60000;
+    if (!happyActive() && now >= plState.happyNext) {
+      plState.happyUntil = now + HAPPY_LEN;
+      plState.happyNext = plState.happyUntil + G.rnd.int(20, 40) * 60000;
+      savePl();
+      toast('🔥 СЧАСТЛИВЫЙ ЧАС: 3 минуты все выплаты ×2!');
+    }
+    const b = $('#pl-happy');
+    if (!b) return;
+    b.hidden = !happyActive();
+    if (happyActive()) {
+      const left = plState.happyUntil - now;
+      $('#pl-happy-t').textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+    }
+  }
+  setInterval(checkHappy, 1000);
+
+  // Короткая запись больших сумм: 1,25 млн
+  function fmtShort(n) {
+    if (n >= 1e9) return (n / 1e9).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' млрд';
+    if (n >= 1e6) return (n / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' млн';
+    return Math.floor(n).toLocaleString('ru-RU');
+  }
   const fmt = (n) => Math.floor(n).toLocaleString('ru-RU');
   const savePl = () => store('qb.plates', plState);
 
@@ -847,16 +896,14 @@
     plState.coins = Math.max(0, plState.coins + delta);
     savePl();
     renderWallet();
-    const cc = document.getElementById('cs-coins');
-    if (cc) cc.textContent = fmt(plState.coins);
   }
 
   /* --- гараж: пассивный доход, в том числе пока приложение закрыто --- */
   function tickGarage(silent) {
-    const rate = lvl('garage') * upg('garage').per;
+    const rate = lvl('garage') ? upVal(upg('garage'), lvl('garage')) : 0;
     const now = Date.now();
     if (!rate) { plState.garageTs = now; return 0; }
-    const minutes = Math.min((now - plState.garageTs) / 60000, 360);
+    const minutes = Math.min((now - plState.garageTs) / 60000, 720);
     const whole = Math.floor(minutes);
     if (whole < 1) return 0;
     const gain = whole * rate;
@@ -964,7 +1011,8 @@
   }
 
   function renderWallet() {
-    $('#pl-coins').textContent = fmt(plState.coins);
+    $('#pl-coins').textContent = fmtShort(plState.coins);
+    $('#pl-coins').title = fmt(plState.coins);
     $('#pl-jp').textContent = fmt(plState.jackpot);
     renderLevel();
     renderSpark();
@@ -984,7 +1032,7 @@
   }
 
   function renderBets() {
-    const bets = P.BETS.filter((b) => b <= 2 || lvl('highroller'));
+    const bets = P.BETS.filter((b) => b <= P.BET_UNLOCK[lvl('highroller')]);
     if (!bets.includes(plState.bet)) plState.bet = 1;
     $('#pl-bet').innerHTML = bets.map((b) => `<button data-v="${b}" class="${b === plState.bet ? 'on' : ''}">×${b} · ${b * P.SPIN_COST}</button>`).join('');
   }
@@ -1006,7 +1054,7 @@
     $('#pl-odds').innerHTML = [...P.TIERS].reverse().map((t) => `
       <div class="pl-odd" style="--t:${t.color}">
         <i></i><span>${t.name}</span><small>${fmtOdds(P.ODDS[t.id])}</small>
-        <b><i class="coin"></i>${fmt(Math.round(P.PAYOUT[t.id] * plState.bet * payMult()))}</b>
+        <b><i class="coin"></i>${fmtShort(Math.round(P.PAYOUT[t.id] * plState.bet * payMult()))}</b>
       </div>`).join('');
   }
 
@@ -1014,7 +1062,7 @@
   function renderShop() {
     const ups = P.UPGRADES.map((u) => {
       const l = lvl(u.id), max = u.prices.length, price = u.prices[l];
-      const now = +(l * u.per).toFixed(1), next = +((l + 1) * u.per).toFixed(1);
+      const now = upVal(u, l), next = upVal(u, l + 1);
       const text = max === 1 ? u.desc() : l ? `${u.desc(now)}${l < max ? ` → ${next}` : ''}` : u.desc(next);
       return `
         <div class="shop-item ${l >= max ? 'maxed' : ''}">
@@ -1233,7 +1281,7 @@
   function showRiskBtn() {
     const b = $('#pl-risk-btn');
     b.hidden = !(riskPot >= 10 && riskStep < 5);
-    b.innerHTML = `🪙 Рискнуть ×2 <em>${fmt(riskPot)} → ${fmt(riskPot * 2)}</em>`;
+    b.innerHTML = `🪙 Риск ×2 <em>→ ${fmtShort(riskPot * 2)}</em>`;
   }
   $('#pl-risk-btn').onclick = () => {
     if (riskPot < 10 || plSpinning) return;
@@ -1317,8 +1365,9 @@
     await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], Math.round((14 + i * 4) * k), Math.round((900 + i * 210) * k))));
 
     const t = sc.tier;
-    let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult());
+    let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult() * (happyActive() ? 2 : 1));
     const extras = [];
+    if (happyActive()) extras.push('<span class="pl-reason happy"><b>🔥</b>счастливый час <em>×2</em></span>');
     // джекпот уходит мифику
     if (t.id === 'mythic') {
       const jp = Math.floor(plState.jackpot);
@@ -1476,7 +1525,7 @@
   };
 
   /* --- работа: мини-игры за монеты, ограничены силами --- */
-  const ENERGY_MAX = 10, ENERGY_REGEN = 90000;
+  const ENERGY_MAX = 15, ENERGY_REGEN = 60000;
   if (plState.energy == null) { plState.energy = ENERGY_MAX; plState.energyTs = Date.now(); plState.jobs = 0; }
   const workMult = () => Math.min(2, 1 + 0.03 * (plState.level - 1));
   let workTimer = null, workKey = null;
@@ -1600,7 +1649,7 @@
       const ok = normPlate(inp.value) === P.format(p);
       const l = left();
       stopJob();
-      if (ok) jobEnd(payJob(6 + 6 * l, `✅ Верно${l > 0.6 ? ', и быстро!' : '!'}`));
+      if (ok) jobEnd(payJob(24 + 24 * l, `✅ Верно${l > 0.6 ? ', и быстро!' : '!'}`));
       else jobEnd(`❌ Мимо. Было <b>${P.format(p)}</b>, ты ввёл <b>${esc(inp.value || '—')}</b> ${payJob(0, '')}`);
     };
   }
@@ -1623,7 +1672,7 @@
     const items = Array.from({ length: 8 }, makeCheckPlate);
     let i = 0, correct = 0;
     const show = () => {
-      if (i >= items.length) return jobEnd(payJob(correct * 1.6, `Проверено: <b>${correct} из 8</b> верно`));
+      if (i >= items.length) return jobEnd(payJob(correct * 6.4, `Проверено: <b>${correct} из 8</b> верно`));
       g.innerHTML = `
         <div class="work-task">🔍 Настоящий номер или фейк? <span class="work-count">${i + 1} / 8 · верно ${correct}</span></div>
         <div class="work-check">${bigPlate(items[i].p)}</div>
@@ -1668,7 +1717,7 @@
       <div class="work-wash">${bigPlate(p)}${spots}</div>
       <div class="work-timer"><i></i></div>`;
     let cleaned = 0;
-    const finish = () => jobEnd(payJob((cleaned / N) * 8 + (cleaned === N ? 2 : 0), cleaned === N ? '✨ Как новенький!' : `Отмыто ${cleaned} из ${N}`));
+    const finish = () => jobEnd(payJob((cleaned / N) * 32 + (cleaned === N ? 8 : 0), cleaned === N ? '✨ Как новенький!' : `Отмыто ${cleaned} из ${N}`));
     timerBar(g, 6000, finish);
     $('.work-wash', g).onclick = (e) => {
       const m = e.target.closest('.mud');
@@ -2061,215 +2110,6 @@
     if (el) flyEmoji(el, b.textContent);
   };
   window.addEventListener('beforeunload', () => { if (room.ch) leaveRoom(true); });
-
-  /* ---------------- кейсы ---------------- */
-  const CS = window.Cases;
-  if (!plState.inv) plState.inv = [];
-  if (plState.casesOpened == null) plState.casesOpened = 0;
-  if (plState.sound == null) plState.sound = true;
-  let csCase = CS.CASES[0], csBusy = false;
-  const STEP = 128, WIN_AT = 52, STRIP_LEN = 60;
-  const rarityOf = (id) => CS.RARITIES.find((r) => r.id === id);
-  const wearOf = (id) => CS.WEAR.find((w) => w.id === id);
-
-  /* --- звук: короткие щелчки ленты и аккорд при выпадении --- */
-  let audio = null;
-  function blip(freq, dur, vol = 0.04, type = 'square', delay = 0) {
-    if (!plState.sound) return;
-    try {
-      audio = audio || new AudioContext();
-      const t = audio.currentTime + delay;
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.type = type;
-      o.frequency.value = freq;
-      g.gain.setValueAtTime(vol, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(audio.destination);
-      o.start(t);
-      o.stop(t + dur + 0.02);
-    } catch {}
-  }
-  const dropChord = (idx) => [0, 1, 2, 3].slice(0, 2 + Math.min(idx, 2)).forEach((i) => blip([523, 659, 784, 1046][i] * (1 + idx * 0.06), 0.35, 0.05, 'triangle', i * 0.09));
-  $('#cs-sound').onclick = () => {
-    plState.sound = !plState.sound;
-    $('#cs-sound').textContent = plState.sound ? '🔊' : '🔇';
-    savePl();
-  };
-
-  const itemCard = (it, extra = '') => {
-    const ra = rarityOf(it.rarity);
-    return `<div class="cs-item ${extra}" style="--rc:${ra.color}">
-      <span class="cs-ico">${it.icon}</span>
-      <span class="cs-name">${esc(it.name)}</span>
-    </div>`;
-  };
-
-  function renderCaseList() {
-    $('#cs-list').innerHTML = CS.CASES.map((c) => `
-      <button class="case-card ${c.id === csCase.id ? 'on' : ''}" data-case="${c.id}" style="--hue:${c.hue}">
-        <span class="case-ico">${c.icon}</span>
-        <b>${c.name}</b>
-        <small><i class="coin"></i>${fmt(c.price)}</small>
-      </button>`).join('');
-    $('#cs-price').innerHTML = `<i class="coin"></i>${fmt(csCase.price)}`;
-    $('#cs-open').classList.toggle('broke', plState.coins < csCase.price);
-    $('#cs-coins').textContent = fmt(plState.coins);
-    $('#cs-opened').textContent = fmt(plState.casesOpened);
-    $('#cs-sound').textContent = plState.sound ? '🔊' : '🔇';
-    // содержимое кейса с шансами
-    $('#cs-contents').innerHTML = `<span class="cap">ВНУТРИ КЕЙСА</span><div class="cs-contents-row">` +
-      CS.RARITIES.map((ra) => csCase.items[ra.id].map(([name, icon]) => `
-        <div class="cs-mini" style="--rc:${ra.color}" title="${ra.name} · ${(ra.p * 100).toFixed(2)}%"><span>${icon}</span><small>${esc(name)}</small></div>`).join('')).join('') +
-      `</div>`;
-  }
-  $('#cs-list').onclick = (e) => {
-    const b = e.target.closest('[data-case]');
-    if (!b || csBusy) return;
-    csCase = CS.CASES.find((c) => c.id === b.dataset.case);
-    fillStrip();
-    renderCaseList();
-  };
-
-  function fillStrip(win) {
-    const items = Array.from({ length: STRIP_LEN }, (_, i) => (i === WIN_AT && win ? win : CS.rollItem(csCase)));
-    const strip = $('#cs-strip');
-    strip.style.transition = 'none';
-    strip.style.transform = 'translateX(0)';
-    strip.innerHTML = items.map((it) => itemCard(it)).join('');
-  }
-
-  function renderInv() {
-    const inv = [...plState.inv].sort((a, b) => b.value - a.value);
-    const total = inv.reduce((s, x) => s + x.value, 0);
-    $('#cs-inv-c').textContent = `${inv.length} шт · ${fmt(total)}`;
-    $('#cs-sellall').innerHTML = inv.length ? `Продать всё за <i class="coin"></i>${fmt(total)}` : 'Инвентарь пуст';
-    $('#cs-sellall').disabled = !inv.length;
-    $('#cs-inv').innerHTML = inv.length ? inv.map((it) => {
-      const ra = rarityOf(it.rarity);
-      return `<div class="inv-item" style="--rc:${ra.color}" title="${esc(it.name)} · ${wearOf(it.wear).name}">
-        <span class="cs-ico">${it.icon}</span>
-        <span class="inv-name">${it.st ? '<em>ST™</em> ' : ''}${esc(it.name)}</span>
-        <small>${it.wear}</small>
-        <button class="inv-sell" data-sell="${it.id}"><i class="coin"></i>${fmt(it.value)}</button>
-      </div>`;
-    }).join('') : `<div class="feed-empty"><div class="sparkle">✦</div><br>ОТКРОЙ КЕЙС — ДРОП БУДЕТ ТУТ</div>`;
-  }
-  function sellItem(id) {
-    const i = plState.inv.findIndex((x) => x.id === id);
-    if (i < 0) return;
-    const [it] = plState.inv.splice(i, 1);
-    setCoins(it.value);
-    blip(880, 0.08, 0.04, 'sine');
-    renderInv();
-    renderCaseList();
-  }
-  $('#cs-inv').onclick = (e) => { const b = e.target.closest('[data-sell]'); if (b) sellItem(b.dataset.sell); };
-  $('#cs-sellall').onclick = () => {
-    const total = plState.inv.reduce((s, x) => s + x.value, 0);
-    if (!total) return;
-    plState.inv = [];
-    setCoins(total);
-    toast(`Продано на ${fmt(total)}`);
-    renderInv();
-    renderCaseList();
-  };
-
-  function csBurst(color, count) {
-    const stage = $('#cs-stage');
-    const r = $('.case-line').getBoundingClientRect(), base = stage.getBoundingClientRect();
-    const cx = r.left - base.left, cy = r.top - base.top + r.height / 2;
-    for (let i = 0; i < count; i++) {
-      const el = document.createElement('i');
-      el.className = 'spark';
-      const ang = Math.random() * Math.PI * 2, dist = 100 + Math.random() * 300;
-      el.style.cssText = `left:${cx}px;top:${cy}px;--dx:${Math.cos(ang) * dist}px;--dy:${Math.sin(ang) * dist * .6}px;--c:${Math.random() < .6 ? color : '#fff'};--s:${4 + Math.random() * 7}px;animation-delay:${Math.random() * 150}ms`;
-      stage.appendChild(el);
-      setTimeout(() => el.remove(), 1500);
-    }
-  }
-
-  function showDrop(it) {
-    const ra = rarityOf(it.rarity), wear = wearOf(it.wear);
-    const box = $('#cs-drop');
-    box.innerHTML = `
-      <div class="drop-card" id="cs-drop-card" style="--rc:${ra.color}">
-        <div class="drop-glare"></div>
-        <div class="drop-rarity">${ra.name}</div>
-        <div class="drop-ico">${it.icon}</div>
-        <div class="drop-name">${it.st ? '<em>StatTrak™</em> ' : ''}${esc(it.name)}</div>
-        <div class="drop-wear">${wear.name}</div>
-      </div>
-      <div class="drop-actions">
-        <button class="pill pill-dark" data-drop="sell">Продать за <i class="coin"></i>${fmt(it.value)}</button>
-        <button class="pill pill-white" data-drop="keep">В инвентарь</button>
-      </div>`;
-    box.hidden = false;
-    box.dataset.id = it.id;
-    tilt($('#cs-drop-card'), $('#cs-drop-card'), 16);
-  }
-  $('#cs-drop').onclick = (e) => {
-    const b = e.target.closest('[data-drop]');
-    if (!b) return;
-    if (b.dataset.drop === 'sell') sellItem($('#cs-drop').dataset.id);
-    $('#cs-drop').hidden = true;
-  };
-
-  async function openCase() {
-    if (csBusy) return;
-    if (plState.coins < csCase.price) return toast('Не хватает монет — сходи на работу 💼 в «Номерах»');
-    csBusy = true;
-    $('#cs-open').disabled = true;
-    $('#cs-drop').hidden = true;
-    setCoins(-csCase.price);
-    const drop = CS.openCase(csCase);
-    fillStrip(drop);
-    renderCaseList();
-
-    const strip = $('#cs-strip'), wrap = $('.case-strip-wrap');
-    const W = wrap.clientWidth;
-    const offset = G.rnd.int(-48, 48);
-    const target = -(WIN_AT * STEP + 60 - W / 2 + offset); // 60 — половина ширины карточки
-    void strip.offsetWidth;
-    strip.style.transition = 'transform 5.6s cubic-bezier(.06, .62, .1, 1)';
-    strip.style.transform = `translateX(${target}px)`;
-
-    // щелчок каждый раз, когда под стрелкой проезжает новая карточка
-    let lastIdx = -1, ticking = true;
-    const tick = () => {
-      if (!ticking) return;
-      const x = new DOMMatrix(getComputedStyle(strip).transform).m41;
-      const idx = Math.floor((-x + W / 2) / STEP);
-      if (idx !== lastIdx) { lastIdx = idx; blip(1400, 0.012, 0.03); }
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-
-    await new Promise((r) => setTimeout(r, 5700));
-    ticking = false;
-    const order = CS.RARITIES.findIndex((r) => r.id === drop.rarity);
-    $$('#cs-strip .cs-item')[WIN_AT].classList.add('won');
-    dropChord(order);
-    if (order >= 2) csBurst(rarityOf(drop.rarity).color, [0, 0, 24, 50, 90][order]);
-    if (order >= 3) toast(`${rarityOf(drop.rarity).name}: ${drop.name}!`);
-
-    plState.casesOpened++;
-    if (drop.rarity === 'gold') plState.flags.caseGold = true;
-    plState.inv.unshift(drop);
-    plState.inv = plState.inv.slice(0, 200);
-    savePl();
-    record('misc', 'Кейс', [`${drop.st ? 'StatTrak™ ' : ''}${drop.name} (${drop.wear}) · ${drop.value}`]);
-    showDrop(drop);
-    renderInv();
-    renderCaseList();
-    refreshPlates();
-    csBusy = false;
-    $('#cs-open').disabled = false;
-  }
-  $('#cs-open').onclick = openCase;
-
-  fillStrip();
-  renderCaseList();
-  renderInv();
 
   /* ---------------- визуал: 3D-наклон и блик ---------------- */
   function tilt(area, target, max = 10) {

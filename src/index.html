@@ -54,10 +54,6 @@
         <svg viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M16 7v10"/><path d="M5.5 12h2M9 12h4"/></svg>
         <span>Номера</span>
       </button>
-      <button class="nav-item" data-go="cases">
-        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M11 12v2h2v-2"/></svg>
-        <span>Кейсы</span>
-      </button>
       <button class="nav-item" data-go="history">
         <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
         <span>История</span>
@@ -438,6 +434,7 @@
                 </div>
               </div>
               <div class="pl-head-right">
+                <div class="pl-happy" id="pl-happy" hidden>🔥 ×2 · <span id="pl-happy-t">3:00</span></div>
                 <div class="pl-jackpot"><span>💎 ДЖЕКПОТ</span><b><i class="coin"></i><span id="pl-jp">500</span></b></div>
                 <button class="pl-daily" id="pl-daily" hidden>🎁 <span id="pl-daily-t">Бонус дня</span></button>
                 <div class="pl-tier" id="pl-tier" hidden><i></i><span id="pl-tier-name">Обычный</span></div>
@@ -519,40 +516,6 @@
               <div class="pl-odds" id="pl-odds"></div>
               <div class="note">Выплата указана для текущей ставки с учётом «Перекупщика». Шансы — для одной обычной крутки.</div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ---------- CASES ---------- -->
-      <section class="page" data-page="cases">
-        <div class="cases-layout">
-          <div class="card case-stage" id="cs-stage">
-            <div class="pl-aurora"><i></i><i></i><i></i></div>
-            <div class="case-head">
-              <div class="pl-wallet">
-                <span class="cap">БАЛАНС</span>
-                <div class="pl-coins"><i class="coin"></i><b id="cs-coins">0</b></div>
-                <div class="pl-spins">Открыто кейсов: <b id="cs-opened">0</b></div>
-              </div>
-              <button class="icon-btn cs-sound" id="cs-sound" title="Звук">🔊</button>
-            </div>
-            <div class="case-list" id="cs-list"></div>
-            <div class="case-roll">
-              <div class="case-strip-wrap"><div class="case-strip" id="cs-strip"></div><i class="case-line"></i></div>
-            </div>
-            <div class="case-actions">
-              <button class="pl-spin" id="cs-open"><span>ОТКРЫТЬ</span><em id="cs-price"></em></button>
-            </div>
-            <div class="case-contents" id="cs-contents"></div>
-            <div class="case-drop" id="cs-drop" hidden></div>
-          </div>
-          <div class="card sand case-inv">
-            <div class="card-head">
-              <h3>Инвентарь</h3>
-              <span class="count" id="cs-inv-c"></span>
-            </div>
-            <button class="pill pill-dark wide" id="cs-sellall">Продать всё</button>
-            <div class="inv-grid" id="cs-inv"></div>
           </div>
         </div>
       </section>
@@ -689,9 +652,9 @@
       <div class="work-energy-track"><i id="work-energy-bar"></i></div>
     </div>
     <div id="work-menu" class="work-menu">
-      <button class="job" data-job="camera"><em>📷</em><b>Оператор камеры</b><span>Перепечатай размытый номер за 8 секунд</span><small>до 12 <i class="coin"></i></small></button>
-      <button class="job" data-job="check"><em>🔍</em><b>Проверка номеров</b><span>8 номеров: настоящий или фейк? Стрелки ← →</span><small>до 13 <i class="coin"></i></small></button>
-      <button class="job" data-job="wash"><em>🧽</em><b>Мойка номеров</b><span>Отмой грязь кликами за 6 секунд</span><small>до 10 <i class="coin"></i></small></button>
+      <button class="job" data-job="camera"><em>📷</em><b>Оператор камеры</b><span>Перепечатай размытый номер за 8 секунд</span><small>до 48 <i class="coin"></i></small></button>
+      <button class="job" data-job="check"><em>🔍</em><b>Проверка номеров</b><span>8 номеров: настоящий или фейк? Стрелки ← →</span><small>до 51 <i class="coin"></i></small></button>
+      <button class="job" data-job="wash"><em>🧽</em><b>Мойка номеров</b><span>Отмой грязь кликами за 6 секунд</span><small>до 40 <i class="coin"></i></small></button>
       <div class="note">Каждое задание тратит 1 силу. Оплата растёт с уровнем: <b id="work-mult">×1.00</b></div>
     </div>
     <div id="work-game" class="work-game" hidden></div>
@@ -755,7 +718,6 @@
 <script src="online-config.js"></script>
 <script src="generators.js"></script>
 <script src="plates.js"></script>
-<script src="cases.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
