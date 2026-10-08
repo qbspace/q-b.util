@@ -564,6 +564,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.1.1': [
+      'Ставки у Ашота и в онлайне до миллиона и любая своя сумма',
+      'У Ашота кнопка «Ва-банк» — поставить всё',
+    ],
     '2.1.0': [
       '🕶 Чёрный рынок: завоз каждые 2 часа, редкие вещи появляются редко',
       '🔑 Брелки с бустами — носи до трёх сразу',
@@ -1500,18 +1504,36 @@
   const TAUNTS_WIN = ['Ашот: «Слышь, это нечестно!»', 'Ашот: «Ладно, сегодня твой день»', 'Ашот: «Я просто разминался»', 'Ашот: «Реванш, брат, реванш!»'];
   const TAUNTS_LOSE = ['Ашот: «Учись, пока я жив»', 'Ашот: «Номера — это искусство»', 'Ашот: «Приходи ещё, монетки нужны»', 'Ашот: «Хе-хе, гараж мой»'];
   let duelStake = 10, duelBusy = false;
-  const DUEL_STAKES = [10, 50, 100, 500];
+  const STAKE_PRESETS = [10, 100, 1000, 10000, 100000, 1000000];
+  // компактная подпись ставки: 10к, 1М
+  const stakeLabel = (v) => (v >= 1e6 ? `${+(v / 1e6).toFixed(2)}М` : v >= 1e3 ? `${+(v / 1e3).toFixed(1)}к` : String(v));
+  const parseStake = (str) => {
+    const m = String(str).toLowerCase().replace(/\s/g, '').replace(',', '.').match(/^(\d+(?:\.\d+)?)(к|k|м|m)?$/);
+    if (!m) return 0;
+    return Math.floor(+m[1] * (m[2] === 'к' || m[2] === 'k' ? 1e3 : m[2] === 'м' || m[2] === 'm' ? 1e6 : 1));
+  };
 
   function renderDuelStakes() {
-    $('#duel-stakes').innerHTML = DUEL_STAKES.map((v) => `<button data-v="${v}" class="${v === duelStake ? 'on' : ''}" ${plState.coins < v ? 'disabled' : ''}>${v}</button>`).join('');
-    $('#duel-rec').textContent = `Счёт: ты ${plState.duels.w} — ${plState.duels.l} Ашот`;
+    $('#duel-stakes').innerHTML = STAKE_PRESETS.map((v) => `<button data-v="${v}" class="${v === duelStake ? 'on' : ''}" ${plState.coins < v ? 'disabled' : ''}>${stakeLabel(v)}</button>`).join('');
+    $('#duel-go').innerHTML = `В бой · <i class="coin"></i>${fmt(duelStake)} <i>›</i>`;
+    $('#duel-rec').textContent = `Счёт: ты ${plState.duels.w} — ${plState.duels.l} Ашот · в банке у тебя ${fmtShort(plState.coins)}`;
+  }
+  function setDuelStake(v) {
+    if (duelBusy) return;
+    if (!(v >= 1)) return toast('Введи сумму, например 25000 или 25к');
+    if (v > plState.coins) return toast('Столько монет нет');
+    duelStake = v;
+    $('#duel-custom').value = '';
+    renderDuelStakes();
   }
   $('#duel-stakes').onclick = (e) => {
     const b = e.target.closest('button');
-    if (!b || b.disabled || duelBusy) return;
-    duelStake = +b.dataset.v;
-    renderDuelStakes();
+    if (!b || b.disabled) return;
+    setDuelStake(+b.dataset.v);
   };
+  $('#duel-custom-ok').onclick = () => setDuelStake(parseStake($('#duel-custom').value));
+  $('#duel-custom').onkeydown = (e) => { if (e.key === 'Enter') $('#duel-custom-ok').click(); };
+  $('#duel-allin').onclick = () => setDuelStake(Math.floor(plState.coins));
   $('#pl-duel').onclick = () => {
     if (duelStake > plState.coins) duelStake = 10;
     renderDuelStakes();
@@ -1956,7 +1978,7 @@
   if (!plState.pvpStats) plState.pvpStats = { games: 0, wins: 0 };
 
   const MAX_PLAYERS = 4;
-  const ON_STAKES = [10, 50, 100, 500];
+  const ON_STAKES = [10, 100, 1000, 10000, 100000, 1000000];
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const room = { ch: null, code: '', joinedAt: 0, host: false, players: [], infos: {}, stake: 10, round: null };
   let smallPhoto = '', revealTimer = null;
@@ -2037,7 +2059,9 @@
       });
     }
     const busy = !!room.round;
-    $('#on-stakes').innerHTML = ON_STAKES.map((v) => `<button data-v="${v}" class="${v === room.stake ? 'on' : ''}" ${!room.host || busy ? 'disabled' : ''}>${v}</button>`).join('');
+    $('#on-stakes').innerHTML = ON_STAKES.map((v) => `<button data-v="${v}" class="${v === room.stake ? 'on' : ''}" ${!room.host || busy ? 'disabled' : ''}>${stakeLabel(v)}</button>`).join('');
+    $('#on-custom-row').hidden = !room.host;
+    $('#on-custom').disabled = $('#on-custom-ok').disabled = busy;
     $('#on-stake-hint').textContent = room.host ? '· ВЫБИРАЕШЬ ТЫ' : '· ВЫБИРАЕТ СОЗДАТЕЛЬ 👑';
     const ready = $('#on-ready');
     const mine = room.round && room.round.commits[myId];
@@ -2192,13 +2216,21 @@
   $('#on-copy').onclick = () => copy(room.code);
   $('#on-leave').onclick = () => leaveRoom();
 
-  $('#on-stakes').onclick = (e) => {
-    const b = e.target.closest('button');
-    if (!b || b.disabled || !room.host) return;
-    room.stake = +b.dataset.v;
+  function setRoomStake(v) {
+    if (!room.host || room.round) return;
+    if (!(v >= 1)) return toast('Введи сумму, например 50000 или 50к');
+    room.stake = v;
+    $('#on-custom').value = '';
     send('stake', { stake: room.stake });
     renderRoom();
+  }
+  $('#on-stakes').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    setRoomStake(+b.dataset.v);
   };
+  $('#on-custom-ok').onclick = () => setRoomStake(parseStake($('#on-custom').value));
+  $('#on-custom').onkeydown = (e) => { if (e.key === 'Enter') $('#on-custom-ok').click(); };
 
   $('#on-ready').onclick = async () => {
     if (room.players.length < 2) return;
