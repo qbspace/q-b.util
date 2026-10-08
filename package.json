@@ -1,7 +1,7 @@
 {
   "name": "q-b.util",
   "productName": "q-b.util",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Утилиты для быстрой генерации паролей, ключей, почт, телефонов и фейковых данных",
   "main": "main.js",
   "scripts": {
@@ -50,7 +50,11 @@
         "repo": "q-b.util",
         "releaseType": "release"
       }
-    ]
+    ],
+    "releaseInfo": {
+      "releaseName": "q-b.util 1.2.0",
+      "releaseNotes": "- Окно «Что нового» после обновления\n- Генераторы координат и Unix-времени в «Разном»\n- Тестовый релиз для проверки автообновления"
+    }
   },
   "dependencies": {
     "@fontsource/inter-tight": "^5.0.0",

@@ -607,3 +607,26 @@ textarea.inp { font-family: var(--mono); font-size: 12px; }
 .upd-dot.ok { background: #5fc2ae; }
 .upd-dot.busy { background: #f0b35a; animation: pulse 1.2s infinite; }
 .upd-dot.new { background: #e5484d; }
+
+/* what's new */
+.modal {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  background: rgba(10, 10, 10, .45); backdrop-filter: blur(8px);
+  animation: fade .3s ease;
+}
+@keyframes fade { from { opacity: 0; } }
+.modal-card {
+  width: min(420px, calc(100vw - 32px)); border-radius: 30px; padding: 28px;
+  display: flex; flex-direction: column; gap: 10px;
+  background:
+    radial-gradient(70% 50% at 90% 0%, #f3d6dd, transparent 70%),
+    radial-gradient(60% 50% at 0% 100%, #cfe3dc, transparent 70%),
+    #f6f5f1;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .35);
+  animation: rise .45s cubic-bezier(.2, .7, .2, 1);
+}
+.modal-logo { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 10px 24px rgba(0, 0, 0, .15); margin-bottom: 6px; }
+.modal-card h2 { font-size: 34px; font-weight: 500; letter-spacing: -.04em; }
+.modal-card ul { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; }
+.modal-card li { display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.modal-card li::before { content: '✦'; color: #b9a46f; flex: none; }

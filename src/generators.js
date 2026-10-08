@@ -331,6 +331,11 @@
     card: { label: 'Тест-карта', gen: () => { const c = testCard(); return `${c.number}  ${c.exp}  ${c.cvc}`; } },
     ua: { label: 'User-Agent', gen: () => rnd.pick(UAS)() },
     lorem: { label: 'Lorem', gen: () => lorem() },
+    coords: {
+      label: 'Координаты',
+      gen: () => `${(rnd.int(-90000000, 90000000) / 1e6).toFixed(6)}, ${(rnd.int(-180000000, 180000000) / 1e6).toFixed(6)}`,
+    },
+    unix: { label: 'Unix-время', gen: () => String(Math.floor(Date.now() / 1000) - rnd.int(0, 5 * 365 * 86400)) },
   };
 
   window.Gen = {

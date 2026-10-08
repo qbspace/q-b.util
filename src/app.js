@@ -516,6 +516,27 @@
 
   renderProfile();
 
+  /* ---------------- what's new ---------------- */
+  const CHANGELOG = {
+    '1.2.0': [
+      'Окно «Что нового» — теперь после каждого обновления видно, что поменялось',
+      'В «Разном» появились генераторы координат и Unix-времени',
+      'Проверено автообновление через GitHub-релизы',
+    ],
+  };
+
+  function showWhatsNew(version) {
+    const seen = load('qb.seenVersion', null);
+    if (seen === version) return;
+    store('qb.seenVersion', version);
+    if (!CHANGELOG[version]) return;
+    $('#wn-ver').textContent = 'v' + version;
+    $('#wn-list').innerHTML = CHANGELOG[version].map((x) => `<li>${esc(x)}</li>`).join('');
+    $('#whatsnew').hidden = false;
+  }
+  $('#wn-ok').onclick = () => { $('#whatsnew').hidden = true; };
+  $('#whatsnew').onclick = (e) => { if (e.target.id === 'whatsnew') $('#whatsnew').hidden = true; };
+
   /* ---------------- updates ---------------- */
   let updPrev = '';
   function renderUpdate(u) {
@@ -553,7 +574,7 @@
   }
 
   if (window.qb && window.qb.updGet) {
-    window.qb.updGet().then(renderUpdate);
+    window.qb.updGet().then((u) => { renderUpdate(u); showWhatsNew(u.current); });
     window.qb.onUpdate(renderUpdate);
     $('#upd-check').onclick = () => window.qb.updCheck().then((u) => { if (u.state === 'dev') renderUpdate(u); });
     $('#upd-releases').onclick = () => window.qb.updReleases();
