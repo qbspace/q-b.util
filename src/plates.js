@@ -175,6 +175,10 @@
     { id: 'skin', name: 'Купи скин номера', reward: 100, done: (s) => (s.skins || []).length > 1 },
     { id: 'bigwin', name: 'Выиграй 1 000 за одну крутку', reward: 500, done: (s) => (s.bestWin || 0) >= 1000 },
     { id: 'work', name: 'Отработай 20 заданий', reward: 100, done: (s) => (s.jobs || 0) >= 20, progress: (s) => [Math.min(s.jobs || 0, 20), 20] },
+    { id: 'case1', name: 'Открой первый кейс', reward: 30, done: (s) => (s.casesOpened || 0) >= 1 },
+    { id: 'case50', name: 'Открой 50 кейсов', reward: 400, done: (s) => (s.casesOpened || 0) >= 50, progress: (s) => [Math.min(s.casesOpened || 0, 50), 50] },
+    { id: 'caseGold', name: 'Выбей ★ из кейса', reward: 1500, done: (s) => !!(s.flags || {}).caseGold },
+    { id: 'online1', name: 'Выиграй онлайн-батл', reward: 150, done: (s) => ((s.pvpStats || {}).wins || 0) >= 1 },
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 400, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
   ];
 

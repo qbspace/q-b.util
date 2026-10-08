@@ -168,6 +168,7 @@
     misc: ['Разное', 'НАЗАД НА ДАШБОРД'],
     tables: ['Тестовые таблицы', 'НАЗАД НА ДАШБОРД'],
     plates: ['Номера РФ', 'НАЗАД НА ДАШБОРД'],
+    cases: ['Кейсы', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -181,6 +182,7 @@
     $('#page-title').textContent = page === 'dashboard' ? greeting() : PAGES[page][0];
     $('#page-crumb').innerHTML = `${PAGES[page][1]} <i>›</i>`;
     if (page === 'history') renderHistory();
+    if (page === 'cases') { renderCaseList(); renderInv(); }
     if (page === 'dashboard') renderDash();
   }
 
@@ -564,6 +566,11 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '1.9.0': [
+      'Онлайн-батл до 4 игроков: банк = ставка × игроки, забирает самый блатной номер',
+      'Кейсы как в CS: три кейса, лента со щелчками, износ, StatTrak™ и инвентарь',
+      '3D-наклон номера за курсором с бликом и северное сияние цвета редкости',
+    ],
     '1.8.0': [
       'Онлайн-батл с кентами: создай комнату, скинь код — и рубитесь номерами',
       'Честный результат: номера считаются из случайных чисел обоих игроков',
@@ -840,6 +847,8 @@
     plState.coins = Math.max(0, plState.coins + delta);
     savePl();
     renderWallet();
+    const cc = document.getElementById('cs-coins');
+    if (cc) cc.textContent = fmt(plState.coins);
   }
 
   /* --- гараж: пассивный доход, в том числе пока приложение закрыто --- */
@@ -1682,27 +1691,29 @@
   refreshPlates();
 
   /* ---------------- онлайн-батл ---------------- */
-  // Комнаты — это realtime-каналы Supabase: без таблиц, только broadcast + presence.
-  // Честность: каждый сначала шлёт хеш своего случайного зерна, потом само зерно;
-  // номера обоих игроков считаются из двух зёрен вместе, поэтому подкрутить нельзя.
+  // Комнаты — realtime-каналы Supabase (broadcast + presence), до 4 игроков.
+  // Честность: каждый шлёт хеш своего зерна, потом само зерно; номера всех игроков
+  // считаются из всех зёрен вместе, поэтому подкрутить результат нельзя.
   const sb = window.supabase && window.QB_ONLINE
     ? window.supabase.createClient(window.QB_ONLINE.url, window.QB_ONLINE.key, { auth: { persistSession: false } })
     : null;
   let myId = load('qb.pid', null);
   if (!myId) { myId = G.uuid4(); store('qb.pid', myId); }
   if (!plState.pvp) plState.pvp = {};
+  if (!plState.pvpStats) plState.pvpStats = { games: 0, wins: 0 };
 
+  const MAX_PLAYERS = 4;
   const ON_STAKES = [10, 50, 100, 500];
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const room = { ch: null, code: '', joinedAt: 0, host: false, opp: null, stake: 10, my: null, their: null, busy: false };
-  let smallPhoto = '';
+  const room = { ch: null, code: '', joinedAt: 0, host: false, players: [], infos: {}, stake: 10, round: null };
+  let smallPhoto = '', revealTimer = null;
 
   const hex = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
   const sha = async (s) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
 
-  // Детерминированный ГСЧ из общего хеша (xoshiro128**) — одинаковый у обоих игроков
+  // Детерминированный ГСЧ из общего хеша (xoshiro128**) — одинаковый у всех игроков
   function seededRnd(hashHex) {
-    let s = [0, 8, 16, 24].map((i) => parseInt(hashHex.slice(i, i + 8), 16) >>> 0);
+    const s = [0, 8, 16, 24].map((i) => parseInt(hashHex.slice(i, i + 8), 16) >>> 0);
     const rotl = (x, k) => (x << k) | (x >>> (32 - k));
     const next = () => {
       const r = Math.imul(rotl(Math.imul(s[1], 5), 7), 9) >>> 0;
@@ -1736,29 +1747,52 @@
     level: plState.level, title: P.titleFor(plState.level),
     grad: profile.grad, photo: smallPhoto,
   });
+  const infoOf = (id) => (id === myId ? meInfo() : room.infos[id]);
+  const nickOf = (id) => (infoOf(id) || {}).nick || 'Игрок';
 
-  function playerCard(pl, status) {
-    if (!pl) return `<div class="on-wait"><span class="on-spinner"></span>Ждём кента…<small>Скинь ему код комнаты</small></div>`;
+  function slotHTML(id) {
+    if (!id) return `<div class="on-slot empty"><div class="on-wait"><span class="on-spinner"></span>Свободно<small>Скинь код кенту</small></div></div>`;
+    const pl = infoOf(id) || { nick: '…', title: '', level: '?', grad: 0 };
     const ava = pl.photo ? `url("${pl.photo}")` : GRADS[pl.grad] || GRADS[0];
+    const ready = room.round && room.round.commits[id];
     return `
-      <div class="on-ava ${pl.photo ? 'photo-on' : ''}" style="--ava:${esc(ava)}">${esc(initials(pl.nick))}</div>
-      <div class="on-nick">${esc(pl.nick)}</div>
-      <div class="on-title">${esc(pl.title)} · ур. ${pl.level}</div>
-      <div class="on-status ${status === 'Готов' ? 'ok' : ''}">${status}</div>`;
+      <div class="on-slot ${id === myId ? 'me' : ''}" data-id="${id}">
+        <div class="on-player">
+          ${room.players[0] && room.players[0].id === id ? '<span class="on-host" title="Создатель комнаты">👑</span>' : ''}
+          <div class="on-ava ${pl.photo ? 'photo-on' : ''}" style="--ava:${esc(ava)}">${esc(initials(pl.nick))}</div>
+          <div class="on-nick">${esc(pl.nick)}${id === myId ? ' <small>(ты)</small>' : ''}</div>
+          <div class="on-title">${esc(pl.title || '')} · ур. ${pl.level}</div>
+          <div class="on-status ${ready ? 'ok' : ''}">${ready ? 'Готов' : 'Думает'}</div>
+        </div>
+        <div class="duel-plate on-plate" id="on-plate-${id}"><span class="duel-q">?</span></div>
+      </div>`;
   }
 
   function renderRoom() {
     $('#on-code-v').textContent = room.code;
-    $('#on-me').innerHTML = playerCard(meInfo(), room.my ? 'Готов' : 'Выбирает ставку');
-    $('#on-opp').innerHTML = playerCard(room.opp, room.their ? 'Готов' : 'Выбирает ставку');
-    $('#on-stakes').innerHTML = ON_STAKES.map((v) => `<button data-v="${v}" class="${v === room.stake ? 'on' : ''}" ${!room.host || room.my || room.their ? 'disabled' : ''}>${v}</button>`).join('');
-    $('#on-stake-hint').textContent = room.host ? '· ВЫБИРАЕШЬ ТЫ' : '· ВЫБИРАЕТ СОЗДАТЕЛЬ КОМНАТЫ';
+    const ids = room.players.map((p) => p.id);
+    const slots = [...ids];
+    while (slots.length < Math.max(2, Math.min(MAX_PLAYERS, ids.length + 1))) slots.push(null);
+    // не перерисовываем номера во время раскрутки
+    if (!(room.round && room.round.resolving)) {
+      $('#on-grid').innerHTML = slots.map(slotHTML).join('');
+      $('#on-grid').dataset.n = slots.length;
+    } else {
+      $$('#on-grid .on-slot[data-id]').forEach((el) => {
+        const st = $('.on-status', el);
+        if (st) { st.textContent = 'Готов'; st.classList.add('ok'); }
+      });
+    }
+    const busy = !!room.round;
+    $('#on-stakes').innerHTML = ON_STAKES.map((v) => `<button data-v="${v}" class="${v === room.stake ? 'on' : ''}" ${!room.host || busy ? 'disabled' : ''}>${v}</button>`).join('');
+    $('#on-stake-hint').textContent = room.host ? '· ВЫБИРАЕШЬ ТЫ' : '· ВЫБИРАЕТ СОЗДАТЕЛЬ 👑';
     const ready = $('#on-ready');
-    ready.disabled = !room.opp || !!room.my || room.busy;
-    ready.innerHTML = room.my ? 'Ждём соперника…' : `Готов · ставка <i class="coin"></i>${room.stake}`;
-    const rec = room.opp && plState.pvp[room.opp.id];
-    $('#on-score').textContent = room.opp ? `Счёт с ${room.opp.nick}: ${rec ? rec.w : 0} — ${rec ? rec.l : 0}` : '';
-    $('#on-emojis').hidden = !room.opp;
+    const mine = room.round && room.round.commits[myId];
+    ready.disabled = ids.length < 2 || !!mine || (room.round && room.round.resolving);
+    ready.innerHTML = mine ? 'Ждём остальных…' : `Готов · ставка <i class="coin"></i>${room.stake} · банк ${room.stake * Math.max(2, ids.length)}`;
+    const st = plState.pvpStats;
+    $('#on-score').textContent = `Онлайн: побед ${st.wins} из ${st.games}`;
+    $('#on-emojis').hidden = ids.length < 2;
   }
 
   function onMenu() {
@@ -1776,93 +1810,103 @@
 
   const send = (event, payload = {}) => room.ch && room.ch.send({ type: 'broadcast', event, payload: { ...payload, from: myId } });
 
-  function refundIfPending(reason) {
-    if (room.my && !room.my.settled) {
+  // Отмена раунда: своя ставка возвращается
+  function abortRound(reason) {
+    clearTimeout(revealTimer);
+    if (room.round && room.round.mySeed && !room.round.settled) {
       setCoins(room.stake);
-      toast(reason);
+      if (reason) toast(reason);
     }
-    room.my = null;
-    room.their = null;
-    room.busy = false;
+    room.round = null;
   }
+
+  const newRound = () => ({ commits: {}, seeds: {}, mySeed: null, revealed: false, settled: false, resolving: false });
 
   async function joinRoom(code, creating) {
     if (!sb) return toast('Онлайн недоступен');
     await leaveRoom(true);
     await makeSmallPhoto();
-    room.code = code;
-    room.joinedAt = Date.now();
-    room.opp = null;
-    room.my = room.their = null;
-    room.stake = 10;
+    Object.assign(room, { code, joinedAt: Date.now(), players: [], infos: {}, stake: 10, round: null, host: false });
     $('#on-status').textContent = 'Подключаюсь…';
     const ch = sb.channel(`qb-room-${code}`, { config: { broadcast: { self: false, ack: false }, presence: { key: myId } } });
     room.ch = ch;
 
     ch.on('presence', { event: 'sync' }, () => {
-      const list = Object.values(ch.presenceState()).map((a) => a[0]).filter(Boolean).sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
-      const meIdx = list.findIndex((x) => x.id === myId);
-      if (meIdx >= 2) { toast('Комната занята — там уже двое'); leaveRoom(); return onMenu(); }
-      room.host = meIdx === 0;
-      const other = list.slice(0, 2).find((x) => x.id !== myId);
-      if (!other && room.opp) {
-        refundIfPending('Соперник вышел — ставка возвращена');
-        room.opp = null;
-        $('#on-res').textContent = 'Соперник вышел. Ждём кента…';
+      const list = Object.values(ch.presenceState()).map((a) => a[0]).filter(Boolean)
+        .sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
+      if (list.findIndex((x) => x.id === myId) >= MAX_PLAYERS) {
+        toast('Комната заполнена — там уже 4 игрока');
+        leaveRoom();
+        return;
       }
-      if (other && (!room.opp || room.opp.id !== other.id)) send('hello', { player: meInfo() });
+      const prev = room.players.map((p) => p.id).join();
+      room.players = list.slice(0, MAX_PLAYERS);
+      room.host = room.players[0] && room.players[0].id === myId;
+      const now = room.players.map((p) => p.id).join();
+      if (prev && prev !== now && room.round && !room.round.resolving) {
+        abortRound('Состав комнаты изменился — ставка возвращена, жмите «Готов» заново');
+      }
+      const unknown = room.players.some((p) => p.id !== myId && !room.infos[p.id]);
+      if (unknown) send('hello', { player: meInfo() });
+      if (room.players.length < 2) $('#on-res').textContent = 'Ждём кентов… Скинь им код';
       renderRoom();
     });
     ch.on('broadcast', { event: 'hello' }, ({ payload }) => {
-      const firstTime = !room.opp || room.opp.id !== payload.player.id;
-      room.opp = payload.player;
-      if (firstTime) {
+      const p = payload.player, isNew = !room.infos[p.id];
+      room.infos[p.id] = p;
+      if (isNew) {
         send('hello', { player: meInfo() });
         if (room.host) send('stake', { stake: room.stake });
-        $('#on-res').textContent = `${room.opp.nick} в комнате. Жмите «Готов»`;
-        toast(`${room.opp.nick} зашёл в комнату`);
+        toast(`${p.nick} в комнате`);
+        $('#on-res').textContent = 'Все в сборе? Жмите «Готов»';
+        $('#on-res').className = 'duel-res';
       }
       renderRoom();
     });
     ch.on('broadcast', { event: 'stake' }, ({ payload }) => {
-      if (room.host) return;
+      if (room.host || room.round) return;
       room.stake = payload.stake;
       renderRoom();
     });
     ch.on('broadcast', { event: 'ready' }, ({ payload }) => {
       if (payload.stake !== room.stake) {
-        // ставка успела поменяться — просим соперника нажать «Готов» заново
-        if (room.host) send('reject', { stake: room.stake });
+        if (room.host) send('reject', { stake: room.stake, to: payload.from });
         return;
       }
-      room.their = { commit: payload.commit };
-      $('#on-res').textContent = room.my ? 'Оба готовы — крутим!' : `${room.opp ? room.opp.nick : 'Соперник'} готов. Твой ход`;
+      if (!room.round) room.round = newRound();
+      room.round.commits[payload.from] = payload.commit;
+      $('#on-res').textContent = `${nickOf(payload.from)} готов`;
       renderRoom();
       maybeReveal();
     });
-    ch.on('broadcast', { event: 'reveal' }, async ({ payload }) => {
-      if (!room.their || !room.my) return;
-      if ((await sha(payload.seed)) !== room.their.commit) {
-        refundIfPending('Соперник прислал неверные данные — ставка возвращена');
-        return renderRoom();
-      }
-      room.their.seed = payload.seed;
-      maybeResolve();
-    });
     ch.on('broadcast', { event: 'reject' }, ({ payload }) => {
-      refundIfPending('Ставка изменилась — жми «Готов» ещё раз');
+      if (payload.to !== myId) return;
+      abortRound('Ставка изменилась — жми «Готов» ещё раз');
       room.stake = payload.stake;
       renderRoom();
     });
-    ch.on('broadcast', { event: 'emoji' }, ({ payload }) => flyEmoji($('#on-opp'), payload.e));
+    ch.on('broadcast', { event: 'reveal' }, async ({ payload }) => {
+      const r = room.round;
+      if (!r || !r.commits[payload.from]) return;
+      if ((await sha(payload.seed)) !== r.commits[payload.from]) {
+        abortRound(`${nickOf(payload.from)} прислал неверные данные — ставка возвращена`);
+        return renderRoom();
+      }
+      r.seeds[payload.from] = payload.seed;
+      maybeResolve();
+    });
+    ch.on('broadcast', { event: 'emoji' }, ({ payload }) => {
+      const el = $(`#on-grid .on-slot[data-id="${payload.from}"] .on-player`);
+      if (el) flyEmoji(el, payload.e);
+    });
 
     ch.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await ch.track({ id: myId, t: room.joinedAt, nick: meInfo().nick });
         $('#on-menu').hidden = true;
         $('#on-room').hidden = false;
-        $('#on-res').textContent = creating ? 'Комната создана. Скинь код кенту' : 'Подключился. Ждём соперника…';
-        ['#on-me-plate', '#on-opp-plate'].forEach((s) => { $(s).innerHTML = '<span class="duel-q">?</span>'; });
+        $('#on-res').textContent = creating ? 'Комната создана. Скинь код кентам (до 3 человек)' : 'Подключился…';
+        $('#on-res').className = 'duel-res';
         renderRoom();
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         $('#on-status').textContent = 'Не получилось подключиться. Проверь интернет';
@@ -1871,11 +1915,11 @@
   }
 
   async function leaveRoom(silent) {
-    if (!room.ch) return;
-    refundIfPending('Ставка возвращена');
+    if (!room.ch) { if (!silent) onMenu(); return; }
+    abortRound('Ставка возвращена');
     const ch = room.ch;
     room.ch = null;
-    room.opp = null;
+    room.players = [];
     try { await ch.untrack(); await sb.removeChannel(ch); } catch {}
     if (!silent) onMenu();
   }
@@ -1904,75 +1948,101 @@
   };
 
   $('#on-ready').onclick = async () => {
-    if (!room.opp || room.my || room.busy) return;
+    if (room.players.length < 2) return;
+    if (room.round && (room.round.commits[myId] || room.round.resolving)) return;
     if (plState.coins < room.stake) return toast('Не хватает монет на эту ставку');
+    if (!room.round) room.round = newRound();
     const seed = hex(crypto.getRandomValues(new Uint8Array(16)));
-    room.my = { seed, commit: await sha(seed), revealed: false };
+    const commit = await sha(seed);
+    room.round.mySeed = seed;
+    room.round.commits[myId] = commit;
     setCoins(-room.stake); // ставка «в банке» до конца раунда
-    send('ready', { commit: room.my.commit, stake: room.stake });
-    $('#on-res').textContent = room.their ? 'Оба готовы — крутим!' : 'Ждём, пока соперник нажмёт «Готов»…';
-    ['#on-me-plate', '#on-opp-plate'].forEach((s) => { $(s).innerHTML = '<span class="duel-q">?</span>'; });
+    send('ready', { commit, stake: room.stake });
+    $('#on-res').textContent = 'Ты готов. Ждём остальных…';
+    $('#on-res').className = 'duel-res';
     renderRoom();
     maybeReveal();
   };
 
-  let revealTimer = null;
+  const allCommitted = () => room.round && room.players.length >= 2 && room.players.every((p) => room.round.commits[p.id]);
+
   function maybeReveal() {
-    if (!room.my || !room.their || room.my.revealed) return;
-    room.my.revealed = true;
-    room.busy = true;
-    send('reveal', { seed: room.my.seed });
+    const r = room.round;
+    if (!r || r.revealed || !r.mySeed || !allCommitted()) return;
+    r.revealed = true;
+    r.resolving = true;
+    r.order = room.players.map((p) => p.id);
+    r.seeds[myId] = r.mySeed;
+    send('reveal', { seed: r.mySeed });
+    $('#on-res').textContent = 'Все готовы — крутим!';
     clearTimeout(revealTimer);
     revealTimer = setTimeout(() => {
-      if (room.my && !room.my.settled) {
-        refundIfPending('Соперник не ответил — ставка возвращена');
+      if (room.round === r && !r.settled) {
+        r.resolving = false;
+        abortRound('Кто-то не ответил — ставка возвращена');
         renderRoom();
       }
     }, 12000);
+    renderRoom();
     maybeResolve();
   }
 
   async function maybeResolve() {
-    if (!room.my || !room.their || !room.their.seed || !room.my.revealed || room.my.settled) return;
-    room.my.settled = true;
+    const r = room.round;
+    if (!r || !r.revealed || r.settled || !r.order.every((id) => r.seeds[id])) return;
+    r.settled = true;
     clearTimeout(revealTimer);
-    const hostSeed = room.host ? room.my.seed : room.their.seed;
-    const guestSeed = room.host ? room.their.seed : room.my.seed;
-    const r = seededRnd(await sha(`${hostSeed}:${guestSeed}`));
-    const hostP = P.random(0, r), guestP = P.random(0, r);
-    const me = { p: room.host ? hostP : guestP }, them = { p: room.host ? guestP : hostP };
-    me.sc = P.score(me.p);
-    them.sc = P.score(them.p);
+    const combined = await sha(r.order.map((id) => r.seeds[id]).join(':'));
+    const rng = seededRnd(combined);
+    const res = r.order.map((id) => { const p = P.random(0, rng); return { id, p, sc: P.score(p) }; });
 
-    await Promise.all([shuffleInto($('#on-me-plate'), me.p, 1300), shuffleInto($('#on-opp-plate'), them.p, 1300)]);
-    $('#on-me-plate').insertAdjacentHTML('beforeend', `<div class="duel-sc"><b style="color:${me.sc.tier.color}">${me.sc.tier.name}</b> · ${me.sc.total}</div>`);
-    $('#on-opp-plate').insertAdjacentHTML('beforeend', `<div class="duel-sc"><b style="color:${them.sc.tier.color}">${them.sc.tier.name}</b> · ${them.sc.total}</div>`);
+    // лучшие по очкам, при равенстве — по цифрам и региону; полная ничья делит банк
+    const best = res.reduce((a, b) => (duelCmp(b, a) > 0 ? b : a));
+    const winners = res.filter((x) => duelCmp(x, best) === 0);
+    const pot = room.stake * res.length;
+    const share = Math.floor(pot / winners.length);
+    const iWon = winners.some((w) => w.id === myId);
+    // деньги начисляем сразу, анимация — только показ
+    if (iWon) setCoins(share);
 
-    const stake = room.stake, opp = room.opp || { id: 'unknown', nick: 'Соперник' };
-    const rec = plState.pvp[opp.id] || (plState.pvp[opp.id] = { nick: opp.nick, w: 0, l: 0 });
-    rec.nick = opp.nick;
-    const c = duelCmp(me, them);
-    const res = $('#on-res');
-    if (c > 0) {
-      setCoins(stake * 2);
-      rec.w++;
-      res.innerHTML = `🏆 Победа! +${fmt(stake * 2)}`;
-      res.className = 'duel-res win';
-    } else if (c < 0) {
-      rec.l++;
-      res.innerHTML = `${esc(opp.nick)} забрал ${fmt(stake)}`;
-      res.className = 'duel-res lose';
-    } else {
-      setCoins(stake);
-      res.textContent = 'Один в один! Ставки вернулись';
-      res.className = 'duel-res';
-    }
+    plState.pvpStats.games++;
+    res.forEach((x) => {
+      if (x.id === myId) return;
+      const rec = plState.pvp[x.id] || (plState.pvp[x.id] = { nick: nickOf(x.id), w: 0, l: 0 });
+      rec.nick = nickOf(x.id);
+      if (iWon && !winners.some((w) => w.id === x.id)) rec.w++;
+      if (!iWon && winners.some((w) => w.id === x.id)) rec.l++;
+    });
+    if (iWon) plState.pvpStats.wins++;
     savePl();
-    room.my = null;
-    room.their = null;
-    room.busy = false;
-    renderRoom();
+    room.round = null;
+
+    await Promise.all(res.map((x, i) => shuffleInto($(`#on-plate-${x.id}`), x.p, 1100 + i * 250)));
+    res.forEach((x) => {
+      $(`#on-plate-${x.id}`).insertAdjacentHTML('beforeend', `<div class="duel-sc"><b style="color:${x.sc.tier.color}">${x.sc.tier.name}</b> · ${x.sc.total}</div>`);
+    });
+    winners.forEach((w) => $(`#on-grid .on-slot[data-id="${w.id}"]`)?.classList.add('winner'));
+    const out = $('#on-res');
+    if (iWon) {
+      out.innerHTML = winners.length > 1 ? `🤝 Ничья наверху — делите банк: +${fmt(share)}` : `🏆 Ты забрал банк: +${fmt(share)}`;
+      out.className = 'duel-res win';
+    } else {
+      out.innerHTML = `${winners.map((w) => esc(nickOf(w.id))).join(' и ')} ${winners.length > 1 ? 'делят' : 'забирает'} банк ${fmt(pot)}`;
+      out.className = 'duel-res lose';
+    }
+    renderRoomAfterRound();
     refreshPlates();
+  }
+
+  // После раунда показываем номера, но разблокируем кнопки
+  function renderRoomAfterRound() {
+    const ready = $('#on-ready');
+    ready.disabled = room.players.length < 2;
+    ready.innerHTML = `Ещё раунд · ставка <i class="coin"></i>${room.stake}`;
+    $$('#on-grid .on-status').forEach((s) => { s.textContent = 'Думает'; s.classList.remove('ok'); });
+    $$('#on-stakes button').forEach((b) => { b.disabled = !room.host; });
+    const st = plState.pvpStats;
+    $('#on-score').textContent = `Онлайн: побед ${st.wins} из ${st.games}`;
   }
 
   function flyEmoji(target, e) {
@@ -1985,11 +2055,237 @@
   }
   $('#on-emojis').onclick = (e) => {
     const b = e.target.closest('button');
-    if (!b || !room.opp) return;
+    if (!b || room.players.length < 2) return;
     send('emoji', { e: b.textContent });
-    flyEmoji($('#on-me'), b.textContent);
+    const el = $(`#on-grid .on-slot[data-id="${myId}"] .on-player`);
+    if (el) flyEmoji(el, b.textContent);
   };
   window.addEventListener('beforeunload', () => { if (room.ch) leaveRoom(true); });
+
+  /* ---------------- кейсы ---------------- */
+  const CS = window.Cases;
+  if (!plState.inv) plState.inv = [];
+  if (plState.casesOpened == null) plState.casesOpened = 0;
+  if (plState.sound == null) plState.sound = true;
+  let csCase = CS.CASES[0], csBusy = false;
+  const STEP = 128, WIN_AT = 52, STRIP_LEN = 60;
+  const rarityOf = (id) => CS.RARITIES.find((r) => r.id === id);
+  const wearOf = (id) => CS.WEAR.find((w) => w.id === id);
+
+  /* --- звук: короткие щелчки ленты и аккорд при выпадении --- */
+  let audio = null;
+  function blip(freq, dur, vol = 0.04, type = 'square', delay = 0) {
+    if (!plState.sound) return;
+    try {
+      audio = audio || new AudioContext();
+      const t = audio.currentTime + delay;
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    } catch {}
+  }
+  const dropChord = (idx) => [0, 1, 2, 3].slice(0, 2 + Math.min(idx, 2)).forEach((i) => blip([523, 659, 784, 1046][i] * (1 + idx * 0.06), 0.35, 0.05, 'triangle', i * 0.09));
+  $('#cs-sound').onclick = () => {
+    plState.sound = !plState.sound;
+    $('#cs-sound').textContent = plState.sound ? '🔊' : '🔇';
+    savePl();
+  };
+
+  const itemCard = (it, extra = '') => {
+    const ra = rarityOf(it.rarity);
+    return `<div class="cs-item ${extra}" style="--rc:${ra.color}">
+      <span class="cs-ico">${it.icon}</span>
+      <span class="cs-name">${esc(it.name)}</span>
+    </div>`;
+  };
+
+  function renderCaseList() {
+    $('#cs-list').innerHTML = CS.CASES.map((c) => `
+      <button class="case-card ${c.id === csCase.id ? 'on' : ''}" data-case="${c.id}" style="--hue:${c.hue}">
+        <span class="case-ico">${c.icon}</span>
+        <b>${c.name}</b>
+        <small><i class="coin"></i>${fmt(c.price)}</small>
+      </button>`).join('');
+    $('#cs-price').innerHTML = `<i class="coin"></i>${fmt(csCase.price)}`;
+    $('#cs-open').classList.toggle('broke', plState.coins < csCase.price);
+    $('#cs-coins').textContent = fmt(plState.coins);
+    $('#cs-opened').textContent = fmt(plState.casesOpened);
+    $('#cs-sound').textContent = plState.sound ? '🔊' : '🔇';
+    // содержимое кейса с шансами
+    $('#cs-contents').innerHTML = `<span class="cap">ВНУТРИ КЕЙСА</span><div class="cs-contents-row">` +
+      CS.RARITIES.map((ra) => csCase.items[ra.id].map(([name, icon]) => `
+        <div class="cs-mini" style="--rc:${ra.color}" title="${ra.name} · ${(ra.p * 100).toFixed(2)}%"><span>${icon}</span><small>${esc(name)}</small></div>`).join('')).join('') +
+      `</div>`;
+  }
+  $('#cs-list').onclick = (e) => {
+    const b = e.target.closest('[data-case]');
+    if (!b || csBusy) return;
+    csCase = CS.CASES.find((c) => c.id === b.dataset.case);
+    fillStrip();
+    renderCaseList();
+  };
+
+  function fillStrip(win) {
+    const items = Array.from({ length: STRIP_LEN }, (_, i) => (i === WIN_AT && win ? win : CS.rollItem(csCase)));
+    const strip = $('#cs-strip');
+    strip.style.transition = 'none';
+    strip.style.transform = 'translateX(0)';
+    strip.innerHTML = items.map((it) => itemCard(it)).join('');
+  }
+
+  function renderInv() {
+    const inv = [...plState.inv].sort((a, b) => b.value - a.value);
+    const total = inv.reduce((s, x) => s + x.value, 0);
+    $('#cs-inv-c').textContent = `${inv.length} шт · ${fmt(total)}`;
+    $('#cs-sellall').innerHTML = inv.length ? `Продать всё за <i class="coin"></i>${fmt(total)}` : 'Инвентарь пуст';
+    $('#cs-sellall').disabled = !inv.length;
+    $('#cs-inv').innerHTML = inv.length ? inv.map((it) => {
+      const ra = rarityOf(it.rarity);
+      return `<div class="inv-item" style="--rc:${ra.color}" title="${esc(it.name)} · ${wearOf(it.wear).name}">
+        <span class="cs-ico">${it.icon}</span>
+        <span class="inv-name">${it.st ? '<em>ST™</em> ' : ''}${esc(it.name)}</span>
+        <small>${it.wear}</small>
+        <button class="inv-sell" data-sell="${it.id}"><i class="coin"></i>${fmt(it.value)}</button>
+      </div>`;
+    }).join('') : `<div class="feed-empty"><div class="sparkle">✦</div><br>ОТКРОЙ КЕЙС — ДРОП БУДЕТ ТУТ</div>`;
+  }
+  function sellItem(id) {
+    const i = plState.inv.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    const [it] = plState.inv.splice(i, 1);
+    setCoins(it.value);
+    blip(880, 0.08, 0.04, 'sine');
+    renderInv();
+    renderCaseList();
+  }
+  $('#cs-inv').onclick = (e) => { const b = e.target.closest('[data-sell]'); if (b) sellItem(b.dataset.sell); };
+  $('#cs-sellall').onclick = () => {
+    const total = plState.inv.reduce((s, x) => s + x.value, 0);
+    if (!total) return;
+    plState.inv = [];
+    setCoins(total);
+    toast(`Продано на ${fmt(total)}`);
+    renderInv();
+    renderCaseList();
+  };
+
+  function csBurst(color, count) {
+    const stage = $('#cs-stage');
+    const r = $('.case-line').getBoundingClientRect(), base = stage.getBoundingClientRect();
+    const cx = r.left - base.left, cy = r.top - base.top + r.height / 2;
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('i');
+      el.className = 'spark';
+      const ang = Math.random() * Math.PI * 2, dist = 100 + Math.random() * 300;
+      el.style.cssText = `left:${cx}px;top:${cy}px;--dx:${Math.cos(ang) * dist}px;--dy:${Math.sin(ang) * dist * .6}px;--c:${Math.random() < .6 ? color : '#fff'};--s:${4 + Math.random() * 7}px;animation-delay:${Math.random() * 150}ms`;
+      stage.appendChild(el);
+      setTimeout(() => el.remove(), 1500);
+    }
+  }
+
+  function showDrop(it) {
+    const ra = rarityOf(it.rarity), wear = wearOf(it.wear);
+    const box = $('#cs-drop');
+    box.innerHTML = `
+      <div class="drop-card" id="cs-drop-card" style="--rc:${ra.color}">
+        <div class="drop-glare"></div>
+        <div class="drop-rarity">${ra.name}</div>
+        <div class="drop-ico">${it.icon}</div>
+        <div class="drop-name">${it.st ? '<em>StatTrak™</em> ' : ''}${esc(it.name)}</div>
+        <div class="drop-wear">${wear.name}</div>
+      </div>
+      <div class="drop-actions">
+        <button class="pill pill-dark" data-drop="sell">Продать за <i class="coin"></i>${fmt(it.value)}</button>
+        <button class="pill pill-white" data-drop="keep">В инвентарь</button>
+      </div>`;
+    box.hidden = false;
+    box.dataset.id = it.id;
+    tilt($('#cs-drop-card'), $('#cs-drop-card'), 16);
+  }
+  $('#cs-drop').onclick = (e) => {
+    const b = e.target.closest('[data-drop]');
+    if (!b) return;
+    if (b.dataset.drop === 'sell') sellItem($('#cs-drop').dataset.id);
+    $('#cs-drop').hidden = true;
+  };
+
+  async function openCase() {
+    if (csBusy) return;
+    if (plState.coins < csCase.price) return toast('Не хватает монет — сходи на работу 💼 в «Номерах»');
+    csBusy = true;
+    $('#cs-open').disabled = true;
+    $('#cs-drop').hidden = true;
+    setCoins(-csCase.price);
+    const drop = CS.openCase(csCase);
+    fillStrip(drop);
+    renderCaseList();
+
+    const strip = $('#cs-strip'), wrap = $('.case-strip-wrap');
+    const W = wrap.clientWidth;
+    const offset = G.rnd.int(-48, 48);
+    const target = -(WIN_AT * STEP + 60 - W / 2 + offset); // 60 — половина ширины карточки
+    void strip.offsetWidth;
+    strip.style.transition = 'transform 5.6s cubic-bezier(.06, .62, .1, 1)';
+    strip.style.transform = `translateX(${target}px)`;
+
+    // щелчок каждый раз, когда под стрелкой проезжает новая карточка
+    let lastIdx = -1, ticking = true;
+    const tick = () => {
+      if (!ticking) return;
+      const x = new DOMMatrix(getComputedStyle(strip).transform).m41;
+      const idx = Math.floor((-x + W / 2) / STEP);
+      if (idx !== lastIdx) { lastIdx = idx; blip(1400, 0.012, 0.03); }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+
+    await new Promise((r) => setTimeout(r, 5700));
+    ticking = false;
+    const order = CS.RARITIES.findIndex((r) => r.id === drop.rarity);
+    $$('#cs-strip .cs-item')[WIN_AT].classList.add('won');
+    dropChord(order);
+    if (order >= 2) csBurst(rarityOf(drop.rarity).color, [0, 0, 24, 50, 90][order]);
+    if (order >= 3) toast(`${rarityOf(drop.rarity).name}: ${drop.name}!`);
+
+    plState.casesOpened++;
+    if (drop.rarity === 'gold') plState.flags.caseGold = true;
+    plState.inv.unshift(drop);
+    plState.inv = plState.inv.slice(0, 200);
+    savePl();
+    record('misc', 'Кейс', [`${drop.st ? 'StatTrak™ ' : ''}${drop.name} (${drop.wear}) · ${drop.value}`]);
+    showDrop(drop);
+    renderInv();
+    renderCaseList();
+    refreshPlates();
+    csBusy = false;
+    $('#cs-open').disabled = false;
+  }
+  $('#cs-open').onclick = openCase;
+
+  fillStrip();
+  renderCaseList();
+  renderInv();
+
+  /* ---------------- визуал: 3D-наклон и блик ---------------- */
+  function tilt(area, target, max = 10) {
+    area.addEventListener('mousemove', (e) => {
+      const r = area.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+      target.style.setProperty('--ry', `${x * max}deg`);
+      target.style.setProperty('--rx', `${-y * max}deg`);
+      target.style.setProperty('--gx', `${(x + 0.5) * 100}%`);
+      target.style.setProperty('--gy', `${(y + 0.5) * 100}%`);
+    });
+    area.addEventListener('mouseleave', () => {
+      ['--rx', '--ry'].forEach((v) => target.style.setProperty(v, '0deg'));
+    });
+  }
+  tilt($('#pl-stage'), $('#pl-tilt'), 14);
 
   /* ---------------- settings ---------------- */
   [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask'], ['set-tray', 'tray'], ['set-hotkey', 'hotkey'], ['set-autostart', 'autostart']].forEach(([id, key]) => {

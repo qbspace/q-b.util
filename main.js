@@ -65,6 +65,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // онлайн-батлы и таймеры должны работать, даже когда окно свёрнуто в трей
+      backgroundThrottling: false,
     },
   });
 
