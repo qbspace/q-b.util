@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://ihopkioakwcbgpznsbxd.supabase.co wss://ihopkioakwcbgpznsbxd.supabase.co">
   <title>q-b.util</title>
   <link rel="icon" href="assets/icon.png">
   <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/300.css">
@@ -486,6 +486,7 @@
               <button class="pill pill-white pl-risk-btn" id="pl-risk-btn" hidden></button>
               <button class="pill pill-white" id="pl-work">💼 Работа</button>
               <button class="pill pill-white" id="pl-duel">⚔️ Батл</button>
+              <button class="pill pill-white pl-online-btn" id="pl-online">🌐 Онлайн</button>
               <button class="pill pill-white icon" id="pl-copy" title="Копировать номер">⧉</button>
               <button class="pill pill-white icon" id="pl-qr" title="QR-код номера">QR</button>
             </div>
@@ -656,6 +657,36 @@
   </div>
 </div>
 
+<div class="modal" id="online-modal" hidden>
+  <div class="modal-card online-card">
+    <div class="card-head"><span class="cap">🌐 ОНЛАЙН-БАТЛ С КЕНТАМИ</span><button class="dots" id="on-close">✕</button></div>
+    <div id="on-menu" class="on-menu">
+      <button class="btn-main" id="on-create">Создать комнату <i>›</i></button>
+      <div class="on-or"><span>или войди по коду кента</span></div>
+      <div class="on-join">
+        <input class="inp" id="on-code" placeholder="QB-XXXX" maxlength="7" spellcheck="false" autocomplete="off">
+        <button class="pill pill-dark" id="on-join">Войти</button>
+      </div>
+      <div class="note" id="on-status"></div>
+      <div class="note">Номера считаются из случайных чисел обоих игроков — подкрутить результат не может никто. Монеты у каждого свои.</div>
+    </div>
+    <div id="on-room" hidden>
+      <div class="on-codebar"><span>Код комнаты</span><b id="on-code-v">QB-XXXX</b><button class="pill pill-white" id="on-copy">Копировать</button></div>
+      <div class="on-arena">
+        <div class="on-side"><div class="on-player" id="on-me"></div><div class="duel-plate on-plate" id="on-me-plate"></div></div>
+        <div class="duel-vs">VS</div>
+        <div class="on-side"><div class="on-player" id="on-opp"></div><div class="duel-plate on-plate" id="on-opp-plate"></div></div>
+      </div>
+      <div class="duel-res" id="on-res"></div>
+      <span class="cap">СТАВКА <span class="dim-cap" id="on-stake-hint"></span></span>
+      <div class="seg small" id="on-stakes"></div>
+      <button class="btn-main" id="on-ready">Готов <i>›</i></button>
+      <div class="on-emojis" id="on-emojis"><button>😂</button><button>🔥</button><button>😭</button><button>🤡</button><button>💀</button><button>👍</button><button>🫡</button></div>
+      <div class="on-bottom"><span class="note" id="on-score"></span><button class="pill pill-white" id="on-leave">Выйти из комнаты</button></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="duel-modal" hidden>
   <div class="modal-card duel-card">
     <div class="card-head"><span class="cap">⚔️ БАТЛ НОМЕРОВ</span><button class="dots" id="duel-close">✕</button></div>
@@ -683,6 +714,8 @@
 </div>
 
 <script src="../node_modules/qrcode-generator/qrcode.js"></script>
+<script src="../node_modules/@supabase/supabase-js/dist/umd/supabase.js"></script>
+<script src="online-config.js"></script>
 <script src="generators.js"></script>
 <script src="plates.js"></script>
 <script src="app.js"></script>

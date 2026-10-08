@@ -67,14 +67,15 @@
   const MOSCOW_CODES = [...MOSCOW];
 
   // moscowChance — бонус от улучшения «Московская прописка»
-  function random(moscowChance = 0) {
+  // r — источник случайности: по умолчанию криптостойкий, в онлайн-батле общий для обоих игроков
+  function random(moscowChance = 0, r = rnd) {
     let digits;
-    do digits = rnd.digits(3); while (digits === '000'); // 000 не выдаётся
+    do digits = String(r.int(0, 9)) + r.int(0, 9) + r.int(0, 9); while (digits === '000'); // 000 не выдаётся
     return {
-      l1: rnd.pick(LETTERS),
+      l1: r.pick(LETTERS),
       digits,
-      l2: rnd.pick(LETTERS) + rnd.pick(LETTERS),
-      region: moscowChance && rnd.int(0, 9999) < moscowChance * 10000 ? rnd.pick(MOSCOW_CODES) : rnd.pick(REGION_CODES),
+      l2: r.pick(LETTERS) + r.pick(LETTERS),
+      region: moscowChance && r.int(0, 9999) < moscowChance * 10000 ? r.pick(MOSCOW_CODES) : r.pick(REGION_CODES),
     };
   }
 

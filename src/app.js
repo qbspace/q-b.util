@@ -564,6 +564,11 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '1.8.0': [
+      'Онлайн-батл с кентами: создай комнату, скинь код — и рубитесь номерами',
+      'Честный результат: номера считаются из случайных чисел обоих игроков',
+      'Ники, авы и звания соперников, эмодзи-реакции и счёт против каждого кента',
+    ],
     '1.7.0': [
       'Работа: три мини-игры за монеты — оператор камеры, проверка номеров и мойка',
       'Силы восстанавливаются сами, даже когда приложение закрыто',
@@ -1676,6 +1681,316 @@
   if (!plState.hist.length) plState.hist.push(plState.coins);
   refreshPlates();
 
+  /* ---------------- онлайн-батл ---------------- */
+  // Комнаты — это realtime-каналы Supabase: без таблиц, только broadcast + presence.
+  // Честность: каждый сначала шлёт хеш своего случайного зерна, потом само зерно;
+  // номера обоих игроков считаются из двух зёрен вместе, поэтому подкрутить нельзя.
+  const sb = window.supabase && window.QB_ONLINE
+    ? window.supabase.createClient(window.QB_ONLINE.url, window.QB_ONLINE.key, { auth: { persistSession: false } })
+    : null;
+  let myId = load('qb.pid', null);
+  if (!myId) { myId = G.uuid4(); store('qb.pid', myId); }
+  if (!plState.pvp) plState.pvp = {};
+
+  const ON_STAKES = [10, 50, 100, 500];
+  const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const room = { ch: null, code: '', joinedAt: 0, host: false, opp: null, stake: 10, my: null, their: null, busy: false };
+  let smallPhoto = '';
+
+  const hex = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+  const sha = async (s) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+
+  // Детерминированный ГСЧ из общего хеша (xoshiro128**) — одинаковый у обоих игроков
+  function seededRnd(hashHex) {
+    let s = [0, 8, 16, 24].map((i) => parseInt(hashHex.slice(i, i + 8), 16) >>> 0);
+    const rotl = (x, k) => (x << k) | (x >>> (32 - k));
+    const next = () => {
+      const r = Math.imul(rotl(Math.imul(s[1], 5), 7), 9) >>> 0;
+      const t = s[1] << 9;
+      s[2] ^= s[0]; s[3] ^= s[1]; s[1] ^= s[2]; s[0] ^= s[3]; s[2] ^= t; s[3] = rotl(s[3], 11);
+      return r;
+    };
+    const int = (min, max) => min + Math.floor((next() / 4294967296) * (max - min + 1));
+    return { int, pick: (arr) => arr[int(0, arr.length - 1)] };
+  }
+
+  function makeSmallPhoto() {
+    if (!profile.photo) { smallPhoto = ''; return Promise.resolve(); }
+    return new Promise((res) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = c.height = 64;
+        c.getContext('2d').drawImage(img, 0, 0, 64, 64);
+        smallPhoto = c.toDataURL('image/webp', 0.8);
+        res();
+      };
+      img.onerror = () => res();
+      img.src = profile.photo;
+    });
+  }
+
+  const meInfo = () => ({
+    id: myId,
+    nick: profile.nick.trim() || `Игрок ${myId.slice(0, 4).toUpperCase()}`,
+    level: plState.level, title: P.titleFor(plState.level),
+    grad: profile.grad, photo: smallPhoto,
+  });
+
+  function playerCard(pl, status) {
+    if (!pl) return `<div class="on-wait"><span class="on-spinner"></span>Ждём кента…<small>Скинь ему код комнаты</small></div>`;
+    const ava = pl.photo ? `url("${pl.photo}")` : GRADS[pl.grad] || GRADS[0];
+    return `
+      <div class="on-ava ${pl.photo ? 'photo-on' : ''}" style="--ava:${esc(ava)}">${esc(initials(pl.nick))}</div>
+      <div class="on-nick">${esc(pl.nick)}</div>
+      <div class="on-title">${esc(pl.title)} · ур. ${pl.level}</div>
+      <div class="on-status ${status === 'Готов' ? 'ok' : ''}">${status}</div>`;
+  }
+
+  function renderRoom() {
+    $('#on-code-v').textContent = room.code;
+    $('#on-me').innerHTML = playerCard(meInfo(), room.my ? 'Готов' : 'Выбирает ставку');
+    $('#on-opp').innerHTML = playerCard(room.opp, room.their ? 'Готов' : 'Выбирает ставку');
+    $('#on-stakes').innerHTML = ON_STAKES.map((v) => `<button data-v="${v}" class="${v === room.stake ? 'on' : ''}" ${!room.host || room.my || room.their ? 'disabled' : ''}>${v}</button>`).join('');
+    $('#on-stake-hint').textContent = room.host ? '· ВЫБИРАЕШЬ ТЫ' : '· ВЫБИРАЕТ СОЗДАТЕЛЬ КОМНАТЫ';
+    const ready = $('#on-ready');
+    ready.disabled = !room.opp || !!room.my || room.busy;
+    ready.innerHTML = room.my ? 'Ждём соперника…' : `Готов · ставка <i class="coin"></i>${room.stake}`;
+    const rec = room.opp && plState.pvp[room.opp.id];
+    $('#on-score').textContent = room.opp ? `Счёт с ${room.opp.nick}: ${rec ? rec.w : 0} — ${rec ? rec.l : 0}` : '';
+    $('#on-emojis').hidden = !room.opp;
+  }
+
+  function onMenu() {
+    $('#on-menu').hidden = false;
+    $('#on-room').hidden = true;
+    $('#on-status').textContent = sb ? '' : 'Онлайн недоступен: не загрузилась библиотека';
+  }
+
+  $('#pl-online').onclick = () => {
+    $('#online-modal').hidden = false;
+    if (!room.ch) onMenu();
+    else renderRoom();
+  };
+  $('#on-close').onclick = () => { $('#online-modal').hidden = true; };
+
+  const send = (event, payload = {}) => room.ch && room.ch.send({ type: 'broadcast', event, payload: { ...payload, from: myId } });
+
+  function refundIfPending(reason) {
+    if (room.my && !room.my.settled) {
+      setCoins(room.stake);
+      toast(reason);
+    }
+    room.my = null;
+    room.their = null;
+    room.busy = false;
+  }
+
+  async function joinRoom(code, creating) {
+    if (!sb) return toast('Онлайн недоступен');
+    await leaveRoom(true);
+    await makeSmallPhoto();
+    room.code = code;
+    room.joinedAt = Date.now();
+    room.opp = null;
+    room.my = room.their = null;
+    room.stake = 10;
+    $('#on-status').textContent = 'Подключаюсь…';
+    const ch = sb.channel(`qb-room-${code}`, { config: { broadcast: { self: false, ack: false }, presence: { key: myId } } });
+    room.ch = ch;
+
+    ch.on('presence', { event: 'sync' }, () => {
+      const list = Object.values(ch.presenceState()).map((a) => a[0]).filter(Boolean).sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
+      const meIdx = list.findIndex((x) => x.id === myId);
+      if (meIdx >= 2) { toast('Комната занята — там уже двое'); leaveRoom(); return onMenu(); }
+      room.host = meIdx === 0;
+      const other = list.slice(0, 2).find((x) => x.id !== myId);
+      if (!other && room.opp) {
+        refundIfPending('Соперник вышел — ставка возвращена');
+        room.opp = null;
+        $('#on-res').textContent = 'Соперник вышел. Ждём кента…';
+      }
+      if (other && (!room.opp || room.opp.id !== other.id)) send('hello', { player: meInfo() });
+      renderRoom();
+    });
+    ch.on('broadcast', { event: 'hello' }, ({ payload }) => {
+      const firstTime = !room.opp || room.opp.id !== payload.player.id;
+      room.opp = payload.player;
+      if (firstTime) {
+        send('hello', { player: meInfo() });
+        if (room.host) send('stake', { stake: room.stake });
+        $('#on-res').textContent = `${room.opp.nick} в комнате. Жмите «Готов»`;
+        toast(`${room.opp.nick} зашёл в комнату`);
+      }
+      renderRoom();
+    });
+    ch.on('broadcast', { event: 'stake' }, ({ payload }) => {
+      if (room.host) return;
+      room.stake = payload.stake;
+      renderRoom();
+    });
+    ch.on('broadcast', { event: 'ready' }, ({ payload }) => {
+      if (payload.stake !== room.stake) {
+        // ставка успела поменяться — просим соперника нажать «Готов» заново
+        if (room.host) send('reject', { stake: room.stake });
+        return;
+      }
+      room.their = { commit: payload.commit };
+      $('#on-res').textContent = room.my ? 'Оба готовы — крутим!' : `${room.opp ? room.opp.nick : 'Соперник'} готов. Твой ход`;
+      renderRoom();
+      maybeReveal();
+    });
+    ch.on('broadcast', { event: 'reveal' }, async ({ payload }) => {
+      if (!room.their || !room.my) return;
+      if ((await sha(payload.seed)) !== room.their.commit) {
+        refundIfPending('Соперник прислал неверные данные — ставка возвращена');
+        return renderRoom();
+      }
+      room.their.seed = payload.seed;
+      maybeResolve();
+    });
+    ch.on('broadcast', { event: 'reject' }, ({ payload }) => {
+      refundIfPending('Ставка изменилась — жми «Готов» ещё раз');
+      room.stake = payload.stake;
+      renderRoom();
+    });
+    ch.on('broadcast', { event: 'emoji' }, ({ payload }) => flyEmoji($('#on-opp'), payload.e));
+
+    ch.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await ch.track({ id: myId, t: room.joinedAt, nick: meInfo().nick });
+        $('#on-menu').hidden = true;
+        $('#on-room').hidden = false;
+        $('#on-res').textContent = creating ? 'Комната создана. Скинь код кенту' : 'Подключился. Ждём соперника…';
+        ['#on-me-plate', '#on-opp-plate'].forEach((s) => { $(s).innerHTML = '<span class="duel-q">?</span>'; });
+        renderRoom();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        $('#on-status').textContent = 'Не получилось подключиться. Проверь интернет';
+      }
+    });
+  }
+
+  async function leaveRoom(silent) {
+    if (!room.ch) return;
+    refundIfPending('Ставка возвращена');
+    const ch = room.ch;
+    room.ch = null;
+    room.opp = null;
+    try { await ch.untrack(); await sb.removeChannel(ch); } catch {}
+    if (!silent) onMenu();
+  }
+
+  $('#on-create').onclick = () => {
+    let code = 'QB-';
+    for (let i = 0; i < 4; i++) code += G.rnd.pick(CODE_CHARS.split(''));
+    joinRoom(code, true);
+  };
+  $('#on-join').onclick = () => {
+    let c = $('#on-code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (c.startsWith('QB')) c = c.slice(2);
+    if (c.length !== 4) return toast('Код — 4 символа, например QB-7K2M');
+    joinRoom('QB-' + c, false);
+  };
+  $('#on-code').onkeydown = (e) => { if (e.key === 'Enter') $('#on-join').click(); };
+  $('#on-copy').onclick = () => copy(room.code);
+  $('#on-leave').onclick = () => leaveRoom();
+
+  $('#on-stakes').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled || !room.host) return;
+    room.stake = +b.dataset.v;
+    send('stake', { stake: room.stake });
+    renderRoom();
+  };
+
+  $('#on-ready').onclick = async () => {
+    if (!room.opp || room.my || room.busy) return;
+    if (plState.coins < room.stake) return toast('Не хватает монет на эту ставку');
+    const seed = hex(crypto.getRandomValues(new Uint8Array(16)));
+    room.my = { seed, commit: await sha(seed), revealed: false };
+    setCoins(-room.stake); // ставка «в банке» до конца раунда
+    send('ready', { commit: room.my.commit, stake: room.stake });
+    $('#on-res').textContent = room.their ? 'Оба готовы — крутим!' : 'Ждём, пока соперник нажмёт «Готов»…';
+    ['#on-me-plate', '#on-opp-plate'].forEach((s) => { $(s).innerHTML = '<span class="duel-q">?</span>'; });
+    renderRoom();
+    maybeReveal();
+  };
+
+  let revealTimer = null;
+  function maybeReveal() {
+    if (!room.my || !room.their || room.my.revealed) return;
+    room.my.revealed = true;
+    room.busy = true;
+    send('reveal', { seed: room.my.seed });
+    clearTimeout(revealTimer);
+    revealTimer = setTimeout(() => {
+      if (room.my && !room.my.settled) {
+        refundIfPending('Соперник не ответил — ставка возвращена');
+        renderRoom();
+      }
+    }, 12000);
+    maybeResolve();
+  }
+
+  async function maybeResolve() {
+    if (!room.my || !room.their || !room.their.seed || !room.my.revealed || room.my.settled) return;
+    room.my.settled = true;
+    clearTimeout(revealTimer);
+    const hostSeed = room.host ? room.my.seed : room.their.seed;
+    const guestSeed = room.host ? room.their.seed : room.my.seed;
+    const r = seededRnd(await sha(`${hostSeed}:${guestSeed}`));
+    const hostP = P.random(0, r), guestP = P.random(0, r);
+    const me = { p: room.host ? hostP : guestP }, them = { p: room.host ? guestP : hostP };
+    me.sc = P.score(me.p);
+    them.sc = P.score(them.p);
+
+    await Promise.all([shuffleInto($('#on-me-plate'), me.p, 1300), shuffleInto($('#on-opp-plate'), them.p, 1300)]);
+    $('#on-me-plate').insertAdjacentHTML('beforeend', `<div class="duel-sc"><b style="color:${me.sc.tier.color}">${me.sc.tier.name}</b> · ${me.sc.total}</div>`);
+    $('#on-opp-plate').insertAdjacentHTML('beforeend', `<div class="duel-sc"><b style="color:${them.sc.tier.color}">${them.sc.tier.name}</b> · ${them.sc.total}</div>`);
+
+    const stake = room.stake, opp = room.opp || { id: 'unknown', nick: 'Соперник' };
+    const rec = plState.pvp[opp.id] || (plState.pvp[opp.id] = { nick: opp.nick, w: 0, l: 0 });
+    rec.nick = opp.nick;
+    const c = duelCmp(me, them);
+    const res = $('#on-res');
+    if (c > 0) {
+      setCoins(stake * 2);
+      rec.w++;
+      res.innerHTML = `🏆 Победа! +${fmt(stake * 2)}`;
+      res.className = 'duel-res win';
+    } else if (c < 0) {
+      rec.l++;
+      res.innerHTML = `${esc(opp.nick)} забрал ${fmt(stake)}`;
+      res.className = 'duel-res lose';
+    } else {
+      setCoins(stake);
+      res.textContent = 'Один в один! Ставки вернулись';
+      res.className = 'duel-res';
+    }
+    savePl();
+    room.my = null;
+    room.their = null;
+    room.busy = false;
+    renderRoom();
+    refreshPlates();
+  }
+
+  function flyEmoji(target, e) {
+    const el = document.createElement('span');
+    el.className = 'on-emoji-fly';
+    el.textContent = e;
+    el.style.left = 30 + Math.random() * 40 + '%';
+    target.appendChild(el);
+    setTimeout(() => el.remove(), 1600);
+  }
+  $('#on-emojis').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b || !room.opp) return;
+    send('emoji', { e: b.textContent });
+    flyEmoji($('#on-me'), b.textContent);
+  };
+  window.addEventListener('beforeunload', () => { if (room.ch) leaveRoom(true); });
+
   /* ---------------- settings ---------------- */
   [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask'], ['set-tray', 'tray'], ['set-hotkey', 'hotkey'], ['set-autostart', 'autostart']].forEach(([id, key]) => {
     const el = $('#' + id);
@@ -1833,7 +2148,7 @@
       spinPlate();
     }
     if (e.key === 'Escape') {
-      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal'].forEach((m) => { $(m).hidden = true; });
+      ['#qr-modal', '#whatsnew', '#duel-modal', '#work-modal', '#online-modal'].forEach((m) => { $(m).hidden = true; });
       stopJob();
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);
