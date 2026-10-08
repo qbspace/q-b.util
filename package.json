@@ -1,0 +1,63 @@
+{
+  "name": "q-b.util",
+  "productName": "q-b.util",
+  "version": "1.1.0",
+  "description": "Утилиты для быстрой генерации паролей, ключей, почт, телефонов и фейковых данных",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
+    "release": "electron-builder --win nsis --publish always"
+  },
+  "author": "quenixxx",
+  "license": "MIT",
+  "build": {
+    "appId": "util.qb.app",
+    "productName": "q-b.util",
+    "copyright": "quenixxx",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "q-b.util",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "q-b.util-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "q-b.util-portable-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "quenixxx",
+        "repo": "q-b.util",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "@fontsource/inter-tight": "^5.0.0",
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}
