@@ -64,25 +64,28 @@
     { id: 'mythic', name: 'Мифический', min: 100, color: '#ff4d6d' },
   ];
 
-  function random() {
+  const MOSCOW_CODES = [...MOSCOW];
+
+  // moscowChance — бонус от улучшения «Московская прописка»
+  function random(moscowChance = 0) {
     let digits;
     do digits = rnd.digits(3); while (digits === '000'); // 000 не выдаётся
     return {
       l1: rnd.pick(LETTERS),
       digits,
       l2: rnd.pick(LETTERS) + rnd.pick(LETTERS),
-      region: rnd.pick(REGION_CODES),
+      region: moscowChance && rnd.int(0, 9999) < moscowChance * 10000 ? rnd.pick(MOSCOW_CODES) : rnd.pick(REGION_CODES),
     };
   }
 
   function score(p) {
     const reasons = [];
-    const add = (pts, label, text) => reasons.push({ pts, label, text });
+    const add = (pts, label, text, key) => reasons.push({ pts, label, text, key });
     const d = p.digits, [a, b, c] = d;
     const series = p.l1 + p.l2;
 
     // цифры
-    if (d === '777') add(60, '777', 'три семёрки');
+    if (d === '777') add(60, '777', 'три семёрки', 's777');
     else if (a === b && b === c) add(45, d, 'три одинаковые цифры');
     else if (d.startsWith('00')) add(40, d, 'первая десятка');
     else if (a === '0' && c === '0') add(25, d, 'круглый номер');
@@ -92,16 +95,16 @@
     else if (a === b || b === c) add(5, d, 'пара цифр');
 
     // буквы
-    if (ELITE[series]) add(ELITE[series][2], series, ELITE[series][1]);
+    if (ELITE[series]) add(ELITE[series][2], series, ELITE[series][1], 'elite');
     else if (p.l1 === p.l2[0] && p.l2[0] === p.l2[1]) add(40, series, 'три одинаковые буквы');
-    else if (WORDS.has(series)) add(15, series, 'читается как слово');
+    else if (WORDS.has(series)) add(15, series, 'читается как слово', 'word');
     else if (p.l1 === p.l2[0] || p.l2[0] === p.l2[1] || p.l1 === p.l2[1]) add(4, series, 'пара букв');
 
     // одинаковые цифры и буквы-«нули»: О000О/ООО и т.п.
     if (series === 'ООО' && /^0+[1-9]?$/.test(d)) add(15, 'О0О', 'нули к нулям');
 
     // регион
-    if (p.region === '77') add(15, '77', 'старая Москва');
+    if (p.region === '77') add(15, '77', 'старая Москва', 'r77');
     else if (p.region === '777' || p.region === '797' || p.region === '799') add(12, p.region, 'Москва, «топовый» регион');
     else if (MOSCOW.has(p.region)) add(8, p.region, 'Москва');
     else if (p.region === '78') add(8, '78', 'старый Петербург');
@@ -123,7 +126,60 @@
   // Вероятность выпасть для каждой редкости — посчитано заранее на 1 млн случайных номеров
   const ODDS = { common: 0.719, uncommon: 0.214, rare: 0.0366, epic: 0.0279, legendary: 0.00152, mythic: 0.000273 };
 
+  /* ---------------- экономика ---------------- */
+  // Выплата за редкость при ставке 10. Базовая отдача ~93%, с полной прокачкой ~108%
+  const SPIN_COST = 10;
+  const PAYOUT = { common: 2, uncommon: 13, rare: 45, epic: 75, legendary: 500, mythic: 2000 };
+  const BETS = [1, 2, 5, 10];
+
+  const UPGRADES = [
+    { id: 'luck', name: 'Связи в ГИБДД', icon: '🤝', per: 1.5, prices: [200, 500, 1200, 2500, 5000],
+      desc: (v) => `${v}% шанс крутануть дважды и забрать лучший номер` },
+    { id: 'moscow', name: 'Московская прописка', icon: '🏛', per: 2, prices: [400, 1500],
+      desc: (v) => `${v}% шанс, что выпадет московский регион` },
+    { id: 'collector', name: 'Перекупщик', icon: '💼', per: 2, prices: [300, 1200, 4000],
+      desc: (v) => `+${v}% ко всем выплатам` },
+    { id: 'garage', name: 'Гараж', icon: '🚗', per: 1, prices: [150, 400, 1000, 2500, 6000],
+      desc: (v) => `+${v} монет в минуту, даже когда приложение закрыто (до 6 ч)` },
+    { id: 'auto', name: 'Автокрутка ×10', icon: '⚡', per: 1, prices: [600],
+      desc: () => 'Кнопка «×10»: десять круток подряд, стоп на легендарке' },
+    { id: 'highroller', name: 'Высокие ставки', icon: '🎲', per: 1, prices: [1000],
+      desc: () => 'Открывает ставки ×5 и ×10 — больше риск, больше куш' },
+  ];
+
+  // Скины — чистая косметика, на баланс не влияют
+  const SKINS = [
+    { id: 'classic', name: 'Классика', price: 0 },
+    { id: 'night', name: 'Ночь', price: 800 },
+    { id: 'gold', name: 'Золото', price: 2500 },
+    { id: 'neon', name: 'Неон', price: 5000 },
+    { id: 'holo', name: 'Голограмма', price: 12000 },
+  ];
+
+  const TIER_INDEX = Object.fromEntries(TIERS.map((t, i) => [t.id, i]));
+  const atLeast = (st, tier) => Object.entries(st.tiers || {}).some(([id, n]) => n > 0 && TIER_INDEX[id] >= TIER_INDEX[tier]);
+  const QUESTS = [
+    { id: 'spin1', name: 'Первая крутка', reward: 20, done: (s) => s.spins >= 1 },
+    { id: 'spin100', name: '100 круток', reward: 200, done: (s) => s.spins >= 100, progress: (s) => [s.spins, 100] },
+    { id: 'spin1000', name: '1000 круток', reward: 1500, done: (s) => s.spins >= 1000, progress: (s) => [s.spins, 1000] },
+    { id: 'rare', name: 'Выбей «Редкий» или выше', reward: 50, done: (s) => atLeast(s, 'rare') },
+    { id: 'epic', name: 'Выбей «Эпический» или выше', reward: 120, done: (s) => atLeast(s, 'epic') },
+    { id: 'legendary', name: 'Выбей «Легендарный» или выше', reward: 600, done: (s) => atLeast(s, 'legendary') },
+    { id: 'mythic', name: 'Выбей «Мифический»', reward: 2500, done: (s) => atLeast(s, 'mythic') },
+    { id: 's777', name: 'Три семёрки', reward: 300, done: (s) => !!(s.flags || {}).s777 },
+    { id: 'elite', name: 'Любая блатная серия (АМР, ЕКХ…)', reward: 300, done: (s) => !!(s.flags || {}).elite },
+    { id: 'word', name: 'Номер-слово', reward: 80, done: (s) => !!(s.flags || {}).word },
+    { id: 'r77', name: 'Регион 77', reward: 40, done: (s) => !!(s.flags || {}).r77 },
+    { id: 'upgrade', name: 'Купи первое улучшение', reward: 50, done: (s) => Object.values(s.upgrades || {}).some((l) => l > 0) },
+    { id: 'skin', name: 'Купи скин номера', reward: 100, done: (s) => (s.skins || []).length > 1 },
+    { id: 'bigwin', name: 'Выиграй 1 000 за одну крутку', reward: 500, done: (s) => (s.bestWin || 0) >= 1000 },
+    { id: 'rich', name: 'Накопи 5 000 монет', reward: 400, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
+  ];
+
   const format = (p) => `${p.l1}${p.digits}${p.l2}${p.region}`;
 
-  window.Plates = { LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format };
+  window.Plates = {
+    LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
+    SPIN_COST, PAYOUT, BETS, UPGRADES, SKINS, QUESTS,
+  };
 })();

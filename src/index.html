@@ -423,15 +423,19 @@
           <div class="card plate-card" id="pl-card">
             <div class="pl-glow"></div>
             <div class="pl-head">
-              <div>
-                <span class="cap">РУЛЕТКА НОМЕРОВ</span>
-                <div class="pl-spins">Прокручено: <b id="pl-spins">0</b></div>
+              <div class="pl-wallet">
+                <span class="cap">БАЛАНС</span>
+                <div class="pl-coins"><i class="coin"></i><b id="pl-coins">0</b></div>
+                <div class="pl-spins">Круток: <b id="pl-spins">0</b> · отдача ≈ <b id="pl-rtp">93%</b></div>
               </div>
-              <div class="pl-tier" id="pl-tier" hidden><i></i><span id="pl-tier-name">Обычный</span></div>
+              <div class="pl-head-right">
+                <button class="pl-daily" id="pl-daily" hidden>🎁 <span id="pl-daily-t">Бонус дня</span></button>
+                <div class="pl-tier" id="pl-tier" hidden><i></i><span id="pl-tier-name">Обычный</span></div>
+              </div>
             </div>
 
             <div class="plate-stage">
-              <div class="plate" id="plate">
+              <div class="plate skin-classic" id="plate">
                 <div class="plate-main">
                   <div class="reel l"><div class="strip"><b>А</b></div></div>
                   <div class="reel d"><div class="strip"><b>0</b></div></div>
@@ -445,6 +449,7 @@
                   <div class="plate-rus">RUS <i class="flag"></i></div>
                 </div>
               </div>
+              <div class="pl-win" id="pl-win"></div>
             </div>
 
             <div class="pl-result" id="pl-result">
@@ -453,21 +458,35 @@
               <div class="pl-reasons" id="pl-reasons"></div>
             </div>
 
+            <div class="pl-bets">
+              <span class="cap">СТАВКА</span>
+              <div class="seg small" id="pl-bet"></div>
+            </div>
             <div class="pl-actions">
-              <button class="pl-spin" id="pl-spin"><span>КРУТИТЬ</span></button>
+              <button class="pl-spin" id="pl-spin"><span>КРУТИТЬ</span><em id="pl-cost"><i class="coin"></i>10</em></button>
+              <button class="pill pill-white" id="pl-auto" hidden>×10</button>
               <button class="pill pill-white" id="pl-copy">Копировать</button>
               <button class="pill pill-white" id="pl-qr">QR</button>
             </div>
+            <button class="pl-batya" id="pl-batya" hidden>Занять у бати 💸 +30</button>
           </div>
 
-          <div class="pl-side">
-            <div class="card sand">
-              <h3>Шансы</h3>
-              <div class="pl-odds" id="pl-odds"></div>
+          <div class="card sand pl-side">
+            <div class="seg small pl-tabs" id="pl-tabs">
+              <button class="on" data-v="shop">Магазин</button>
+              <button data-v="quests">Задания <i class="pl-badge" id="pl-qbadge" hidden></i></button>
+              <button data-v="best">Коллекция</button>
+              <button data-v="odds">Шансы</button>
             </div>
-            <div class="card sand pl-best-card">
-              <div class="card-head"><h3>Коллекция</h3><button class="dots" id="pl-reset" title="Очистить коллекцию">⋮</button></div>
+            <div class="pl-panel" data-tab="shop" id="pl-shop"></div>
+            <div class="pl-panel" data-tab="quests" id="pl-quests" hidden></div>
+            <div class="pl-panel" data-tab="best" hidden>
               <div class="pl-best" id="pl-best"></div>
+              <button class="pill pill-white wide" id="pl-reset">Очистить коллекцию</button>
+            </div>
+            <div class="pl-panel" data-tab="odds" hidden>
+              <div class="pl-odds" id="pl-odds"></div>
+              <div class="note">Выплата указана для текущей ставки с учётом «Перекупщика». Шансы — для одной обычной крутки.</div>
             </div>
           </div>
         </div>

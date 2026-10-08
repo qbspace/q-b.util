@@ -564,6 +564,12 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '1.5.0': [
+      'Рулетка номеров стала игрой: монеты, ставки и выплаты за редкость',
+      'Магазин улучшений: связи в ГИБДД, московская прописка, перекупщик, гараж с пассивным доходом, автокрутка ×10',
+      'Скины номера: Ночь, Золото, Неон, Голограмма',
+      '15 заданий с наградами, ежедневный бонус с серией дней и батя, который выручит, если всё проиграл',
+    ],
     '1.4.0': [
       'Рулетка номеров РФ: крути барабаны и выбивай блатные номера — от «Обычного» до «Мифического»',
       'QR-код для любого результата: кнопка в каждой строке, можно сохранить PNG',
@@ -792,25 +798,221 @@
 
   /* ---------------- plates ---------------- */
   const P = window.Plates;
-  const plState = Object.assign({ spins: 0, best: [] }, load('qb.plates', {}));
-  let plCurrent = null, plSpinning = false;
+  const PL_DEFAULT = {
+    spins: 0, best: [], coins: 100, upgrades: {}, skins: ['classic'], skin: 'classic', quests: {},
+    tiers: {}, flags: {}, bestWin: 0, won: 0, spent: 0, daily: { last: '', streak: 0 },
+    garageTs: Date.now(), batyaTs: 0, bet: 1,
+  };
+  const plState = Object.assign({}, PL_DEFAULT, load('qb.plates', {}));
+  let plCurrent = null, plSpinning = false, plAuto = false;
 
+  const lvl = (id) => plState.upgrades[id] || 0;
+  const upg = (id) => P.UPGRADES.find((u) => u.id === id);
+  const luckChance = () => lvl('luck') * upg('luck').per / 100;
+  const moscowChance = () => lvl('moscow') * upg('moscow').per / 100;
+  const payMult = () => 1 + lvl('collector') * upg('collector').per / 100;
+  const spinCost = () => P.SPIN_COST * plState.bet;
+  // Оценка отдачи по результатам симуляций (на 1 млн круток)
+  const rtp = () => Math.round(93 + lvl('luck') * 1.4 + lvl('moscow') * 2.7 + lvl('collector') * 2);
+  const fmt = (n) => Math.floor(n).toLocaleString('ru-RU');
+  const savePl = () => store('qb.plates', plState);
+
+  function setCoins(delta) {
+    plState.coins = Math.max(0, plState.coins + delta);
+    savePl();
+    renderWallet();
+  }
+
+  /* --- гараж: пассивный доход, в том числе пока приложение закрыто --- */
+  function tickGarage(silent) {
+    const rate = lvl('garage') * upg('garage').per;
+    const now = Date.now();
+    if (!rate) { plState.garageTs = now; return 0; }
+    const minutes = Math.min((now - plState.garageTs) / 60000, 360);
+    const whole = Math.floor(minutes);
+    if (whole < 1) return 0;
+    const gain = whole * rate;
+    plState.garageTs = now - (minutes - whole) * 60000;
+    plState.coins += gain;
+    savePl();
+    renderWallet();
+    if (!silent && gain >= 10) toast(`Гараж принёс +${fmt(gain)} монет`);
+    return gain;
+  }
+
+  /* --- ежедневный бонус --- */
+  const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  function dailyInfo() {
+    const today = dayKey();
+    if (plState.daily.last === today) return null;
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const streak = plState.daily.last === dayKey(y) ? plState.daily.streak + 1 : 1;
+    return { streak, reward: 50 + 10 * Math.min(streak - 1, 10) };
+  }
+  $('#pl-daily').onclick = () => {
+    const d = dailyInfo();
+    if (!d) return;
+    plState.daily = { last: dayKey(), streak: d.streak };
+    setCoins(d.reward);
+    floatWin(`+${d.reward}`, '#f0b35a');
+    toast(`Бонус дня: +${d.reward} · серия ${d.streak} дн.`);
+    renderWallet();
+  };
+
+  /* --- батя выручит, если всё проиграл --- */
+  $('#pl-batya').onclick = () => {
+    if (Date.now() - plState.batyaTs < 10 * 60000) {
+      const left = Math.ceil((10 * 60000 - (Date.now() - plState.batyaTs)) / 60000);
+      return toast(`Батя сказал: «Через ${left} мин приходи»`);
+    }
+    plState.batyaTs = Date.now();
+    setCoins(30);
+    toast('Батя дал 30 монет. Не проиграй всё сразу');
+  };
+
+  function renderWallet() {
+    $('#pl-coins').textContent = fmt(plState.coins);
+    $('#pl-spins').textContent = fmt(plState.spins);
+    $('#pl-rtp').textContent = rtp() + '%';
+    const d = dailyInfo();
+    $('#pl-daily').hidden = !d;
+    if (d) $('#pl-daily-t').textContent = `Бонус дня +${d.reward}`;
+    $('#pl-cost').innerHTML = `<i class="coin"></i>${fmt(spinCost())}`;
+    const broke = plState.coins < spinCost();
+    $('#pl-spin').classList.toggle('broke', broke);
+    $('#pl-batya').hidden = !(plState.coins < P.SPIN_COST);
+    $('#pl-auto').hidden = !lvl('auto');
+    renderBets();
+  }
+
+  function renderBets() {
+    const bets = P.BETS.filter((b) => b <= 2 || lvl('highroller'));
+    if (!bets.includes(plState.bet)) plState.bet = 1;
+    $('#pl-bet').innerHTML = bets.map((b) => `<button data-v="${b}" class="${b === plState.bet ? 'on' : ''}">×${b} · ${b * P.SPIN_COST}</button>`).join('');
+  }
+  $('#pl-bet').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b || plSpinning) return;
+    plState.bet = +b.dataset.v;
+    savePl();
+    renderWallet();
+    renderOdds();
+  };
+
+  /* --- шансы --- */
   function fmtOdds(pr) {
     if (pr >= 0.1) return `${Math.round(pr * 100)}%`;
     return `1 из ${Math.round(1 / pr).toLocaleString('ru-RU')}`;
   }
-
   function renderOdds() {
     $('#pl-odds').innerHTML = [...P.TIERS].reverse().map((t) => `
       <div class="pl-odd" style="--t:${t.color}">
-        <i></i><span>${t.name}</span><b>${fmtOdds(P.ODDS[t.id])}</b>
+        <i></i><span>${t.name}</span><small>${fmtOdds(P.ODDS[t.id])}</small>
+        <b><i class="coin"></i>${fmt(Math.round(P.PAYOUT[t.id] * plState.bet * payMult()))}</b>
       </div>`).join('');
   }
 
-  const plateHTML = (p) => `<span class="mini-plate"><b>${p.l1}${p.digits}${p.l2}</b><em>${p.region}</em></span>`;
+  /* --- магазин --- */
+  function renderShop() {
+    const ups = P.UPGRADES.map((u) => {
+      const l = lvl(u.id), max = u.prices.length, price = u.prices[l];
+      const now = +(l * u.per).toFixed(1), next = +((l + 1) * u.per).toFixed(1);
+      const text = max === 1 ? u.desc() : l ? `${u.desc(now)}${l < max ? ` → ${next}` : ''}` : u.desc(next);
+      return `
+        <div class="shop-item ${l >= max ? 'maxed' : ''}">
+          <div class="shop-ico">${u.icon}</div>
+          <div class="shop-body">
+            <div class="shop-name">${u.name}${max > 1 ? `<span class="pips">${Array.from({ length: max }, (_, i) => `<i class="${i < l ? 'on' : ''}"></i>`).join('')}</span>` : ''}</div>
+            <div class="shop-desc">${text}</div>
+          </div>
+          ${l >= max
+            ? `<span class="shop-max">${max === 1 ? 'КУПЛЕНО' : 'МАКС'}</span>`
+            : `<button class="shop-buy" data-up="${u.id}" ${plState.coins < price ? 'disabled' : ''}><i class="coin"></i>${fmt(price)}</button>`}
+        </div>`;
+    }).join('');
+    const skins = P.SKINS.map((sk) => {
+      const owned = plState.skins.includes(sk.id), active = plState.skin === sk.id;
+      return `
+        <button class="skin-card ${active ? 'on' : ''}" data-skin="${sk.id}" ${!owned && plState.coins < sk.price ? 'disabled' : ''}>
+          <span class="mini-plate skin-${sk.id}"><b>А777МР</b><em>77</em></span>
+          <span class="skin-name">${sk.name}</span>
+          <span class="skin-price">${active ? 'ВЫБРАН' : owned ? 'НАДЕТЬ' : `<i class="coin"></i>${fmt(sk.price)}`}</span>
+        </button>`;
+    }).join('');
+    $('#pl-shop').innerHTML = `
+      <span class="cap">УЛУЧШЕНИЯ</span>
+      <div class="shop-list">${ups}</div>
+      <span class="cap">СКИНЫ НОМЕРА <span class="dim-cap">· ТОЛЬКО КРАСОТА</span></span>
+      <div class="skins">${skins}</div>`;
+  }
+  $('#pl-shop').onclick = (e) => {
+    const b = e.target.closest('[data-up]');
+    if (b) {
+      const u = upg(b.dataset.up), l = lvl(u.id), price = u.prices[l];
+      if (price == null || plState.coins < price) return;
+      plState.upgrades[u.id] = l + 1;
+      if (u.id === 'garage' && !l) plState.garageTs = Date.now();
+      setCoins(-price);
+      toast(`${u.name}: уровень ${l + 1}`);
+      return refreshPlates();
+    }
+    const s = e.target.closest('[data-skin]');
+    if (s) {
+      const sk = P.SKINS.find((x) => x.id === s.dataset.skin);
+      if (!plState.skins.includes(sk.id)) {
+        if (plState.coins < sk.price) return;
+        plState.skins.push(sk.id);
+        setCoins(-sk.price);
+        toast(`Скин «${sk.name}» куплен`);
+      }
+      plState.skin = sk.id;
+      savePl();
+      refreshPlates();
+    }
+  };
 
+  /* --- задания --- */
+  function claimable() {
+    return P.QUESTS.filter((q) => q.done(plState) && !plState.quests[q.id]).length;
+  }
+  function renderQuests() {
+    const list = [...P.QUESTS].sort((a, b) => {
+      const st = (q) => (plState.quests[q.id] ? 2 : q.done(plState) ? 0 : 1);
+      return st(a) - st(b);
+    });
+    $('#pl-quests').innerHTML = list.map((q) => {
+      const done = q.done(plState), got = plState.quests[q.id];
+      const pr = !done && q.progress ? q.progress(plState) : null;
+      return `
+        <div class="quest ${got ? 'got' : done ? 'ready' : ''}">
+          <div class="quest-body">
+            <div class="quest-name">${q.name}</div>
+            ${pr ? `<div class="quest-bar"><i style="width:${Math.min(100, (pr[0] / pr[1]) * 100)}%"></i></div><small>${fmt(pr[0])} / ${fmt(pr[1])}</small>` : ''}
+          </div>
+          ${got ? '<span class="quest-done">✓</span>'
+            : done ? `<button class="shop-buy claim" data-q="${q.id}">Забрать <i class="coin"></i>${fmt(q.reward)}</button>`
+              : `<span class="quest-reward"><i class="coin"></i>${fmt(q.reward)}</span>`}
+        </div>`;
+    }).join('');
+    const n = claimable();
+    $('#pl-qbadge').hidden = !n;
+    $('#pl-qbadge').textContent = n;
+  }
+  $('#pl-quests').onclick = (e) => {
+    const b = e.target.closest('[data-q]');
+    if (!b) return;
+    const q = P.QUESTS.find((x) => x.id === b.dataset.q);
+    if (!q.done(plState) || plState.quests[q.id]) return;
+    plState.quests[q.id] = Date.now();
+    setCoins(q.reward);
+    floatWin(`+${fmt(q.reward)}`, '#5fc2ae');
+    toast(`Задание «${q.name}»: +${fmt(q.reward)}`);
+    refreshPlates();
+  };
+
+  /* --- коллекция --- */
+  const plateHTML = (p) => `<span class="mini-plate"><b>${p.l1}${p.digits}${p.l2}</b><em>${p.region}</em></span>`;
   function renderBest() {
-    $('#pl-spins').textContent = plState.spins.toLocaleString('ru-RU');
     if (!plState.best.length) {
       $('#pl-best').innerHTML = `<div class="feed-empty"><div class="sparkle">✦</div><br>ЛУЧШИЕ НОМЕРА БУДУТ ТУТ</div>`;
       return;
@@ -827,12 +1029,25 @@
   };
   $('#pl-reset').onclick = () => {
     plState.best = [];
-    store('qb.plates', plState);
+    savePl();
     renderBest();
     toast('Коллекция очищена');
   };
 
-  // Строим барабан: много случайных символов, последний — выпавший
+  const plTab = seg($('#pl-tabs'), (v) => {
+    $$('.pl-panel').forEach((p) => (p.hidden = p.dataset.tab !== v));
+  });
+
+  function refreshPlates() {
+    $('#plate').className = `plate skin-${plState.skin}`;
+    renderWallet();
+    renderShop();
+    renderQuests();
+    renderBest();
+    renderOdds();
+  }
+
+  /* --- анимация --- */
   function spinReel(reel, finalSym, pool, steps, dur) {
     const strip = $('.strip', reel);
     const h = reel.clientHeight;
@@ -873,61 +1088,109 @@
     }
   }
 
-  async function spinPlate() {
-    if (plSpinning) return;
+  function floatWin(text, color) {
+    const w = $('#pl-win');
+    w.textContent = text;
+    w.style.setProperty('--c', color);
+    w.classList.remove('go');
+    void w.offsetWidth;
+    w.classList.add('go');
+  }
+
+  async function spinPlate(fast) {
+    if (plSpinning) return false;
+    const cost = spinCost();
+    if (plState.coins < cost) {
+      toast(plState.coins < P.SPIN_COST ? 'Монеты кончились — займи у бати или подожди гараж' : 'Не хватает на эту ставку');
+      return false;
+    }
     plSpinning = true;
     $('#pl-spin').disabled = true;
+    setCoins(-cost);
+    plState.spent += cost;
+
     const card = $('#pl-card');
     card.className = 'card plate-card spinning';
     $('#pl-tier').hidden = true;
     $('#pl-result').classList.remove('show');
 
-    const p = P.random();
+    // «Связи в ГИБДД»: иногда крутим дважды и берём лучший
+    let p = P.random(moscowChance()), sc = P.score(p), second = false;
+    if (luckChance() && G.rnd.int(0, 9999) < luckChance() * 10000) {
+      const p2 = P.random(moscowChance()), sc2 = P.score(p2);
+      second = true;
+      if (sc2.total > sc.total) { p = p2; sc = sc2; }
+    }
+
+    const k = fast ? 0.45 : 1;
     const reels = $$('#plate .reel');
     const finals = [p.l1, p.digits[0], p.digits[1], p.digits[2], p.l2[0], p.l2[1], p.region];
     const pools = reels.map((r) => (r.classList.contains('l') ? () => G.rnd.pick(P.LETTERS)
       : r.classList.contains('d') ? () => G.rnd.pick(P.DIGITS)
         : () => G.rnd.pick(P.REGION_CODES)));
-    await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], 14 + i * 4, 900 + i * 210)));
+    await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], Math.round((14 + i * 4) * k), Math.round((900 + i * 210) * k))));
 
-    const sc = P.score(p);
+    const t = sc.tier;
+    const win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult());
     plCurrent = p;
     plState.spins++;
-    const entry = { p, total: sc.total, tier: sc.tier.id, ts: Date.now() };
+    plState.won += win;
+    plState.bestWin = Math.max(plState.bestWin, win);
+    plState.tiers[t.id] = (plState.tiers[t.id] || 0) + 1;
+    sc.reasons.forEach((r) => { if (r.key) plState.flags[r.key] = true; });
     if (sc.total > 0) {
-      plState.best.push(entry);
+      plState.best.push({ p, total: sc.total, tier: t.id, ts: Date.now() });
       plState.best.sort((a, b) => b.total - a.total || b.ts - a.ts);
       plState.best = plState.best.slice(0, 15);
     }
-    store('qb.plates', plState);
+    setCoins(win);
     record('misc', 'Номер авто', [P.format(p)]);
 
-    const t = sc.tier;
     card.className = `card plate-card tier-${t.id}`;
     card.style.setProperty('--tier', t.color);
     $('#pl-tier').hidden = false;
     $('#pl-tier-name').textContent = t.name;
     $('#pl-score').textContent = sc.total;
     $('#pl-region').textContent = `Регион ${p.region} — ${P.REGIONS[p.region]}`;
-    $('#pl-reasons').innerHTML = sc.reasons.length
-      ? sc.reasons.map((r) => `<span class="pl-reason"><b>${r.label}</b>${r.text}${r.pts ? ` <em>+${r.pts}</em>` : ''}</span>`).join('')
-      : '<span class="pl-reason muted">Ничего особенного — обычный номер</span>';
+    const chips = sc.reasons.length
+      ? sc.reasons.map((r) => `<span class="pl-reason"><b>${r.label}</b>${r.text}${r.pts ? ` <em>+${r.pts}</em>` : ''}</span>`)
+      : ['<span class="pl-reason muted">Ничего особенного — обычный номер</span>'];
+    if (second) chips.push('<span class="pl-reason"><b>🤝</b>связи сработали — крутка ×2</span>');
+    $('#pl-reasons').innerHTML = chips.join('');
     void $('#pl-result').offsetWidth;
     $('#pl-result').classList.add('show');
 
     const order = P.TIERS.findIndex((x) => x.id === t.id);
+    floatWin(`+${fmt(win)}`, t.color);
     if (order >= 2) burst(t.color, [0, 0, 18, 34, 60, 90][order]);
-    if (order >= 4) toast(`${t.name.toUpperCase()}: ${P.format(p)}!`);
-    renderBest();
+    if (order >= 4) toast(`${t.name.toUpperCase()}: ${P.format(p)} · +${fmt(win)}`);
+    refreshPlates();
     plSpinning = false;
     $('#pl-spin').disabled = false;
+    return order;
   }
 
-  $('#pl-spin').onclick = spinPlate;
+  async function autoSpin() {
+    if (plAuto || plSpinning) return;
+    plAuto = true;
+    $('#pl-auto').classList.add('running');
+    for (let i = 0; i < 10 && plAuto; i++) {
+      const order = await spinPlate(true);
+      if (order === false || order >= 4) break; // нет денег или выпала легендарка
+      await new Promise((r) => setTimeout(r, 350));
+    }
+    plAuto = false;
+    $('#pl-auto').classList.remove('running');
+  }
+
+  $('#pl-spin').onclick = () => spinPlate();
+  $('#pl-auto').onclick = () => (plAuto ? (plAuto = false) : autoSpin());
   $('#pl-copy').onclick = () => (plCurrent ? copy(P.format(plCurrent)) : toast('Сначала крутани'));
   $('#pl-qr').onclick = () => (plCurrent ? showQR(P.format(plCurrent)) : toast('Сначала крутани'));
-  renderOdds();
-  renderBest();
+
+  tickGarage();
+  setInterval(() => tickGarage(true), 15000);
+  refreshPlates();
 
   /* ---------------- settings ---------------- */
   [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask'], ['set-tray', 'tray'], ['set-hotkey', 'hotkey'], ['set-autostart', 'autostart']].forEach(([id, key]) => {
