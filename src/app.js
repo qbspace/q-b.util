@@ -564,6 +564,9 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.0.1': [
+      'Отсчёт до следующего счастливого часа — плашка 🔥 в «Номерах» видна всегда',
+    ],
     '2.0.0': [
       'Новая экономика: выплаты выросли, крутить номера выгодно — баланс растёт',
       'Ставки ×25, ×50 и ×100 через «Высокие ставки»',
@@ -875,11 +878,14 @@
     }
     const b = $('#pl-happy');
     if (!b) return;
-    b.hidden = !happyActive();
-    if (happyActive()) {
-      const left = plState.happyUntil - now;
-      $('#pl-happy-t').textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
-    }
+    // плашка видна всегда: идёт ×2 или отсчёт до следующего
+    const on = happyActive();
+    const left = (on ? plState.happyUntil : plState.happyNext) - now;
+    const mm = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+    b.classList.toggle('wait', !on);
+    b.title = on ? 'Счастливый час: все выплаты ×2' : 'До следующего счастливого часа';
+    $('#pl-happy-l').textContent = on ? '🔥 ×2 ·' : '🔥 через';
+    $('#pl-happy-t').textContent = mm;
   }
   setInterval(checkHappy, 1000);
 

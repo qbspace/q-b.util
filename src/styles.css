@@ -1427,3 +1427,9 @@ kbd {
 .pl-actions { flex-wrap: wrap; row-gap: 8px; }
 .pl-actions .pl-spin { min-width: 210px; }
 .pl-actions .pill { padding: 0 14px; }
+
+.pl-happy b { font-weight: inherit; }
+.pl-happy.wait {
+  background: rgba(255, 154, 60, .12); color: #ffb978; box-shadow: none; animation: none;
+  border: 1px solid rgba(255, 154, 60, .3);
+}
