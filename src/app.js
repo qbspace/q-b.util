@@ -187,7 +187,7 @@
     if (page === 'history') renderHistory();
     if (page === 'casino') { renderCrash(); renderLotto(); }
     if (page === 'biz') renderBiz();
-    if (page === 'crypto') requestAnimationFrame(renderLdk);
+    if (page === 'crypto') renderLdk();
     if (page === 'dashboard') renderDash();
   }
 
@@ -571,6 +571,12 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.2.0': [
+      '🌐 Биржа ЛАДАКОИНА теперь онлайн: часы сверяются, курс у всех кентов один в один',
+      '🐋 Крупные покупки и продажи кентов двигают курс для всех',
+      '👥 Видно кошельки LDK всех, кто на бирже, и общую ленту сделок',
+      '📊 Понятнее прибыль: рост курса за период и отдельно — от твоей цены покупки',
+    ],
     '4.1.0': [
       '🪙 ЛАДАКОИН — своя крипта с живым графиком: курс один на всех кентов, бывают пампы и скамы',
       '✍️ Своя надпись на рамке номера — «БАЗА 777» и что угодно',
@@ -3254,12 +3260,36 @@
   if (!plState.ldk) plState.ldk = { amt: 0, cost: 0, trades: 0, bestX: 0, log: [] };
   const LD = plState.ldk;
   let ldkRange = 3600000, ldkSum = 0;
-  const ldkNow = () => P.ldkPrice(Date.now());
+  // общее время биржи: часы подгоняем под лидера зала (а лидер — под сервер)
+  let ldkOff = 0;
+  const srvNow = () => Date.now() + ldkOff;
+  // сделки игроков двигают курс; влияние затухает (полураспад 15 минут)
+  if (!plState.ldkTrades) plState.ldkTrades = [];
+  const LDT = plState.ldkTrades;
+  const LDK_HL = 15 * 60000, LDK_LIQ = 4e9, LDK_KEEP = 3 * 3600000, LDK_CAP = 1.2;
+  function ldkImpact(t) {
+    let sum = 0;
+    for (const x of LDT) if (x.t <= t) sum += x.d * 0.5 ** ((t - x.t) / LDK_HL);
+    return Math.max(-LDK_CAP, Math.min(LDK_CAP, sum));
+  }
+  const ldkAt = (t) => P.ldkPrice(t) * Math.exp(ldkImpact(t));
+  const ldkNow = () => ldkAt(srvNow());
+  // средняя цена с учётом того, что крупная сделка сама двигает курс
+  const ldkBuyQuote = (sum, p0 = ldkNow()) => {
+    const net = sum * (1 - P.LDK_FEE), dl = net / LDK_LIQ;
+    const avg = dl > 1e-9 ? (p0 * (Math.exp(dl) - 1)) / dl : p0;
+    return { a: net / avg, avg, dl };
+  };
+  const ldkSellQuote = (a, p0 = ldkNow()) => {
+    const dl = (a * p0) / LDK_LIQ;
+    const avg = dl > 1e-9 ? (p0 * (1 - Math.exp(-dl))) / dl : p0;
+    return { net: Math.floor(a * avg * (1 - P.LDK_FEE)), avg, dl };
+  };
   const fmtPrice = (v) => v.toLocaleString('ru-RU', { maximumFractionDigits: v < 100 ? 2 : 0 });
   const fmtAmt = (v) => v.toLocaleString('ru-RU', { maximumFractionDigits: v < 10 ? 4 : 2 });
 
   // текущее событие (памп/скам), если оно уже идёт
-  function ldkLive(t = Date.now()) {
+  function ldkLive(t = srvNow()) {
     const w = Math.floor(t / P.LDK_EVENT_LEN), ev = P.ldkEvent(w);
     if (!ev) return null;
     const m = (t - w * P.LDK_EVENT_LEN) / 60000;
@@ -3272,10 +3302,11 @@
     if (!cv.clientWidth) return;
     const dpr = devicePixelRatio, ctx = cv.getContext('2d');
     const w = (cv.width = cv.clientWidth * dpr), h = (cv.height = cv.clientHeight * dpr);
-    const now = Date.now(), N = 240, pts = [];
-    for (let i = 0; i <= N; i++) pts.push(P.ldkPrice(now - ldkRange + (ldkRange * i) / N));
+    const now = srvNow(), N = 240, pts = [];
+    for (let i = 0; i <= N; i++) pts.push(ldkAt(now - ldkRange + (ldkRange * i) / N));
     let mn = Math.min(...pts), mx = Math.max(...pts);
-    if (LD.amt > 0) { const avg = LD.cost / LD.amt; mn = Math.min(mn, avg); mx = Math.max(mx, avg); }
+    const myAvg = LD.amt > 0 ? (LD.cost * (1 - P.LDK_FEE)) / LD.amt : 0;
+    if (myAvg) { mn = Math.min(mn, myAvg); mx = Math.max(mx, myAvg); }
     const pad = (mx - mn) * 0.12 || 1;
     mn -= pad;
     mx += pad;
@@ -3303,7 +3334,7 @@
     ctx.stroke();
     // средняя цена покупки
     if (LD.amt > 0) {
-      const y = Y(LD.cost / LD.amt);
+      const y = Y(myAvg);
       ctx.setLineDash([6 * dpr, 6 * dpr]);
       ctx.strokeStyle = 'rgba(240,197,82,.7)';
       ctx.lineWidth = 1.5 * dpr;
@@ -3324,28 +3355,41 @@
 
   function renderLdk() {
     if (current !== 'crypto') return;
-    const pts = drawLdk() || [ldkNow()];
-    const price = pts[pts.length - 1], chg = (price / pts[0] - 1) * 100;
+    drawLdk();
+    const t = srvNow(), price = ldkAt(t), chg = (price / ldkAt(t - ldkRange) - 1) * 100;
     $('#ldk-price').innerHTML = `<i class="coin"></i>${fmtPrice(price)}`;
-    $('#ldk-chg').textContent = `${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%`;
+    const rangeName = { 300000: 'за 5 мин', 3600000: 'за час', 86400000: 'за сутки', 604800000: 'за неделю' }[ldkRange] || '';
+    $('#ldk-chg').textContent = `${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}% ${rangeName}`;
     $('#ldk-chg').className = chg >= 0 ? 'up' : 'down';
+    // отдельно — сколько курс прошёл от твоей цены покупки
+    const mine = $('#ldk-chg-mine');
+    mine.hidden = !(LD.amt > 0);
+    if (LD.amt > 0) {
+      const fromMe = (price / ((LD.cost * (1 - P.LDK_FEE)) / LD.amt) - 1) * 100; // цена покупки без комиссии
+      mine.textContent = `${fromMe >= 0 ? '▲' : '▼'} ${Math.abs(fromMe).toFixed(2)}% от твоей цены`;
+      mine.className = `mine ${fromMe >= 0 ? 'up' : 'down'}`;
+    }
     const ev = ldkLive();
     const news = $('#ldk-news');
     news.className = `ldk-news ${ev ? ev.kind : ''}`;
     news.textContent = ev ? `${ev.kind === 'pump' ? '📈 ПАМП' : '📉 СКАМ'} · ${ev.news}` : '📰 На рынке спокойно. Ждём новостей…';
     $('#ldk-coins').textContent = fmtShort(plState.coins);
     $('#ldk-amt').textContent = `${fmtAmt(LD.amt)} LDK`;
-    const val = LD.amt * price * (1 - P.LDK_FEE);
+    const val = LD.amt > 0 ? ldkSellQuote(LD.amt, price).net : 0;
     $('#ldk-val').innerHTML = `<i class="coin"></i>${fmtShort(val)}`;
-    $('#ldk-avg').textContent = LD.amt > 0 ? fmtPrice(LD.cost / LD.amt) : '—';
+    $('#ldk-avg').textContent = LD.amt > 0 ? fmtPrice((LD.cost * (1 - P.LDK_FEE)) / LD.amt) : '—';
     const pnl = val - LD.cost;
     $('#ldk-pnl').textContent = LD.amt > 0 ? `${pnl >= 0 ? '+' : '−'}${fmtShort(Math.abs(pnl))} (${pnl >= 0 ? '+' : '−'}${Math.abs((pnl / LD.cost) * 100).toFixed(1)}%)` : '—';
     $('#ldk-pnl').className = LD.amt > 0 ? (pnl >= 0 ? 'up' : 'down') : '';
     $$('#ldk-sell button').forEach((b) => (b.disabled = LD.amt <= 0));
     const sum = ldkSum || parseStake($('#ldk-sum').value);
     $('#ldk-buy').disabled = !(sum >= 100 && sum <= plState.coins);
-    $('#ldk-buy').textContent = sum >= 100 ? `Купить ≈ ${fmtAmt((sum * (1 - P.LDK_FEE)) / price)} LDK` : 'Купить';
-    $('#ldk-log').innerHTML = LD.log.length ? LD.log.slice(-8).reverse().map((l) => `<div class="${l.k}"><span>${l.k === 'buy' ? 'Купил' : 'Продал'} ${fmtAmt(l.a)} LDK по ${fmtPrice(l.p)}</span><b>${l.k === 'buy' ? '−' : '+'}${fmtShort(l.s)}</b></div>`).join('') : '<div class="note">Сделок пока нет</div>';
+    $('#ldk-buy').textContent = sum >= 100 ? `Купить ≈ ${fmtAmt(ldkBuyQuote(sum, price).a)} LDK` : 'Купить';
+    $('#ldk-log').innerHTML = LDT.length ? LDT.slice(-12).reverse().map((l) => {
+      const me = l.from === aucId, ago = Math.max(0, Math.round((srvNow() - l.t) / 60000));
+      return `<div class="${l.k} ${me ? 'me' : ''}"><span><i>${me ? 'Ты' : esc(l.nick)}</i> ${l.k === 'buy' ? 'купил' : 'продал'} ${fmtAmt(l.a)} LDK по ${fmtPrice(l.p)} <small>${ago ? `${ago} мин назад` : 'сейчас'}</small></span><b>${l.k === 'buy' ? '−' : '+'}${fmtShort(l.s)}</b></div>`;
+    }).join('') : '<div class="note">Сделок пока нет — будь первым</div>';
+    renderLdkHall(price);
   }
 
   function ldkLog(k, a, p, s) {
@@ -3355,12 +3399,13 @@
   function ldkBuy() {
     const sum = Math.floor(ldkSum || parseStake($('#ldk-sum').value));
     if (sum < 100 || sum > plState.coins) return;
-    const price = ldkNow(), a = (sum * (1 - P.LDK_FEE)) / price;
+    const q = ldkBuyQuote(sum), a = q.a, price = q.avg;
     plState.coins -= sum;
     LD.amt += a;
     LD.cost += sum;
     LD.trades++;
     ldkLog('buy', a, price, sum);
+    ldkTrade('buy', a, price, sum, q.dl);
     savePl();
     renderWallet();
     coinClink();
@@ -3371,8 +3416,8 @@
   }
   function ldkSell(frac) {
     if (LD.amt <= 0) return;
-    const price = ldkNow(), a = frac >= 1 ? LD.amt : LD.amt * frac;
-    const net = Math.floor(a * price * (1 - P.LDK_FEE)), costPart = frac >= 1 ? LD.cost : LD.cost * frac;
+    const a = frac >= 1 ? LD.amt : LD.amt * frac;
+    const q = ldkSellQuote(a), price = q.avg, net = q.net, costPart = frac >= 1 ? LD.cost : LD.cost * frac;
     const x = costPart > 0 ? net / costPart : 0;
     LD.amt -= a;
     LD.cost -= costPart;
@@ -3381,6 +3426,7 @@
     LD.trades++;
     plState.coins += net;
     ldkLog('sell', a, price, net);
+    ldkTrade('sell', a, price, net, -q.dl);
     savePl();
     renderWallet();
     coinClink();
@@ -3404,6 +3450,120 @@
       o.start(t + i * 0.06);
       o.stop(t + i * 0.06 + 0.32);
     });
+  }
+
+
+  /* --- онлайн-зал биржи: общий курс, сделки и кошельки кентов --- */
+  const LH = { ch: null, live: false, hall: [], leaderId: null, joinedAt: Date.now(), best: Infinity, srvOff: null };
+  const ldkSend = (event, payload = {}) => LH.ch && LH.live && LH.ch.send({ type: 'broadcast', event, payload: { ...payload, from: aucId } });
+  const cleanTrade = (x) => ({
+    id: String(x.id).slice(0, 40), t: +x.t, d: +x.d, k: x.k === 'sell' ? 'sell' : 'buy',
+    a: Math.max(0, +x.a || 0), p: Math.max(0, +x.p || 0), s: Math.max(0, +x.s || 0),
+    from: String(x.from || '').slice(0, 40), nick: String(x.nick || 'Игрок').slice(0, 24),
+  });
+  function pruneTrades() {
+    const lim = srvNow() - LDK_KEEP;
+    const keep = LDT.filter((x) => x.t > lim).sort((a, b) => a.t - b.t).slice(-600);
+    LDT.splice(0, LDT.length, ...keep);
+  }
+  function addTrades(list) {
+    const ids = new Set(LDT.map((x) => x.id)), now = srvNow(), fresh = [];
+    (Array.isArray(list) ? list : []).forEach((raw) => {
+      if (!raw || typeof raw !== 'object') return;
+      const x = cleanTrade(raw);
+      if (!x.id || ids.has(x.id) || !Number.isFinite(x.d) || Math.abs(x.d) > 2 || !(x.t > now - LDK_KEEP) || x.t > now + 60000) return;
+      ids.add(x.id);
+      LDT.push(x);
+      fresh.push(x);
+    });
+    if (fresh.length) { pruneTrades(); savePl(); }
+    return fresh;
+  }
+  function ldkTrade(k, a, p, s, d) {
+    const x = { id: G.uuid4(), t: srvNow(), d, k, a, p, s, from: aucId, nick: myNick() };
+    addTrades([x]);
+    ldkSend('trade', { trade: x });
+    ldkTrack();
+  }
+  function ldkTrack() {
+    if (!LH.ch || !LH.live) return;
+    LH.ch.track({ id: aucId, t: LH.joinedAt, nick: myNick(), grad: profile.grad, amt: LD.amt });
+  }
+  // время сервера (через main), чтобы лидер тоже не врал
+  async function ldkServerClock() {
+    if (!window.qb || !window.qb.serverTime || !window.QB_ONLINE) return;
+    try {
+      const t0 = Date.now(), st = await window.qb.serverTime(window.QB_ONLINE.url), t1 = Date.now();
+      if (st) LH.srvOff = st + 500 - (t0 + t1) / 2; // заголовок Date — с точностью до секунды
+      if (LH.srvOff != null && LH.leaderId === aucId) ldkOff = LH.srvOff;
+    } catch (e) { /* без сервера — по своим часам */ }
+  }
+  function ldkPing() {
+    if (LH.leaderId && LH.leaderId !== aucId) ldkSend('ping', { to: LH.leaderId, t0: Date.now() });
+  }
+  function joinLdkHall() {
+    if (!aucSb) return;
+    LH.ch = aucSb.channel('qb-ldk-hall', { config: { broadcast: { self: false }, presence: { key: aucId } } });
+    LH.ch.on('presence', { event: 'sync' }, () => {
+      LH.hall = Object.values(LH.ch.presenceState()).map((a) => a[0]).filter((h) => h && h.id)
+        .sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
+      const lead = LH.hall.length ? LH.hall[0].id : aucId;
+      if (lead !== LH.leaderId) {
+        LH.leaderId = lead;
+        LH.best = Infinity;
+        if (lead === aucId) { if (LH.srvOff != null) ldkOff = LH.srvOff; } else [0, 300, 700].forEach((ms) => setTimeout(ldkPing, ms));
+      }
+      if (current === 'crypto') renderLdk();
+    });
+    LH.ch.on('broadcast', { event: 'trade' }, ({ payload }) => {
+      const fresh = addTrades([payload.trade]);
+      fresh.forEach((x) => {
+        if (x.s >= 50e6) toast(`🐋 ${x.nick} ${x.k === 'buy' ? 'закупил' : 'слил'} ЛАДАКОИН на ${fmtShort(x.s)}`);
+      });
+      if (current === 'crypto') renderLdk();
+    });
+    // историю шлёт любой, у кого она есть (дубли отсекаются по id)
+    LH.ch.on('broadcast', { event: 'sync-req' }, () => {
+      if (LDT.length) setTimeout(() => ldkSend('sync', { trades: LDT.slice(-400) }), LH.leaderId === aucId ? 0 : 200 + Math.random() * 600);
+    });
+    LH.ch.on('broadcast', { event: 'sync' }, ({ payload }) => {
+      if (addTrades(payload.trades).length && current === 'crypto') renderLdk();
+    });
+    LH.ch.on('broadcast', { event: 'ping' }, ({ payload }) => {
+      if (payload.to === aucId) ldkSend('pong', { to: payload.from, t0: payload.t0, tl: srvNow() });
+    });
+    LH.ch.on('broadcast', { event: 'pong' }, ({ payload }) => {
+      if (payload.to !== aucId || payload.from !== LH.leaderId) return;
+      const rtt = Date.now() - payload.t0;
+      if (rtt < 0 || rtt > 5000 || rtt > LH.best) return;
+      LH.best = rtt;
+      ldkOff = payload.tl + rtt / 2 - Date.now();
+    });
+    LH.ch.subscribe(async (st) => {
+      LH.live = st === 'SUBSCRIBED';
+      if (!LH.live) return;
+      ldkTrack();
+      ldkSend('sync-req');
+      if (current === 'crypto') renderLdk();
+    });
+  }
+  // подстройка часов: раз в 30 секунд, порог понемногу ослабляем
+  setInterval(() => { LH.best = Math.min(5000, LH.best * 1.25); ldkPing(); }, 30000);
+  setInterval(ldkServerClock, 10 * 60000);
+  ldkServerClock();
+  joinLdkHall();
+
+  function renderLdkHall(price) {
+    const net = $('#ldk-net');
+    net.textContent = LH.live ? `🟢 Онлайн · на бирже ${Math.max(1, LH.hall.length)}` : aucSb ? '🟡 Подключаемся…' : '📴 Офлайн';
+    net.className = `ldk-net ${LH.live ? 'on' : ''}`;
+    const rows = LH.hall.filter((h) => h.id !== aucId).map((h) => ({ id: h.id, nick: String(h.nick || 'Игрок').slice(0, 24), grad: h.grad, amt: Math.max(0, +h.amt || 0) }));
+    rows.push({ id: aucId, nick: 'Ты', grad: profile.grad, amt: LD.amt });
+    rows.sort((a, b) => b.amt - a.amt);
+    $('#ldk-hold').innerHTML = rows.map((h) => `<div class="${h.id === aucId ? 'me' : ''}">
+      <i class="ldk-ava" style="--ava:${esc(GRADS[h.grad] || GRADS[0])}">${esc(initials(h.nick))}</i>
+      <span>${esc(h.nick)}</span><b>${fmtAmt(h.amt)} LDK</b><em><i class="coin"></i>${fmtShort(h.amt * price)}</em></div>`).join('')
+      + (LH.live && rows.length < 2 ? '<div class="note">Кентов на бирже пока нет — позови их в «Крипту»</div>' : '');
   }
 
   $('#ldk-range').addEventListener('click', (e) => {

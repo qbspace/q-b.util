@@ -2398,3 +2398,21 @@ kbd {
   .plate-stage:has(.plate-tilt[data-photo]) { padding: 16px 0; }
   .plate-stage:has(.plate-tilt[data-photo][data-cap]) { padding-bottom: 46px; }
 }
+
+/* 4.2: онлайн-биржа */
+.ldk-net { margin-left: 8px; font-size: 10px; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; background: rgba(255, 255, 255, .06); color: #b9b8b2; }
+.ldk-net.on { background: rgba(95, 194, 174, .14); color: #8ff0db; }
+.ldk-hold { display: flex; flex-direction: column; gap: 4px; }
+.ldk-hold > div:not(.note) { display: grid; grid-template-columns: 26px 1fr auto auto; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; background: rgba(255, 255, 255, .04); font-size: 12px; }
+.ldk-hold > div.me { background: rgba(228, 240, 126, .08); border: 1px solid rgba(228, 240, 126, .2); }
+.ldk-hold span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ldk-hold b { font-family: var(--mono); font-size: 12px; }
+.ldk-hold em { font-style: normal; color: #9a9a95; display: flex; align-items: center; font-family: var(--mono); font-size: 11px; }
+.ldk-hold em .coin { width: 12px; height: 12px; margin-right: 4px; }
+.ldk-ava { width: 26px; height: 26px; border-radius: 50%; background: var(--ava); display: grid; place-items: center; font-style: normal; font-size: 10px; font-weight: 800; color: #111; }
+.ldk-log span i { font-style: normal; font-weight: 700; color: #f2f2ee; }
+.ldk-log small { color: #6f6e6a; margin-left: 4px; }
+.ldk-log .me { background: rgba(228, 240, 126, .05); }
+
+.ldk-price span[hidden] { display: none; }
+.ldk-price span.mine { border: 1px dashed currentColor; background: transparent; }

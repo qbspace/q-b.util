@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('qb', {
   storeAll: () => ipcRenderer.sendSync('store:all'),
   storeSet: (key, value) => ipcRenderer.sendSync('store:set', key, value),
 
+  serverTime: (url) => ipcRenderer.invoke('time:server', url),
   updGet: () => ipcRenderer.invoke('upd:get'),
   updCheck: () => ipcRenderer.invoke('upd:check'),
   updInstall: () => ipcRenderer.send('upd:install'),

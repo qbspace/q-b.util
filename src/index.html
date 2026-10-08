@@ -614,27 +614,30 @@
         <div class="casino-layout ldk-layout">
           <div class="card casino-card">
             <div class="casino-head">
-              <span class="cap">🪙 ЛАДАКОИН · LDK</span>
+              <span class="cap">🪙 ЛАДАКОИН · LDK <span class="ldk-net" id="ldk-net"></span></span>
               <div class="ldk-range" id="ldk-range"><button data-r="300000">5 мин</button><button data-r="3600000" class="on">1 час</button><button data-r="86400000">24 часа</button><button data-r="604800000">неделя</button></div>
             </div>
-            <div class="ldk-price"><b id="ldk-price">—</b><span id="ldk-chg"></span></div>
+            <div class="ldk-price"><b id="ldk-price">—</b><span id="ldk-chg"></span><span id="ldk-chg-mine" hidden></span></div>
             <div class="ldk-news" id="ldk-news"></div>
             <div class="cr-stage ldk-stage"><canvas id="ldk-canvas"></canvas></div>
-            <div class="note">Курс один на всех — у кентов он такой же, как у тебя. Комиссия биржи 2% на покупку и на продажу. Иногда ЛДК пампят, а иногда случается скам.</div>
+            <div class="note">Курс общий и онлайн: часы сверяются с биржей, а крупные покупки и продажи кентов двигают цену для всех. Комиссия биржи 2% на покупку и на продажу. Иногда ЛДК пампят, а иногда случается скам.</div>
           </div>
           <div class="card casino-card">
             <div class="casino-head"><span class="cap">💼 КОШЕЛЁК</span><div class="pl-coins small"><i class="coin"></i><b id="ldk-coins">0</b></div></div>
             <div class="ldk-bal">
               <div><span>У тебя</span><b id="ldk-amt">0 LDK</b></div>
-              <div><span>Если продать</span><b id="ldk-val">0</b></div>
+              <div><span>Если продать · −2%</span><b id="ldk-val">0</b></div>
               <div><span>Средняя цена</span><b id="ldk-avg">—</b></div>
-              <div><span>Прибыль</span><b id="ldk-pnl">—</b></div>
+              <div><span>Прибыль с комиссией</span><b id="ldk-pnl">—</b></div>
             </div>
             <span class="cap">КУПИТЬ НА СУММУ</span>
             <div class="cr-bets ldk-presets" id="ldk-buy-p"><button data-lb="10000">10к</button><button data-lb="100000">100к</button><button data-lb="1000000">1М</button><button data-lb="10000000">10М</button><button data-lb="100000000">100М</button><button data-lb="half">½</button><button data-lb="max">ВСЁ</button></div>
             <div class="ldk-buyrow"><input class="inp" id="ldk-sum" placeholder="Сумма, напр. 500к или 2м" autocomplete="off"><button class="cr-btn ldk-buy" id="ldk-buy">Купить</button></div>
             <span class="cap">ПРОДАТЬ</span>
             <div class="ldk-sell" id="ldk-sell"><button data-ls="0.25">25%</button><button data-ls="0.5">50%</button><button data-ls="1">Всё</button></div>
+            <span class="cap">👥 КОШЕЛЬКИ НА БИРЖЕ</span>
+            <div class="ldk-hold" id="ldk-hold"></div>
+            <span class="cap">📜 ЛЕНТА СДЕЛОК</span>
             <div class="ldk-log" id="ldk-log"></div>
           </div>
         </div>

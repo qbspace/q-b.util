@@ -204,6 +204,19 @@ function setupUpdater() {
   setInterval(check, 4 * 60 * 60 * 1000);
 }
 
+// время сервера по заголовку Date — общие часы для онлайн-биржи
+ipcMain.handle('time:server', async (_e, url) => {
+  if (typeof url !== 'string' || !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(url)) return null;
+  try {
+    const { net } = require('electron');
+    const res = await net.fetch(url.replace(/\/$/, '') + '/auth/v1/health', { method: 'HEAD', cache: 'no-store' });
+    const d = Date.parse(res.headers.get('date'));
+    return Number.isFinite(d) ? d : null;
+  } catch (e) {
+    return null;
+  }
+});
+
 ipcMain.handle('upd:get', () => updState);
 ipcMain.handle('upd:check', () => {
   if (!updater) return updState;
