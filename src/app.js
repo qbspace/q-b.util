@@ -564,6 +564,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '2.4.0': [
+      '🔨 Аукцион стал общим: один лот на всех, перебивай кентов и ботов-перекупов',
+      'В окне аукциона видно, сколько людей в зале и кто лидирует',
+    ],
     '2.3.0': [
       '💎 Кристаллы — новая редкая валюта: за эпики, легендарки, мифики, задания, уровни и колесо',
       '💎 Лавка кристаллов на чёрном рынке: слоты под брелки, легендарные брелки, эксклюзивные скины, наборы',
@@ -2182,127 +2186,248 @@
   $('#mk-buygem').onclick = () => buyGems(1);
   $('#mk-buygem10').onclick = () => buyGems(10);
 
-  /* --- аукцион номеров: боты-перекупы торгуются против тебя --- */
-  if (!plState.auction) plState.auction = { lot: null, nextAt: Date.now() + 60000 };
+  /* --- аукцион номеров: общий для всех онлайн, против ботов и кентов --- */
+  // Лот каждого 10-минутного окна одинаков у всех: номер и бюджеты ботов считаются из номера окна.
+  // Ведущий (первый по времени входа в зал) принимает ставки, крутит ботов и рассылает состояние.
   if (!plState.fleet) plState.fleet = [];
-  let aucLastTick = Date.now();
+  if (!plState.auction || !('esc' in plState.auction)) {
+    // переход со старого локального аукциона: незавершённая ставка возвращается
+    const old = plState.auction && plState.auction.lot;
+    if (old && old.leader === 'me' && old.myBid) plState.coins += old.myBid;
+    plState.auction = { esc: null };
+  }
+  let aucId = load('qb.pid', null);
+  if (!aucId) { aucId = G.uuid4(); store('qb.pid', aucId); }
+  const aucSb = window.supabase && window.QB_ONLINE
+    ? window.supabase.createClient(window.QB_ONLINE.url, window.QB_ONLINE.key, { auth: { persistSession: false } })
+    : null;
+  const aucHex = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+  const aucSha = async (str) => aucHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)));
+  const aucWindow = () => Math.floor(Date.now() / P.AUCTION_EVERY);
+  const myNick = () => profile.nick.trim() || `Игрок ${aucId.slice(0, 4).toUpperCase()}`;
 
-  function newLot() {
+  let aucCh = null, aucJoinedAt = Date.now(), aucHall = [], aucHost = false;
+  let lot = null; // текущее состояние лота (у ведущего — источник правды)
+  const lotCache = {};
+
+  // одинаковый у всех лот для окна w
+  async function lotFor(w) {
+    if (lotCache[w]) return lotCache[w];
+    const rng = seededRnd(await aucSha(`qb-auction-${w}`));
     let p, sc;
-    for (let i = 0; i < 300000; i++) { p = P.random(); sc = P.score(p); if (P.TIERS.indexOf(sc.tier) >= 4) break; }
+    for (let i = 0; i < 400000; i++) { p = P.random(0, rng); sc = P.score(p); if (P.TIERS.indexOf(sc.tier) >= 4) break; }
     const start = Math.round((P.PAYOUT[sc.tier.id] * 80) / 100) * 100;
-    const now = Date.now();
-    const bots = G.rnd.shuffle([...P.AUCTION_BOTS]).slice(0, 3).map((name) => ({
-      name, max: Math.round(start * (1.3 + G.rnd.int(0, 220) / 100) * (sc.tier.id === 'mythic' ? 1.25 : 1)),
-    }));
-    plState.auction.lot = { p, total: sc.total, tier: sc.tier.id, price: start, leader: null, myBid: 0, ends: now + P.AUCTION_LEN, bots, log: [] };
-    savePl();
-    toast(`🔨 Новый лот на аукционе: ${P.format(p)} (${sc.tier.name})`);
+    const names = [...P.AUCTION_BOTS];
+    const bots = [0, 1, 2].map(() => {
+      const name = names.splice(rng.int(0, names.length - 1), 1)[0];
+      return { name, max: Math.round(start * (1.3 + rng.int(0, 220) / 100) * (sc.tier.id === 'mythic' ? 1.25 : 1)) };
+    });
+    lotCache[w] = { w, p, total: sc.total, tier: sc.tier.id, start, bots, startAt: w * P.AUCTION_EVERY };
+    return lotCache[w];
   }
 
-  const nextBid = (lot, k = 1.1) => (lot.leader ? Math.ceil((lot.price * k) / 100) * 100 : lot.price);
+  const nextBid = (l, k = 1.1) => (l.leader ? Math.ceil((l.price * k) / 100) * 100 : l.price);
+  const lotOpen = (l) => l && !l.ended && Date.now() < l.ends;
 
-  function placeBid(lot, who, amount) {
-    const now = Date.now();
-    if (lot.leader === 'me' && who !== 'me') {
-      setCoins(lot.myBid); // твою ставку перебили — монеты вернулись
-      toast(`🔨 ${who} перебил тебя: ${fmtShort(amount)}`);
-      lot.myBid = 0;
-    }
+  async function freshLot(w) {
+    const base = await lotFor(w);
+    return { ...base, price: base.start, leader: null, leaderNick: '', ends: base.startAt + P.AUCTION_LEN, log: [], ended: false, ver: 0 };
+  }
+
+  const aucSend = (event, payload) => aucCh && aucCh.send({ type: 'broadcast', event, payload: { ...payload, from: aucId } });
+  const pubState = () => lot && aucSend('au-state', { lot: { ...lot, p: undefined, bots: undefined } });
+
+  // применяем ставку (вызывает только ведущий)
+  function applyBid(who, nick, amount) {
+    if (!lotOpen(lot) || amount < nextBid(lot)) return false;
     lot.price = amount;
     lot.leader = who;
-    lot.log.unshift({ who, amount });
-    lot.log = lot.log.slice(0, 8);
-    if (lot.ends - now < P.AUCTION_EXTEND) lot.ends = now + P.AUCTION_EXTEND;
+    lot.leaderNick = nick;
+    lot.log.unshift({ who, nick, amount });
+    lot.log = lot.log.slice(0, 10);
+    if (lot.ends - Date.now() < P.AUCTION_EXTEND) lot.ends = Date.now() + P.AUCTION_EXTEND;
+    lot.ver++;
+    return true;
   }
 
-  function finishLot(lot) {
-    if (lot.leader === 'me') {
-      plState.fleet.push({ p: lot.p, total: lot.total, tier: lot.tier, paid: lot.myBid, ts: Date.now() });
-      toast(`🏆 Лот твой: ${P.format(lot.p)} · аренда +${P.fleetRent(lot.total)}/мин`);
-      burst('#f0c552', 70);
-    } else if (lot.leader && lot.myTried) toast(`🔨 Лот ушёл к ${lot.leader} за ${fmtShort(lot.price)}`);
-    plState.auction.lot = null;
-    plState.auction.nextAt = Date.now() + P.AUCTION_EVERY;
+  // эскроу: ставка списана, пока не перебили или не выиграли
+  function settleEscrow() {
+    const e = plState.auction.esc;
+    if (!e || !lot || lot.w !== e.w) return;
+    if (lot.ended) {
+      if (lot.leader === aucId) {
+        plState.fleet.push({ p: lot.p, total: lot.total, tier: lot.tier, paid: e.amount, ts: Date.now() });
+        toast(`🏆 Лот твой: ${P.format(lot.p)} · аренда +${P.fleetRent(lot.total)}/мин`);
+        burst('#f0c552', 70);
+      } else {
+        setCoins(e.amount);
+        toast(`🔨 Лот ушёл к ${lot.leaderNick || 'перекупу'} за ${fmtShort(lot.price)} — ставка вернулась`);
+      }
+      plState.auction.esc = null;
+    } else if (e.acked && lot.leader !== aucId) {
+      setCoins(e.amount);
+      toast(`🔨 ${lot.leaderNick} перебил тебя: ${fmtShort(lot.price)}`);
+      plState.auction.esc = null;
+    }
     savePl();
     refreshPlates();
   }
 
-  function aucTick() {
-    const now = Date.now(), A = plState.auction;
-    // приложение было закрыто — доигрываем торги за ботов разом
-    if (A.lot && now - aucLastTick > 5000 && A.lot.leader === 'me') {
-      const rival = A.lot.bots.filter((b) => b.max >= nextBid(A.lot)).sort((a, b) => b.max - a.max)[0];
-      if (rival) placeBid(A.lot, rival.name, Math.min(rival.max, nextBid(A.lot, 1.25)));
+  async function hostTick() {
+    const w = aucWindow();
+    if (!lot || (lot.ended && lot.w < w)) {
+      if (lot && lot.w === w) return;
+      lot = await freshLot(w);
+      if (Date.now() >= lot.ends) { lot.ended = true; return; } // окно уже прошло
+      toast(`🔨 Новый лот на аукционе: ${P.format(lot.p)}`);
     }
-    aucLastTick = now;
-    if (!A.lot && now >= A.nextAt) newLot();
-    const lot = A.lot;
-    if (lot) {
-      if (now >= lot.ends) finishLot(lot);
-      else {
-        const closing = lot.ends - now < 20000;
-        lot.bots.forEach((b) => {
-          if (plState.auction.lot !== lot || lot.leader === b.name) return;
-          const bid = nextBid(lot);
-          const chance = lot.leader === 'me' ? (closing ? 45 : 22) : (closing ? 25 : 10);
-          if (b.max >= bid && G.rnd.int(0, 99) < chance) placeBid(lot, b.name, bid);
-        });
-        savePl();
-      }
+    if (lot.ended) return;
+    const now = Date.now();
+    if (now >= lot.ends) {
+      lot.ended = true;
+      lot.ver++;
+      pubState();
+      settleEscrow();
+      return;
+    }
+    const closing = lot.ends - now < 20000;
+    const human = lot.leader && !lot.bots.some((b) => b.name === lot.leader);
+    lot.bots.forEach((b) => {
+      if (lot.leader === b.name) return;
+      const chance = human ? (closing ? 45 : 22) : (closing ? 25 : 10);
+      if (b.max >= nextBid(lot) && G.rnd.int(0, 99) < chance) applyBid(b.name, b.name, nextBid(lot));
+    });
+    pubState();
+    settleEscrow();
+  }
+
+  function joinAuctionHall() {
+    if (!aucSb) return;
+    aucCh = aucSb.channel('qb-auction-hall', { config: { broadcast: { self: false, ack: false }, presence: { key: aucId } } });
+    aucCh.on('presence', { event: 'sync' }, () => {
+      aucHall = Object.values(aucCh.presenceState()).map((a) => a[0]).filter(Boolean).sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
+      const wasHost = aucHost;
+      aucHost = aucHall.length > 0 && aucHall[0].id === aucId;
+      if (aucHost && !wasHost) pubState();
+    });
+    aucCh.on('broadcast', { event: 'au-state' }, async ({ payload }) => {
+      if (aucHost) return;
+      const s = payload.lot;
+      if (lot && lot.w === s.w && lot.ver > s.ver) return;
+      const base = await lotFor(s.w);
+      lot = { ...base, ...s };
+      settleEscrow();
+    });
+    aucCh.on('broadcast', { event: 'au-sync' }, () => { if (aucHost) pubState(); });
+    aucCh.on('broadcast', { event: 'au-bid' }, ({ payload }) => {
+      if (!aucHost) return;
+      const ok = lot && lot.w === payload.w && applyBid(payload.from, payload.nick, payload.amount);
+      aucSend('au-ack', { to: payload.from, nonce: payload.nonce, ok });
+      if (ok) pubState();
+    });
+    aucCh.on('broadcast', { event: 'au-ack' }, ({ payload }) => {
+      const e = plState.auction.esc;
+      if (payload.to !== aucId || !e || e.nonce !== payload.nonce) return;
+      if (payload.ok) { e.acked = true; savePl(); return; }
+      setCoins(e.amount);
+      plState.auction.esc = null;
+      savePl();
+      toast('Ставка не прошла — кто-то успел раньше');
+    });
+    aucCh.subscribe(async (status) => {
+      if (status !== 'SUBSCRIBED') return;
+      await aucCh.track({ id: aucId, t: aucJoinedAt, nick: myNick() });
+      aucSend('au-sync', {});
+    });
+  }
+
+  async function aucTick() {
+    // без сети — аукцион идёт локально, ведущий — ты сам
+    if (!aucCh || aucHost || !aucHall.length) await hostTick();
+    // зависшая ставка: окно давно прошло, итога не узнали — возвращаем
+    const e = plState.auction.esc;
+    if (e && e.w < aucWindow() - 1) {
+      setCoins(e.amount);
+      plState.auction.esc = null;
+      savePl();
+      toast('Итог прошлого аукциона не дошёл — ставка вернулась');
     }
     renderAuctionBtn();
     if (!$('#auction-modal').hidden) renderAuction();
   }
   setInterval(aucTick, 1000);
+  joinAuctionHall();
 
   const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+  const nextLotIn = () => (aucWindow() + 1) * P.AUCTION_EVERY - Date.now();
+
   function renderAuctionBtn() {
-    const A = plState.auction, b = $('#pl-auction');
-    b.classList.toggle('live', !!A.lot);
-    b.innerHTML = A.lot ? '🔨 Аукцион <em>LIVE</em>' : `🔨 Аукцион · ${mmss(Math.max(0, A.nextAt - Date.now()))}`;
+    const b = $('#pl-auction'), live = lotOpen(lot);
+    b.classList.toggle('live', live);
+    b.innerHTML = live ? '🔨 Аукцион <em>LIVE</em>' : `🔨 Аукцион · ${mmss(Math.max(0, nextLotIn()))}`;
   }
 
   function renderAuction() {
-    const A = plState.auction, lot = A.lot, body = $('#au-body');
-    const fleetRentNow = plState.fleet.reduce((s, f) => s + P.fleetRent(f.total), 0);
-    if (!lot) {
-      body.innerHTML = `<div class="au-wait"><div class="sparkle">🔨</div><b>Следующий лот через ${mmss(Math.max(0, A.nextAt - Date.now()))}</b>
-        <span>На торги выставляется гарантированно легендарный или мифический номер. Выиграешь — он встанет в автопарк и будет приносить аренду.</span>
-        <small>Твой автопарк: ${plState.fleet.length} номеров · +${fmt(fleetRentNow)}/мин</small></div>`;
+    const body = $('#au-body');
+    const hall = aucCh ? `👥 В зале: ${Math.max(1, aucHall.length)}${aucHost ? ' · ты ведущий' : ''}` : '📴 Офлайн-режим: торгуешься только с ботами';
+    const fleetRentNow = plState.fleet.reduce((sum, f) => sum + P.fleetRent(f.total), 0);
+    if (!lotOpen(lot)) {
+      const last = lot && lot.ended && lot.leader ? `<small>Прошлый лот ${plateHTML(lot.p)} ушёл к <b>${esc(lot.leaderNick)}</b> за ${fmtShort(lot.price)}</small>` : '';
+      body.innerHTML = `<div class="au-hall">${hall}</div><div class="au-wait"><div class="sparkle">🔨</div><b>Следующий лот через ${mmss(Math.max(0, nextLotIn()))}</b>
+        <span>Лот один на всех: торгуешься с кентами и ботами-перекупами. Выиграешь — номер встанет в автопарк и будет приносить аренду.</span>
+        ${last}<small>Твой автопарк: ${plState.fleet.length} номеров · +${fmt(fleetRentNow)}/мин</small></div>`;
       return;
     }
     const t = P.TIERS.find((x) => x.id === lot.tier), left = Math.max(0, lot.ends - Date.now());
-    const b10 = nextBid(lot), b25 = nextBid(lot, 1.25), mine = lot.leader === 'me';
+    const mine = lot.leader === aucId, pending = plState.auction.esc && !plState.auction.esc.acked;
+    const b10 = nextBid(lot), b25 = nextBid(lot, 1.25);
     body.innerHTML = `
+      <div class="au-hall">${hall}</div>
       <div class="au-lot" style="--t:${t.color}">
         <div class="au-plate">${plateHTML(lot.p)}</div>
         <div class="au-meta"><span class="au-tier">${t.name}</span> · ${lot.total} очков · аренда <b>+${P.fleetRent(lot.total)}/мин</b></div>
       </div>
       <div class="au-price">
         <div><span>ТЕКУЩАЯ СТАВКА</span><b><i class="coin"></i>${fmt(lot.price)}</b></div>
-        <div><span>ЛИДЕР</span><b class="${mine ? 'me' : ''}">${lot.leader ? (mine ? 'Ты 😎' : esc(lot.leader)) : '—'}</b></div>
+        <div><span>ЛИДЕР</span><b class="${mine ? 'me' : ''}">${lot.leader ? (mine ? 'Ты 😎' : esc(lot.leaderNick)) : '—'}</b></div>
         <div><span>ДО КОНЦА</span><b class="${left < 15000 ? 'hot' : ''}">${mmss(left)}</b></div>
       </div>
-      <div class="au-bar"><i style="width:${(left / P.AUCTION_LEN) * 100}%"></i></div>
+      <div class="au-bar"><i style="width:${Math.min(100, (left / P.AUCTION_LEN) * 100)}%"></i></div>
       <div class="au-actions">
-        ${mine ? '<div class="au-lead">Ты лидируешь — ждём, перебьют ли</div>' : `
+        ${mine ? '<div class="au-lead">Ты лидируешь — не выходи до конца торгов</div>' : pending ? '<div class="au-lead">Ставка отправлена…</div>' : `
         <button class="pill pill-dark" data-bid="${b10}" ${plState.coins < b10 ? 'disabled' : ''}>${lot.leader ? '+10%' : 'Старт'} · ${fmtShort(b10)}</button>
         ${lot.leader ? `<button class="pill pill-white" data-bid="${b25}" ${plState.coins < b25 ? 'disabled' : ''}>+25% · ${fmtShort(b25)}</button>` : ''}`}
       </div>
-      <div class="au-log">${lot.log.map((l) => `<div><span>${l.who === 'me' ? 'Ты' : esc(l.who)}</span><b>${fmt(l.amount)}</b></div>`).join('') || '<div class="note">Ставок пока нет — будь первым</div>'}</div>`;
+      <div class="au-log">${lot.log.map((l) => `<div class="${l.who === aucId ? 'me' : ''}"><span>${l.who === aucId ? 'Ты' : esc(l.nick)}${lot.bots.some((b) => b.name === l.who) ? ' 🤖' : l.who === aucId ? '' : ' 👤'}</span><b>${fmt(l.amount)}</b></div>`).join('') || '<div class="note">Ставок пока нет — будь первым</div>'}</div>`;
   }
+
   $('#au-body').onclick = (e) => {
     const b = e.target.closest('[data-bid]');
-    const lot = plState.auction.lot;
-    if (!b || !lot || lot.leader === 'me') return;
+    if (!b || !lotOpen(lot) || lot.leader === aucId || plState.auction.esc) return;
     const amount = +b.dataset.bid;
     if (plState.coins < amount) return toast('Не хватает монет');
     setCoins(-amount);
-    lot.myBid = amount;
-    lot.myTried = true;
-    placeBid(lot, 'me', amount);
+    const nonce = G.uuid4();
+    plState.auction.esc = { w: lot.w, amount, nonce, acked: false };
     savePl();
+    if (!aucCh || aucHost || !aucHall.length) {
+      // ведущий — ты: ставка применяется сразу
+      if (applyBid(aucId, myNick(), amount)) { plState.auction.esc.acked = true; pubState(); }
+      else { setCoins(amount); plState.auction.esc = null; toast('Ставка не прошла — кто-то успел раньше'); }
+      savePl();
+    } else {
+      aucSend('au-bid', { w: lot.w, amount, nonce, nick: myNick() });
+      // ведущий не ответил — ставку возвращаем
+      setTimeout(() => {
+        const esc0 = plState.auction.esc;
+        if (esc0 && esc0.nonce === nonce && !esc0.acked) {
+          setCoins(amount);
+          plState.auction.esc = null;
+          savePl();
+          toast('Ведущий аукциона не ответил — ставка вернулась');
+        }
+      }, 6000);
+    }
     renderAuction();
   };
   $('#pl-auction').onclick = () => { renderAuction(); $('#auction-modal').hidden = false; };

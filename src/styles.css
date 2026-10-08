@@ -1935,3 +1935,9 @@ kbd {
 .pl-best-row.fleet { background: rgba(240, 197, 82, .12); }
 :root[data-theme="dark"] .pl-best-row.fleet { background: rgba(240, 197, 82, .1); }
 @media (max-width: 1100px) { .gem-shop { grid-template-columns: repeat(2, 1fr); } }
+
+/* общий аукцион */
+.au-hall { font-size: 12px; color: #9a9a95; text-align: center; }
+.au-log > div.me { background: rgba(142, 211, 198, .14); }
+.au-log > div.me span { color: #8ed3c6; font-weight: 600; }
+.au-wait small .mini-plate { font-size: 11px; vertical-align: middle; }
