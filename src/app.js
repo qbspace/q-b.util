@@ -564,6 +564,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '3.0.1': [
+      'Скин «Чемпион сезона» и наклейка 🏆 больше не продаются за 0 — только награда пропуска',
+      'Нарисован скин «Чемпион сезона»: клетчатый флаг, золото и перелив',
+    ],
     '3.0.0': [
       '📅 Задания дня и недели + 🏁 сезонный пропуск на 30 уровней с наградами',
       '🚘 Автосалон: 9 тачек с твоим номером, каждая даёт свой буст',
@@ -1159,7 +1163,7 @@
             : `<button class="shop-buy" data-up="${u.id}" ${plState.coins < price ? 'disabled' : ''}><i class="coin"></i>${fmt(price)}</button>`}
         </div>`;
     }).join('');
-    const skins = P.SKINS.filter((sk) => (!sk.market && !sk.gems) || plState.skins.includes(sk.id)).map((sk) => {
+    const skins = P.SKINS.filter((sk) => (!sk.market && !sk.gems && !sk.season) || plState.skins.includes(sk.id)).map((sk) => {
       const owned = plState.skins.includes(sk.id), active = plState.skin === sk.id;
       return `
         <button class="skin-card ${active ? 'on' : ''}" data-skin="${sk.id}" ${!owned && plState.coins < sk.price ? 'disabled' : ''}>
@@ -2193,7 +2197,7 @@
     $('#tn-style-bar').style.width = Math.min(100, (style / 96) * 100) + '%';
     $('#tn-bonus').textContent = `+${(style / P.STYLE_DIV).toFixed(1)}% к выплатам`;
     $('#tn-cats').innerHTML = P.TUNING_CATS.map((c) => `<button data-v="${c.id}" class="${c.id === tnCat ? 'on' : ''}">${c.icon} ${c.name}</button>`).join('');
-    $('#tn-grid').innerHTML = P.TUNING.filter((t) => t.cat === tnCat).map((t) => {
+    $('#tn-grid').innerHTML = P.TUNING.filter((t) => t.cat === tnCat && (!t.season || plState.tuning.owned.includes(t.id))).map((t) => {
       const owned = plState.tuning.owned.includes(t.id), on = plState.tuning.eq[t.cat] === t.id;
       const btn = on ? `<button class="tn-btn off" data-off="${t.cat}">Снять</button>`
         : owned ? `<button class="tn-btn" data-eq="${t.id}">Надеть</button>`
@@ -2580,6 +2584,22 @@
     }
   }
   ensurePeriodic();
+  // награды сезона, которые раньше по ошибке отдавались бесплатно, — только тем, кто их заработал
+  (() => {
+    const best = Math.max(plState.season.best || 0, plState.season.level || 0);
+    let fixed = false;
+    if (best < 30 && plState.skins.includes('season')) {
+      plState.skins = plState.skins.filter((x) => x !== 'season');
+      if (plState.skin === 'season') plState.skin = 'classic';
+      fixed = true;
+    }
+    if (best < 20 && plState.tuning.owned.includes('s-champ')) {
+      plState.tuning.owned = plState.tuning.owned.filter((x) => x !== 's-champ');
+      if (plState.tuning.eq.sticker === 's-champ') delete plState.tuning.eq.sticker;
+      fixed = true;
+    }
+    if (fixed) savePl();
+  })();
 
   // событие игры двигает прогресс заданий дня и недели
   function qev(type, n = 1) {
