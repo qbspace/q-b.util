@@ -2416,3 +2416,54 @@ kbd {
 
 .ldk-price span[hidden] { display: none; }
 .ldk-price span.mine { border: 1px dashed currentColor; background: transparent; }
+
+/* ================= 4.3: МИНЁР ================= */
+.cs-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, .06); }
+.cs-tabs button { height: 28px; padding: 0 14px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #b9b8b2; }
+.cs-tabs button.on { background: #e4f07e; color: #111; }
+.casino-card[hidden] { display: none; }
+.mn-opts { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.mn-opt { display: flex; flex-direction: column; gap: 6px; }
+.mn-opt > span { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #8a8984; }
+.mn-opt > span b { color: #fff; font-size: 13px; }
+.mn-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.mn-seg button, .mn-step button { height: 30px; padding: 0 10px; border-radius: 10px; background: rgba(255, 255, 255, .08); color: #f2f2ee; font-size: 12px; font-weight: 700; }
+.mn-seg button.on { background: #e4f07e; color: #111; }
+.mn-seg button:disabled:not(.on), .mn-step button:disabled { opacity: .35; cursor: not-allowed; }
+.mn-step { display: flex; align-items: center; gap: 8px; }
+.mn-step input { width: 150px; accent-color: #ff6b70; }
+.mn-board-wrap { position: relative; flex: 1; min-height: 240px; display: grid; place-items: center; container-type: size; }
+.mn-board {
+  --n: 5; width: min(100cqw, 100cqh); aspect-ratio: 1; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); grid-template-rows: repeat(var(--n), minmax(0, 1fr)); gap: calc(14px - var(--n) * 1px);
+  padding: 10px; border-radius: 20px; background: #121211; border: 1px solid rgba(255, 255, 255, .06);
+}
+.mn-cell {
+  border-radius: calc(16px - var(--n) * 1px); background: linear-gradient(180deg, #2c2c29, #1e1e1c); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 3px 0 #0b0b0a;
+  font-size: calc(110px / var(--n)); display: grid; place-items: center; transition: transform .12s, background .2s; width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 0;
+}
+.mn-cell:not(:disabled):hover { transform: translateY(-2px); background: linear-gradient(180deg, #3a3a36, #262624); }
+.mn-cell:not(:disabled):active { transform: translateY(1px); }
+.mn-cell.gem { background: radial-gradient(circle, rgba(95, 194, 174, .35), rgba(95, 194, 174, .08)); box-shadow: inset 0 0 0 1px rgba(95, 194, 174, .5); }
+.mn-cell.pop { animation: mnpop .3s ease-out; }
+.mn-cell.mine { background: rgba(255, 107, 112, .1); opacity: .8; }
+.mn-cell.boom { background: radial-gradient(circle, #ff6b3d, #7a0d14); opacity: 1; box-shadow: 0 0 30px rgba(255, 80, 60, .7); animation: mnpop .4s ease-out; }
+.mn-cell.rest { opacity: .28; }
+@keyframes mnpop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.mines-card.shake { animation: shake .5s; }
+.mn-res { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; pointer-events: none; opacity: 0; transition: opacity .2s; white-space: nowrap; }
+.mn-res.good, .mn-res.bad { opacity: 1; }
+.mn-res.good { background: rgba(95, 194, 174, .9); color: #062019; }
+.mn-res.bad { background: rgba(229, 72, 77, .92); color: #fff; }
+.mn-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mn-info div { padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .05); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mn-info span { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #8a8984; }
+.mn-info b { font-family: var(--mono); font-size: 15px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mn-info b .coin { width: 15px; height: 15px; margin-right: 6px; }
+#mn-mult { color: #e4f07e; }
+.mn-actions { display: flex; gap: 8px; }
+.mn-actions .cr-btn { flex: 1; }
+.mn-rand { width: 58px; border-radius: 999px; background: rgba(255, 255, 255, .08); font-size: 22px; }
+.mn-rand:disabled { opacity: .3; cursor: not-allowed; }
+.cr-bets button:disabled { opacity: .35; cursor: not-allowed; }
+.mn-ico { width: 58%; height: 58%; display: block; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .4)); }
+.mn-cell.gem .mn-ico { filter: drop-shadow(0 0 10px rgba(95, 224, 196, .6)); }

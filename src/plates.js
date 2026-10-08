@@ -540,6 +540,7 @@
     { id: 'crash10', name: 'Выйди из Crash на ×10 или выше', reward: 100000, done: (s) => (s.crashBest || 0) >= 10 },
     { id: 'lotto1', name: 'Выиграй лотерею', reward: 100000, done: (s) => (s.lottoWins || 0) >= 1 },
     { id: 'petrovich', name: 'Получи подарок от Петровича', reward: 50000, done: (s) => (s.keys || []).includes('whistle') },
+    { id: 'mines10', name: 'Забери ×10 или больше в минёре', reward: 150000, done: (s) => (s.minesBest || 0) >= 10 },
     { id: 'curse1', name: 'Выбей проклятый номер 666', reward: 66600, done: (s) => (s.curses || 0) >= 1 },
     { id: 'ldk1', name: 'Купи ЛАДАКОИН', reward: 20000, done: (s) => ((s.ldk || {}).trades || 0) >= 1 },
     { id: 'ldk2', name: 'Продай ЛАДАКОИН с прибылью ×2', reward: 500000, done: (s) => ((s.ldk || {}).bestX || 0) >= 2 },

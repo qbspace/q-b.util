@@ -185,7 +185,7 @@
     $('#page-title').textContent = page === 'dashboard' ? greeting() : PAGES[page][0];
     $('#page-crumb').innerHTML = `${PAGES[page][1]} <i>›</i>`;
     if (page === 'history') renderHistory();
-    if (page === 'casino') { renderCrash(); renderLotto(); }
+    if (page === 'casino') { if (plState.casinoTab === 'mines') renderMines(); else renderCrash(); renderLotto(); }
     if (page === 'biz') renderBiz();
     if (page === 'crypto') renderLdk();
     if (page === 'dashboard') renderDash();
@@ -571,6 +571,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.3.0': [
+      '💣 Минёр в казино: поле от 3×3 до 8×8, сам выбираешь сколько мин',
+      '📈 Каждая открытая клетка поднимает множитель — забирай вовремя',
+    ],
     '4.2.0': [
       '🌐 Биржа ЛАДАКОИНА теперь онлайн: часы сверяются, курс у всех кентов один в один',
       '🐋 Крупные покупки и продажи кентов двигают курс для всех',
@@ -2818,7 +2822,7 @@
   const BADGES = {
     spin1: '🎰', spin100: '💯', spin1000: '🏭', rare: '🔷', epic: '🟣', legendary: '🟠', mythic: '🔴', s777: '7️⃣', elite: '🏛',
     word: '🔤', r77: '🏙', upgrade: '⬆️', skin: '🎨', bigwin: '💸', work: '💼', online1: '🌐', key1: '🔑', prestige1: '⭐',
-    curse1: '👁', ldk2: '🪙', pframe1: '📸', tune1: '🔧', style50: '✨', auction1: '🔨', gems100: '💎', rich: '💰', rich2: '🏦', million: '🤑', car1: '🚘', trade1: '🤝', season10: '🏁',
+    mines10: '💣', curse1: '👁', ldk2: '🪙', pframe1: '📸', tune1: '🔧', style50: '✨', auction1: '🔨', gems100: '💎', rich: '💰', rich2: '🏦', million: '🤑', car1: '🚘', trade1: '🤝', season10: '🏁',
   };
   // краткая карточка — её же видят соперники в онлайне
   function myCard() {
@@ -3996,9 +4000,195 @@
   document.addEventListener('keydown', (e) => {
     if (current === 'casino' && e.code === 'Space' && !['INPUT', 'TEXTAREA', 'BUTTON'].includes(document.activeElement.tagName)) {
       e.preventDefault();
-      $('#cr-btn').click();
+      $(plState.casinoTab === 'mines' ? '#mn-btn' : '#cr-btn').click();
     }
   });
+
+  /* ======================= минёр ======================= */
+  const MN_SIZES = [3, 4, 5, 6, 7, 8];
+  const MN_EDGE = 0.97, MN_CAP = 10000;
+  if (!plState.minesCfg) plState.minesCfg = { n: 5, mines: 3, bet: 1000 };
+  const MC = plState.minesCfg;
+  // незаконченная игра переживает перезапуск
+  let MG = plState.minesGame || null;
+  const mnTotal = () => MC.n * MC.n;
+  function mnMult(k, T = (MG ? MG.n * MG.n : mnTotal()), M = (MG ? MG.mines : MC.mines)) {
+    let m = MN_EDGE;
+    for (let i = 0; i < k; i++) m *= (T - i) / (T - M - i);
+    return k ? Math.min(MN_CAP, m) : 1;
+  }
+  const fmtX = (m) => `×${m >= 100 ? fmt(m) : m.toFixed(2)}`;
+  const MN_GEM = '<svg viewBox="0 0 24 24" class="mn-ico"><path d="M6 3h12l4 6-10 12L2 9z" fill="#5fe0c4"/><path d="M2 9h20L12 21z" fill="#2fae95"/><path d="M6 3l3 6 3-6 3 6 3-6" fill="none" stroke="#c9fff2" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 9l3 12 3-12" fill="none" stroke="#c9fff2" stroke-width="1" opacity=".6"/></svg>';
+  const MN_BOMB = '<svg viewBox="0 0 24 24" class="mn-ico"><g stroke="#ff8a8e" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.8 2.8M16.2 16.2L19 19M5 19l2.8-2.8M16.2 7.8L19 5"/></g><circle cx="12" cy="12" r="6.5" fill="#1a0a0b" stroke="#ff5a5f" stroke-width="1.5"/><circle cx="10" cy="10" r="1.8" fill="#ffb3b6"/></svg>';
+  // мины раскладываем криптослучайно
+  function mnField(T, M) {
+    const idx = Array.from({ length: T }, (_, i) => i);
+    for (let i = T - 1; i > 0; i--) { const j = G.rnd.int(0, i); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    return idx.slice(0, M);
+  }
+
+  function mnSound(kind, k = 0) {
+    if (kind === 'gem') { tone(740 + k * 45, 0, 0.18, 0.05, 'triangle'); tone(1110 + k * 60, 0.05, 0.2, 0.03, 'sine'); }
+    if (kind === 'boom') { tone(90, 0, 0.7, 0.12, 'sawtooth'); tone(55, 0.05, 0.9, 0.12, 'square'); tone(30, 0.1, 1, 0.1, 'sawtooth'); }
+    if (kind === 'cash') { [784, 988, 1319].forEach((f, i) => tone(f, i * 0.07, 0.3, 0.05, 'triangle')); }
+  }
+
+  function renderMines() {
+    const playing = !!(MG && !MG.over);
+    const n = MG ? MG.n : MC.n, M = MG ? MG.mines : MC.mines, T = n * n;
+    $('#mn-coins').textContent = fmtShort(plState.coins);
+    $$('#mn-size button').forEach((b) => { b.classList.toggle('on', +b.dataset.n === MC.n); b.disabled = playing; });
+    const r = $('#mn-mines');
+    r.max = mnTotal() - 1;
+    r.value = MC.mines;
+    r.disabled = playing;
+    $$('#mn-mines-box button').forEach((b) => (b.disabled = playing));
+    $('#mn-mines-v').textContent = MC.mines;
+    $$('#mn-bets button').forEach((b) => (b.disabled = playing));
+    $('#mn-bet-v').textContent = fmt(MC.bet);
+
+    const board = $('#mn-board');
+    board.style.setProperty('--n', n);
+    const mines = new Set(MG ? MG.field : []), opened = new Set(MG ? MG.opened : []);
+    board.innerHTML = Array.from({ length: T }, (_, i) => {
+      let cls = 'mn-cell', inner = '';
+      if (opened.has(i)) { cls += ' gem'; inner = MN_GEM; }
+      else if (MG && MG.over && mines.has(i)) { cls += i === MG.boom ? ' mine boom' : ' mine'; inner = MN_BOMB; }
+      else if (MG && MG.over) { cls += ' rest'; inner = MN_GEM; }
+      return `<button class="${cls}" data-i="${i}" ${playing && !opened.has(i) ? '' : 'disabled'}>${inner}</button>`;
+    }).join('');
+
+    const k = MG ? MG.opened.length : 0, safe = T - M;
+    const lost = !!(MG && MG.over && MG.boom != null);
+    const cur = lost ? 0 : mnMult(k, T, M), next = k < safe ? mnMult(k + 1, T, M) : null;
+    $('#mn-mult').textContent = fmtX(cur);
+    $('#mn-next').textContent = playing && next ? `${fmtX(next)} · шанс ${(((safe - k) / (T - k)) * 100).toFixed(0)}%` : !MG ? `${fmtX(mnMult(1, T, M))} · шанс ${((safe / T) * 100).toFixed(0)}%` : '—';
+    const bet = MG ? MG.bet : MC.bet;
+    $('#mn-win').innerHTML = `<i class="coin"></i>${fmtShort(Math.floor(bet * cur))}`;
+
+    const btn = $('#mn-btn');
+    if (playing) {
+      btn.disabled = k === 0;
+      btn.className = `cr-btn ${k ? 'cash' : 'wait'}`;
+      btn.textContent = k ? `Забрать ${fmtShort(Math.floor(MG.bet * cur))}` : 'Открой клетку';
+    } else {
+      btn.disabled = plState.coins < MC.bet || MC.bet < 1;
+      btn.className = 'cr-btn';
+      btn.textContent = `Играть · ${fmtShort(MC.bet)}`;
+    }
+    $('#mn-rand').disabled = !playing;
+    const res = $('#mn-res');
+    res.className = `mn-res ${MG && MG.over ? (MG.boom != null ? 'bad' : 'good') : ''}`;
+    res.textContent = MG && MG.over ? (MG.boom != null ? `💥 Мина! Ставка ${fmtShort(MG.bet)} сгорела` : `💰 Забрал ${fmtShort(MG.win)} (${fmtX(MG.x)})`) : '';
+  }
+
+  function mnSave() { plState.minesGame = MG && !MG.over ? MG : null; savePl(); }
+
+  function mnStart() {
+    if (MG && !MG.over) return;
+    const bet = Math.floor(MC.bet);
+    if (bet < 1 || plState.coins < bet) { toast('Не хватает монет на ставку'); return; }
+    plState.coins -= bet;
+    MG = { n: MC.n, mines: MC.mines, bet, field: mnField(MC.n * MC.n, MC.mines), opened: [], over: false };
+    mnSave();
+    renderWallet();
+    renderMines();
+  }
+  function mnOpen(i) {
+    if (!MG || MG.over || MG.opened.includes(i)) return;
+    const cell = $(`#mn-board [data-i="${i}"]`);
+    if (MG.field.includes(i)) {
+      MG.over = true;
+      MG.boom = i;
+      mnSave();
+      mnSound('boom');
+      renderMines();
+      $('#mines-card').classList.remove('shake');
+      void $('#mines-card').offsetWidth;
+      $('#mines-card').classList.add('shake');
+      return;
+    }
+    MG.opened.push(i);
+    mnSound('gem', MG.opened.length);
+    const T = MG.n * MG.n;
+    // всё открыто или упёрлись в потолок — забираем сами
+    if (MG.opened.length >= T - MG.mines || mnMult(MG.opened.length) >= MN_CAP) { mnCash(); return; }
+    mnSave();
+    renderMines();
+    if (cell) { const c = $(`#mn-board [data-i="${i}"]`); if (c) c.classList.add('pop'); }
+  }
+  function mnCash() {
+    if (!MG || MG.over || !MG.opened.length) return;
+    const x = mnMult(MG.opened.length), win = Math.floor(MG.bet * x);
+    MG.over = true;
+    MG.win = win;
+    MG.x = x;
+    plState.coins += win;
+    plState.minesBest = Math.max(plState.minesBest || 0, x);
+    plState.bestWin = Math.max(plState.bestWin || 0, win - MG.bet);
+    mnSave();
+    renderWallet();
+    mnSound('cash');
+    toast(`💣 Минёр: +${fmtShort(win)} (${fmtX(x)})`);
+    if (x >= 5) burst('#5fc2ae', x >= 50 ? 80 : 40);
+    renderMines();
+  }
+
+  $('#mn-board').addEventListener('click', (e) => {
+    const c = e.target.closest('.mn-cell');
+    if (c && !c.disabled) mnOpen(+c.dataset.i);
+  });
+  $('#mn-btn').onclick = () => (MG && !MG.over ? mnCash() : mnStart());
+  $('#mn-rand').onclick = () => {
+    if (!MG || MG.over) return;
+    const free = Array.from({ length: MG.n * MG.n }, (_, i) => i).filter((i) => !MG.opened.includes(i));
+    mnOpen(free[G.rnd.int(0, free.length - 1)]);
+  };
+  $('#mn-size').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-n]');
+    if (!b || (MG && !MG.over)) return;
+    MC.n = +b.dataset.n;
+    MC.mines = Math.min(MC.mines, mnTotal() - 1);
+    MG = null;
+    savePl();
+    renderMines();
+  });
+  const mnSetMines = (v) => {
+    if (MG && !MG.over) return;
+    MC.mines = Math.max(1, Math.min(mnTotal() - 1, v));
+    MG = null;
+    savePl();
+    renderMines();
+  };
+  $('#mn-mines').addEventListener('input', (e) => mnSetMines(+e.target.value));
+  $('#mn-mines-box').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mm]');
+    if (b) mnSetMines(MC.mines + +b.dataset.mm);
+  });
+  $('#mn-bets').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mb]');
+    if (!b || (MG && !MG.over)) return;
+    const v = b.dataset.mb;
+    MC.bet = v === 'max' ? plState.coins : v === 'half' ? Math.floor(MC.bet / 2) : v === 'x2' ? MC.bet * 2 : +v;
+    MC.bet = Math.max(1, Math.min(Math.floor(MC.bet), Math.max(1, plState.coins)));
+    savePl();
+    renderMines();
+  });
+
+  // вкладки казино: Crash или Минёр
+  function casinoTab(tab) {
+    plState.casinoTab = tab;
+    $('#crash-card').hidden = tab !== 'crash';
+    $('#mines-card').hidden = tab !== 'mines';
+    $$('.cs-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.cs === tab));
+    if (tab === 'mines') renderMines();
+    else renderCrash();
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.cs-tabs [data-cs]');
+    if (b) casinoTab(b.dataset.cs);
+  });
+  casinoTab(plState.casinoTab === 'mines' ? 'mines' : 'crash');
 
   /* --- лотерея: общий розыгрыш раз в 15 минут --- */
   const lotRound = () => Math.floor(Date.now() / P.LOTTERY_EVERY);

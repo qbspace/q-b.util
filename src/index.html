@@ -555,9 +555,9 @@
       <!-- ---------- CASINO ---------- -->
       <section class="page" data-page="casino">
         <div class="casino-layout">
-          <div class="card casino-card">
+          <div class="card casino-card" id="crash-card">
             <div class="casino-head">
-              <span class="cap">🚀 CRASH</span>
+              <div class="cs-tabs"><button data-cs="crash">🚀 Crash</button><button data-cs="mines">💣 Минёр</button></div>
               <div class="pl-coins small"><i class="coin"></i><b id="cr-coins">0</b></div>
             </div>
             <div class="cr-hist" id="cr-hist"></div>
@@ -577,6 +577,29 @@
             <button class="cr-btn" id="cr-btn">Поставить</button>
             <div class="note">Пробел — поставить или забрать. Ракета может взорваться в любой момент, даже сразу.</div>
             <div class="cr-players" id="cr-players"></div>
+          </div>
+          <div class="card casino-card mines-card" id="mines-card" hidden>
+            <div class="casino-head">
+              <div class="cs-tabs"><button data-cs="crash">🚀 Crash</button><button data-cs="mines">💣 Минёр</button></div>
+              <div class="pl-coins small"><i class="coin"></i><b id="mn-coins">0</b></div>
+            </div>
+            <div class="mn-opts">
+              <div class="mn-opt"><span>Поле</span><div class="mn-seg" id="mn-size"><button data-n="3">3×3</button><button data-n="4">4×4</button><button data-n="5">5×5</button><button data-n="6">6×6</button><button data-n="7">7×7</button><button data-n="8">8×8</button></div></div>
+              <div class="mn-opt"><span>Мин: <b id="mn-mines-v">3</b></span><div class="mn-step" id="mn-mines-box"><button data-mm="-1">−</button><input type="range" id="mn-mines" min="1" max="24" step="1"><button data-mm="1">+</button></div></div>
+            </div>
+            <div class="mn-board-wrap"><div class="mn-board" id="mn-board"></div><div class="mn-res" id="mn-res"></div></div>
+            <div class="mn-info">
+              <div><span>Множитель</span><b id="mn-mult">×1.00</b></div>
+              <div><span>Следующая клетка</span><b id="mn-next">—</b></div>
+              <div><span>Заберёшь</span><b id="mn-win">0</b></div>
+            </div>
+            <div class="cr-bets" id="mn-bets">
+              <span>Ставка <b id="mn-bet-v">1 000</b></span>
+              <button data-mb="1000">1к</button><button data-mb="10000">10к</button><button data-mb="100000">100к</button><button data-mb="1000000">1М</button><button data-mb="10000000">10М</button>
+              <button data-mb="half">½</button><button data-mb="x2">×2</button><button data-mb="max">MAX</button>
+            </div>
+            <div class="mn-actions"><button class="cr-btn" id="mn-btn">Играть</button><button class="mn-rand" id="mn-rand" title="Открыть случайную клетку">🎲</button></div>
+            <div class="note">Открывай клетки с 💎 — каждая поднимает множитель. Наткнулся на 💣 — ставка сгорела. Чем больше мин, тем быстрее растёт множитель. Пробел — играть или забрать.</div>
           </div>
           <div class="card casino-card lotto-card">
             <div class="casino-head"><span class="cap">🎟 ЛОТЕРЕЯ · РАЗ В 15 МИНУТ</span><span class="lt-hall" id="lt-hall"></span></div>
