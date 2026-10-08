@@ -93,7 +93,7 @@ ipcMain.handle('file:save', async (_e, { name, content }) => {
 });
 
 /* ---------------- обновления ---------------- */
-const RELEASES_URL = 'https://github.com/quenixxx/q-b.util/releases';
+const RELEASES_URL = 'https://github.com/qbspace/q-b.util/releases';
 let updater = null;
 let updState = { state: 'idle', current: app.getVersion() };
 

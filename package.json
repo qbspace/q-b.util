@@ -46,7 +46,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "quenixxx",
+        "owner": "qbspace",
         "repo": "q-b.util",
         "releaseType": "release"
       }
