@@ -30,7 +30,7 @@
     try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; }
   };
 
-  const settings = Object.assign({ autocopy: false, history: true, mask: false }, load('qb.settings', {}));
+  const settings = Object.assign({ autocopy: false, history: true, mask: false, theme: 'light', tray: true, hotkey: true }, load('qb.settings', {}));
   const stats = Object.assign({ gen: 0, copied: 0 }, load('qb.stats', {}));
   let history = settings.history ? load('qb.history', []) : [];
   let session = 0;
@@ -163,6 +163,7 @@
     phones: ['Телефоны', 'НАЗАД НА ДАШБОРД'],
     identity: ['Личности', 'НАЗАД НА ДАШБОРД'],
     misc: ['Разное', 'НАЗАД НА ДАШБОРД'],
+    tables: ['Тестовые таблицы', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -190,7 +191,45 @@
   /* ---------------- passwords ---------------- */
   const pwMode = seg($('#pw-mode'), (v) => {
     $$('[data-mode]', $('[data-page=passwords]')).forEach((el) => (el.hidden = el.dataset.mode !== v));
+    $('#pw-count-f').hidden = $('#pw-gen').hidden = v === 'check';
+    if (v === 'check') { renderCheck(); $('#chk-in').focus(); } else renderResults($('#pw-results'), { items: [] });
   });
+
+  function renderCheck() {
+    const box = $('#pw-results');
+    const pw = $('#chk-in').value;
+    box.onclick = null;
+    if (!pw) {
+      box.innerHTML = `<div class="empty"><div class="sparkle">✦</div><p>ВСТАВЬ ПАРОЛЬ СЛЕВА — ОЦЕНКА ПОЯВИТСЯ ТУТ</p></div>`;
+      return;
+    }
+    const a = G.analyze(pw);
+    const col = ['#e5484d', '#f0b35a', '#e6d36a', '#c9df6f', '#5fc2ae'][a.score];
+    box.innerHTML = `
+      <div class="chk">
+        <div class="chk-top">
+          <div>
+            <span class="cap">НАДЁЖНОСТЬ</span>
+            <div class="chk-label" style="--c:${col}">${a.label}</div>
+          </div>
+          <div class="chk-bits"><b>${a.bits}</b><span>БИТ</span></div>
+        </div>
+        <div class="chk-meter">${[0, 1, 2, 3, 4].map((i) => `<i style="${i <= a.score ? `background:${col}` : ''}"></i>`).join('')}</div>
+        <div class="chk-times">
+          <div class="chk-time"><span>ПЕРЕБОР НА ВИДЕОКАРТЕ</span><b>${a.offline}</b><small>10 млрд попыток в секунду</small></div>
+          <div class="chk-time"><span>ПЕРЕБОР ЧЕРЕЗ ФОРМУ ВХОДА</span><b>${a.online}</b><small>100 попыток в секунду</small></div>
+        </div>
+        <div class="chk-list">
+          ${a.checks.map((c) => `<div class="chk-item ${c.ok ? 'ok' : ''}"><i></i>${c.text}${!c.ok && c.hint ? ` <small>· ${c.hint}</small>` : ''}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+  $('#chk-in').addEventListener('input', renderCheck);
+  $('#chk-eye').onclick = () => {
+    const i = $('#chk-in');
+    i.type = i.type === 'password' ? 'text' : 'password';
+    $('#chk-eye').classList.toggle('on', i.type === 'text');
+  };
   const pwLen = range('pw-len'), pwCount = range('pw-count'), ppWords = range('pp-words');
   const ppSep = seg($('#pp-sep'));
 
@@ -518,6 +557,13 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '1.3.0': [
+      'Трей: иконка у часов с быстрым меню — пароль, UUID, почта, телефон в один клик',
+      'Ctrl+Shift+Q — свежий пароль в буфер из любой программы',
+      'Новый раздел «Таблицы»: тестовые данные до 1000 строк в CSV, JSON и SQL',
+      'Проверка своего пароля: энтропия, время взлома и подсказки',
+      'Тёмная тема — переключается в настройках',
+    ],
     '1.2.0': [
       'Окно «Что нового» — теперь после каждого обновления видно, что поменялось',
       'В «Разном» появились генераторы координат и Unix-времени',
@@ -584,11 +630,101 @@
     $('#upd-check').onclick = () => toast('Обновления работают только в установленном приложении');
   }
 
+  /* ---------------- tables ---------------- */
+  const tbCols = new Set(['id', 'full_name', 'email', 'phone', 'city', 'created_at']);
+  $('#tb-cols').innerHTML = Object.entries(G.TABLE_COLUMNS)
+    .map(([k, c]) => `<button data-v="${k}" class="${tbCols.has(k) ? 'on' : ''}">${c.label}</button>`).join('');
+  const syncTbCount = () => ($('#tb-cols-c').textContent = `· ${tbCols.size} ИЗ ${Object.keys(G.TABLE_COLUMNS).length}`);
+  syncTbCount();
+  $('#tb-cols').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (tbCols.has(b.dataset.v)) tbCols.delete(b.dataset.v);
+    else tbCols.add(b.dataset.v);
+    b.classList.toggle('on', tbCols.has(b.dataset.v));
+    syncTbCount();
+  };
+  const tbFormat = seg($('#tb-format'), (v) => ($('#tb-table-f').hidden = v !== 'sql'));
+  const tbLocale = seg($('#tb-locale'));
+  const tbRows = range('tb-rows');
+
+  function genTable() {
+    // порядок колонок — как на экране, а не как кликали
+    const cols = Object.keys(G.TABLE_COLUMNS).filter((k) => tbCols.has(k));
+    if (!cols.length) return toast('Выбери хотя бы одну колонку');
+    const fmt = tbFormat(), n = tbRows();
+    const rows = G.tableRows(cols, n, tbLocale());
+    const text = G.formatTable(rows, cols, fmt, $('#tb-table').value);
+    const preview = rows.slice(0, 30);
+    const box = $('#tb-results');
+    box.innerHTML = `
+      <div class="res-head">
+        <h3>${n} строк · ${fmt.toUpperCase()}</h3>
+        <span class="count">${(new Blob([text]).size / 1024).toFixed(1)} КБ</span>
+        <button class="pill pill-white" data-a="copy">Копировать</button>
+        <button class="pill pill-dark" data-a="save">Сохранить файл</button>
+      </div>
+      <div class="tb-wrap">
+        <table class="tb">
+          <thead><tr><th>#</th>${cols.map((k) => `<th>${k}</th>`).join('')}</tr></thead>
+          <tbody>${preview.map((r, i) => `<tr><td>${i + 1}</td>${cols.map((k) => `<td>${esc(r[k])}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${n > preview.length ? `<div class="tb-more">+ ещё ${n - preview.length} строк в файле</div>` : ''}`;
+    box.onclick = (e) => {
+      const a = e.target.closest('[data-a]');
+      if (a?.dataset.a === 'copy') copy(text);
+      if (a?.dataset.a === 'save') save(`${$('#tb-table').value.replace(/[^\w-]/g, '') || 'data'}.${fmt}`, text);
+    };
+    stats.gen += n;
+    session += n;
+    persist();
+    renderStats();
+  }
+  $('#tb-gen').onclick = genTable;
+
+  /* ---------------- theme ---------------- */
+  const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
+  function applyTheme() {
+    const t = settings.theme === 'system' ? (sysDark.matches ? 'dark' : 'light') : settings.theme;
+    document.documentElement.dataset.theme = t;
+  }
+  const themeSeg = $('#set-theme');
+  $$('button', themeSeg).forEach((b) => b.classList.toggle('on', b.dataset.v === settings.theme));
+  seg(themeSeg, (v) => { settings.theme = v; persist(); applyTheme(); });
+  sysDark.addEventListener('change', applyTheme);
+  applyTheme();
+
+  /* ---------------- tray / hotkey ---------------- */
+  // Main-процесс просит сгенерировать что-то из трея или по горячей клавише
+  const QUICK_GEN = {
+    password: () => ['pw', 'Символы', G.password({ length: 20 }), 'Пароль'],
+    uuid: () => ['key', 'UUID v4', G.uuid4(), 'UUID'],
+    email: () => ['em', 'Почта', G.email(), 'Почта'],
+    phone: () => ['ph', 'Россия', G.phone('RU'), 'Телефон'],
+  };
+  if (window.qb && window.qb.onQuickGen) {
+    window.qb.onQuickGen((kind) => {
+      const q = QUICK_GEN[kind];
+      if (!q) return;
+      const [type, sub, value, title] = q();
+      copy(value, true);
+      record(type, sub, [value]);
+      const shown = type === 'pw' && settings.mask ? '•'.repeat(12) : value;
+      window.qb.notify(`${title} в буфере обмена`, shown);
+    });
+  }
+
   /* ---------------- settings ---------------- */
-  [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask']].forEach(([id, key]) => {
+  [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask'], ['set-tray', 'tray'], ['set-hotkey', 'hotkey']].forEach(([id, key]) => {
     const el = $('#' + id);
     el.checked = settings[key];
-    el.onchange = () => { settings[key] = el.checked; persist(); renderDash(); };
+    el.onchange = () => {
+      settings[key] = el.checked;
+      persist();
+      renderDash();
+      if ((key === 'tray' || key === 'hotkey') && window.qb && window.qb.applySettings) window.qb.applySettings();
+    };
   });
   $('#set-clear').onclick = clearHistory;
 
@@ -725,7 +861,7 @@
     $('.winctl').hidden = true;
   }
 
-  const GENS = { passwords: genPasswords, keys: genKeys, emails: genEmails, phones: genPhones, identity: () => genIdentity(), misc: genMisc };
+  const GENS = { tables: () => genTable(), passwords: () => pwMode() !== 'check' && genPasswords(), keys: genKeys, emails: genEmails, phones: genPhones, identity: () => genIdentity(), misc: genMisc };
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement.tagName) && GENS[current]) {
       e.preventDefault();

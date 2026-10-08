@@ -46,6 +46,10 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" class="fill"/></svg>
         <span>Разное</span>
       </button>
+      <button class="nav-item" data-go="tables">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M3 15h18M9 9.5V20"/></svg>
+        <span>Таблицы</span>
+      </button>
       <button class="nav-item" data-go="history">
         <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
         <span>История</span>
@@ -161,7 +165,7 @@
             <button class="pill pill-white wide" data-go="history">Вся история</button>
           </div>
           <div class="card grey stat">
-            <b class="stat-num">7</b>
+            <b class="stat-num">8</b>
             <div class="stat-label">ИНСТРУМЕНТОВ<br><span>22 СТРАНЫ ТЕЛЕФОНОВ</span></div>
             <button class="pill pill-white wide" data-go="misc">Открыть</button>
           </div>
@@ -185,6 +189,7 @@
             <div class="seg" id="pw-mode">
               <button class="on" data-v="chars">Символы</button>
               <button data-v="phrase">Фраза</button>
+              <button data-v="check">Проверка</button>
             </div>
 
             <div data-mode="chars">
@@ -218,7 +223,20 @@
               </div>
             </div>
 
-            <label class="field">
+            <div data-mode="check" hidden>
+              <label class="field">
+                <span>ТВОЙ ПАРОЛЬ</span>
+                <div class="pw-check-inp">
+                  <input class="inp" type="password" id="chk-in" placeholder="Вставь пароль для проверки" spellcheck="false" autocomplete="off">
+                  <button id="chk-eye" title="Показать">
+                    <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </label>
+              <div class="note">Проверка идёт только на твоём компьютере. Пароль никуда не отправляется и не попадает в историю.</div>
+            </div>
+
+            <label class="field" id="pw-count-f">
               <span>КОЛИЧЕСТВО <b id="pw-count-v">8</b></span>
               <input type="range" id="pw-count" min="1" max="50" value="8">
             </label>
@@ -364,6 +382,37 @@
         </div>
       </section>
 
+      <!-- ---------- TABLES ---------- -->
+      <section class="page" data-page="tables">
+        <div class="tool">
+          <div class="card cfg">
+            <span class="cap">КОЛОНКИ <span class="dim-cap" id="tb-cols-c"></span></span>
+            <div class="chips" id="tb-cols"></div>
+            <span class="cap">ФОРМАТ</span>
+            <div class="seg" id="tb-format">
+              <button class="on" data-v="csv">CSV</button>
+              <button data-v="json">JSON</button>
+              <button data-v="sql">SQL</button>
+            </div>
+            <label class="field" id="tb-table-f" hidden>
+              <span>ИМЯ ТАБЛИЦЫ</span>
+              <input class="inp" id="tb-table" value="users" spellcheck="false">
+            </label>
+            <span class="cap">ИМЕНА</span>
+            <div class="seg small" id="tb-locale">
+              <button class="on" data-v="ru">Русские</button>
+              <button data-v="en">Английские</button>
+            </div>
+            <label class="field">
+              <span>СТРОК <b id="tb-rows-v">50</b></span>
+              <input type="range" id="tb-rows" min="1" max="1000" value="50">
+            </label>
+            <button class="btn-main" id="tb-gen">Сгенерировать <i>›</i></button>
+          </div>
+          <div class="card sand results" id="tb-results"></div>
+        </div>
+      </section>
+
       <!-- ---------- HISTORY ---------- -->
       <section class="page" data-page="history">
         <div class="card sand results full" id="hist-results"></div>
@@ -409,6 +458,19 @@
           </div>
 
           <div class="card cfg">
+            <span class="cap">ТЕМА</span>
+            <div class="seg" id="set-theme">
+              <button data-v="light">Светлая</button>
+              <button data-v="dark">Тёмная</button>
+              <button data-v="system">Как в Windows</button>
+            </div>
+            <div class="divider"></div>
+            <span class="cap">ТРЕЙ И ГОРЯЧАЯ КЛАВИША</span>
+            <div class="toggles">
+              <label class="tgl"><input type="checkbox" id="set-tray"><i></i>Сворачивать в трей при закрытии</label>
+              <label class="tgl"><input type="checkbox" id="set-hotkey"><i></i><span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> — пароль в буфер из любой программы</span></label>
+            </div>
+            <div class="divider"></div>
             <span class="cap">ПОВЕДЕНИЕ</span>
             <div class="toggles">
               <label class="tgl"><input type="checkbox" id="set-autocopy"><i></i>Автокопирование, если сгенерирован 1 результат</label>

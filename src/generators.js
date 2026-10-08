@@ -338,6 +338,108 @@
     unix: { label: 'Unix-время', gen: () => String(Math.floor(Date.now() / 1000) - rnd.int(0, 5 * 365 * 86400)) },
   };
 
+  /* ---------------- Проверка пароля ---------------- */
+  const COMMON = new Set(('123456 123456789 12345678 password qwerty 111111 12345 1234567 1234567890 123123 000000 abc123 password1 iloveyou qwerty123 1q2w3e4r 1q2w3e 654321 666666 777777 987654321 qwertyuiop 123321 dragon monkey letmein football admin welcome login master sunshine princess shadow superman michael baseball zaq12wsx qazwsx 1qaz2wsx passw0rd trustno1 starwars hello 121212 112233 696969 ' +
+    'йцукен пароль привет любовь солнышко').split(' '));
+  const SEQS = ['0123456789', 'abcdefghijklmnopqrstuvwxyz', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', 'йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю'];
+
+  function hasSequence(pw) {
+    const low = pw.toLowerCase();
+    for (const seq of SEQS) {
+      const both = seq + ' ' + [...seq].reverse().join('');
+      for (let i = 0; i + 4 <= low.length; i++) if (both.includes(low.slice(i, i + 4))) return true;
+    }
+    return false;
+  }
+
+  // Человеческое время для числа секунд
+  function humanTime(sec) {
+    if (sec < 1) return 'мгновенно';
+    const units = [['лет', 31536000], ['дней', 86400], ['часов', 3600], ['минут', 60], ['секунд', 1]];
+    if (sec > 31536000 * 1e9) return 'дольше возраста Вселенной';
+    for (const [name, size] of units) {
+      if (sec >= size) {
+        const n = sec / size;
+        if (name === 'лет' && n >= 1e6) return `${(n / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} млн лет`;
+        if (name === 'лет' && n >= 1e3) return `${(n / 1e3).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} тыс. лет`;
+        return `${Math.round(n).toLocaleString('ru-RU')} ${name}`;
+      }
+    }
+    return 'мгновенно';
+  }
+
+  function analyze(pw) {
+    const c = composition(pw);
+    const common = COMMON.has(pw.toLowerCase());
+    const repeats = /(.)\1{2,}/.test(pw);
+    const seq = hasSequence(pw);
+    let bits = entropy(pw);
+    // штрафы за предсказуемость
+    if (repeats) bits = Math.round(bits * 0.75);
+    if (seq) bits = Math.round(bits * 0.7);
+    if (common) bits = Math.min(bits, 8);
+    const offline = Math.pow(2, bits) / 2 / 1e10; // GPU-перебор быстрого хеша
+    const online = Math.pow(2, bits) / 2 / 100;   // перебор через форму входа
+    const score = bits < 28 ? 0 : bits < 45 ? 1 : bits < 60 ? 2 : bits < 80 ? 3 : 4;
+    const checks = [
+      { ok: pw.length >= 12, text: 'Длина от 12 символов', hint: `сейчас ${pw.length}` },
+      { ok: c.upper > 0, text: 'Есть заглавные буквы' },
+      { ok: c.lower > 0, text: 'Есть строчные буквы' },
+      { ok: c.digits > 0, text: 'Есть цифры' },
+      { ok: c.symbols > 0, text: 'Есть спецсимволы' },
+      { ok: !repeats, text: 'Нет повторов вроде «aaa»' },
+      { ok: !seq, text: 'Нет последовательностей вроде «1234», «qwer»' },
+      { ok: !common, text: 'Не из списка популярных паролей' },
+    ];
+    return {
+      bits, score,
+      label: ['Очень слабый', 'Слабый', 'Средний', 'Надёжный', 'Очень надёжный'][score],
+      offline: humanTime(offline), online: humanTime(online),
+      checks,
+    };
+  }
+
+  /* ---------------- Тестовые таблицы ---------------- */
+  const TABLE_COLUMNS = {
+    id: { label: 'ID (UUID)', get: () => uuid4() },
+    full_name: { label: 'Полное имя', get: (p) => p.full },
+    first_name: { label: 'Имя', get: (p) => p.first },
+    last_name: { label: 'Фамилия', get: (p) => p.last },
+    gender: { label: 'Пол', get: (p) => (p.gender === 'male' ? 'M' : 'F') },
+    email: { label: 'Почта', get: (p) => p.email },
+    phone: { label: 'Телефон', get: (p) => p.phone },
+    birth_date: { label: 'Дата рождения', get: (p) => p.birth.split('.').reverse().join('-') },
+    age: { label: 'Возраст', get: (p) => p.age },
+    city: { label: 'Город', get: (p) => p.city },
+    address: { label: 'Адрес', get: (p) => p.address },
+    zip: { label: 'Индекс', get: (p) => p.zip },
+    username: { label: 'Логин', get: (p) => p.username },
+    password: { label: 'Пароль', get: (p) => p.password },
+    ip: { label: 'IPv4', get: () => ipv4() },
+    created_at: { label: 'Создан', get: () => new Date(Date.now() - rnd.int(0, 730) * 864e5 - rnd.int(0, 86399) * 1e3).toISOString().slice(0, 19).replace('T', ' ') },
+  };
+
+  function tableRows(cols, n, locale) {
+    return Array.from({ length: n }, () => {
+      const p = identity(locale);
+      const row = {};
+      cols.forEach((k) => { row[k] = TABLE_COLUMNS[k].get(p); });
+      return row;
+    });
+  }
+
+  function formatTable(rows, cols, format, table = 'users') {
+    if (format === 'json') return JSON.stringify(rows, null, 2);
+    if (format === 'csv') {
+      const cell = (v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+      return [cols.join(','), ...rows.map((r) => cols.map((k) => cell(r[k])).join(','))].join('\n');
+    }
+    const name = (table.replace(/[^\w]/g, '') || 'users');
+    const val = (v) => (typeof v === 'number' ? v : `'${String(v).replace(/'/g, "''")}'`);
+    const head = `INSERT INTO ${name} (${cols.join(', ')}) VALUES`;
+    return `${head}\n${rows.map((r) => `  (${cols.map((k) => val(r[k])).join(', ')})`).join(',\n')};`;
+  }
+
   window.Gen = {
     rnd, password, passphrase, entropy, composition,
     KEY_TYPES, hash, uuid4,
@@ -345,5 +447,6 @@
     COUNTRIES, phone,
     identity, testCard,
     MISC_TYPES,
+    analyze, TABLE_COLUMNS, tableRows, formatTable,
   };
 })();

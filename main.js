@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain, clipboard, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, dialog, shell, Tray, Menu, nativeImage, globalShortcut, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let win;
+let tray = null;
+let quitting = false;
+const ICON = path.join(__dirname, 'src', 'assets', 'icon.png');
 
 /* ---------------- один экземпляр ---------------- */
 // Два окна делили бы одно хранилище и перетирали данные друг друга
@@ -10,12 +13,7 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    if (!win) return;
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-  });
+  app.on('second-instance', () => showWindow());
 }
 
 /* ---------------- хранилище ---------------- */
@@ -33,6 +31,8 @@ function writeData() {
   fs.writeFileSync(tmp, JSON.stringify(data));
   fs.renameSync(tmp, dataFile);
 }
+
+const prefs = () => Object.assign({ tray: true, hotkey: true }, data['qb.settings'] || {});
 
 ipcMain.on('store:all', (e) => { e.returnValue = data; });
 ipcMain.on('store:set', (e, key, value) => {
@@ -56,7 +56,7 @@ function createWindow() {
     frame: false,
     backgroundColor: '#121212',
     title: 'q-b.util',
-    icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
+    icon: ICON,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -71,7 +71,55 @@ function createWindow() {
   win.on('maximize', () => win.webContents.send('win:state', true));
   win.on('unmaximize', () => win.webContents.send('win:state', false));
   win.on('closed', () => { win = null; });
+  // Крестик прячет окно в трей, если это включено в настройках
+  win.on('close', (e) => {
+    if (!quitting && prefs().tray) {
+      e.preventDefault();
+      win.hide();
+    }
+  });
 }
+
+function showWindow() {
+  if (!win) return createWindow();
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+/* ---------------- трей и горячая клавиша ---------------- */
+const quickGen = (kind) => { if (win) win.webContents.send('quick:gen', kind); };
+
+function buildTray() {
+  if (tray) return;
+  tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: 16, height: 16 }));
+  tray.setToolTip('q-b.util');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Открыть q-b.util', click: showWindow },
+    { type: 'separator' },
+    { label: 'Пароль в буфер', accelerator: 'CommandOrControl+Shift+Q', click: () => quickGen('password') },
+    { label: 'UUID в буфер', click: () => quickGen('uuid') },
+    { label: 'Почта в буфер', click: () => quickGen('email') },
+    { label: 'Телефон RU в буфер', click: () => quickGen('phone') },
+    { type: 'separator' },
+    { label: 'Выйти', click: () => { quitting = true; app.quit(); } },
+  ]));
+  tray.on('click', showWindow);
+}
+
+function applyPrefs() {
+  const p = prefs();
+  if (p.tray) buildTray();
+  else if (tray) { tray.destroy(); tray = null; }
+
+  globalShortcut.unregisterAll();
+  if (p.hotkey) globalShortcut.register('CommandOrControl+Shift+Q', () => quickGen('password'));
+}
+
+ipcMain.on('prefs:apply', applyPrefs);
+ipcMain.on('notify', (_e, title, body) => {
+  if (Notification.isSupported()) new Notification({ title, body, icon: ICON, silent: true }).show();
+});
 
 ipcMain.on('win:minimize', () => win.minimize());
 ipcMain.on('win:maximize', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
@@ -85,7 +133,7 @@ ipcMain.handle('clipboard:write', (_e, text) => {
 ipcMain.handle('file:save', async (_e, { name, content }) => {
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     defaultPath: name,
-    filters: [{ name: 'Text', extensions: ['txt', 'csv', 'json'] }],
+    filters: [{ name: 'Text', extensions: ['txt', 'csv', 'json', 'sql'] }],
   });
   if (canceled || !filePath) return false;
   fs.writeFileSync(filePath, content, 'utf8');
@@ -133,7 +181,10 @@ ipcMain.handle('upd:check', () => {
   return updState;
 });
 ipcMain.on('upd:install', () => {
-  if (updater && updState.state === 'ready') updater.quitAndInstall(false, true);
+  if (updater && updState.state === 'ready') {
+    quitting = true;
+    updater.quitAndInstall(false, true);
+  }
 });
 ipcMain.on('upd:releases', () => shell.openExternal(RELEASES_URL));
 
@@ -141,6 +192,9 @@ app.setAppUserModelId('util.qb.app');
 app.whenReady().then(() => {
   if (!gotLock) return;
   createWindow();
+  applyPrefs();
   setupUpdater();
 });
+app.on('before-quit', () => { quitting = true; });
+app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed', () => app.quit());
