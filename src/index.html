@@ -425,10 +425,15 @@
             <div class="pl-head">
               <div class="pl-wallet">
                 <span class="cap">БАЛАНС</span>
-                <div class="pl-coins"><i class="coin"></i><b id="pl-coins">0</b></div>
+                <div class="pl-coins"><i class="coin"></i><b id="pl-coins">0</b><svg class="pl-spark" id="pl-spark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg></div>
                 <div class="pl-spins">Круток: <b id="pl-spins">0</b> · отдача ≈ <b id="pl-rtp">93%</b></div>
+                <div class="pl-level">
+                  <div class="pl-level-top"><span><b id="pl-title">Пешеход</b> · ур. <b id="pl-lvl">1</b></span><small id="pl-xp-t"></small></div>
+                  <div class="pl-xpbar"><i id="pl-xp"></i></div>
+                </div>
               </div>
               <div class="pl-head-right">
+                <div class="pl-jackpot"><span>💎 ДЖЕКПОТ</span><b><i class="coin"></i><span id="pl-jp">500</span></b></div>
                 <button class="pl-daily" id="pl-daily" hidden>🎁 <span id="pl-daily-t">Бонус дня</span></button>
                 <div class="pl-tier" id="pl-tier" hidden><i></i><span id="pl-tier-name">Обычный</span></div>
               </div>
@@ -450,6 +455,18 @@
                 </div>
               </div>
               <div class="pl-win" id="pl-win"></div>
+              <div class="pl-risk" id="pl-risk" hidden>
+                <div class="risk-coin" id="risk-coin"><i class="f h">О</i><i class="f t">Р</i></div>
+                <div class="risk-title" id="risk-title"></div>
+                <div class="risk-row" id="risk-pick">
+                  <button class="pill pill-white" data-side="heads">Орёл</button>
+                  <button class="pill pill-white" data-side="tails">Решка</button>
+                </div>
+                <div class="risk-row" id="risk-after" hidden>
+                  <button class="pill pill-white" id="risk-again">Ещё ×2</button>
+                  <button class="pill pill-white" id="risk-take">Забрать</button>
+                </div>
+              </div>
             </div>
 
             <div class="pl-result" id="pl-result">
@@ -458,6 +475,7 @@
               <div class="pl-reasons" id="pl-reasons"></div>
             </div>
 
+            <div class="pl-ostrip" id="pl-ostrip"></div>
             <div class="pl-bets">
               <span class="cap">СТАВКА</span>
               <div class="seg small" id="pl-bet"></div>
@@ -465,8 +483,10 @@
             <div class="pl-actions">
               <button class="pl-spin" id="pl-spin"><span>КРУТИТЬ</span><em id="pl-cost"><i class="coin"></i>10</em></button>
               <button class="pill pill-white" id="pl-auto" hidden>×10</button>
-              <button class="pill pill-white" id="pl-copy">Копировать</button>
-              <button class="pill pill-white" id="pl-qr">QR</button>
+              <button class="pill pill-white pl-risk-btn" id="pl-risk-btn" hidden></button>
+              <button class="pill pill-white" id="pl-duel">⚔️ Батл</button>
+              <button class="pill pill-white icon" id="pl-copy" title="Копировать номер">⧉</button>
+              <button class="pill pill-white icon" id="pl-qr" title="QR-код номера">QR</button>
             </div>
             <button class="pl-batya" id="pl-batya" hidden>Занять у бати 💸 +30</button>
           </div>
@@ -474,11 +494,13 @@
           <div class="card sand pl-side">
             <div class="seg small pl-tabs" id="pl-tabs">
               <button class="on" data-v="shop">Магазин</button>
-              <button data-v="quests">Задания <i class="pl-badge" id="pl-qbadge" hidden></i></button>
-              <button data-v="best">Коллекция</button>
+              <button data-v="orders">Заказы</button>
+              <button data-v="quests">Квесты <i class="pl-badge" id="pl-qbadge" hidden></i></button>
+              <button data-v="best">Гараж</button>
               <button data-v="odds">Шансы</button>
             </div>
             <div class="pl-panel" data-tab="shop" id="pl-shop"></div>
+            <div class="pl-panel" data-tab="orders" id="pl-orders" hidden></div>
             <div class="pl-panel" data-tab="quests" id="pl-quests" hidden></div>
             <div class="pl-panel" data-tab="best" hidden>
               <div class="pl-best" id="pl-best"></div>
@@ -600,6 +622,35 @@
       <button class="pill pill-dark" id="qr-save">Сохранить PNG</button>
       <button class="pill pill-white" id="qr-copy">Копировать текст</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="wheel-modal" hidden>
+  <div class="modal-card wheel-card">
+    <div class="card-head"><span class="cap">КОЛЕСО ФОРТУНЫ · РАЗ В ДЕНЬ</span><button class="dots" id="wheel-close">✕</button></div>
+    <div class="wheel-wrap">
+      <i class="wheel-arrow"></i>
+      <svg id="wheel-svg" viewBox="0 0 220 220"></svg>
+    </div>
+    <div class="wheel-streak" id="wheel-streak"></div>
+    <div class="wheel-res" id="wheel-res"></div>
+    <button class="btn-main" id="wheel-go">Крутить колесо <i>›</i></button>
+  </div>
+</div>
+
+<div class="modal" id="duel-modal" hidden>
+  <div class="modal-card duel-card">
+    <div class="card-head"><span class="cap">⚔️ БАТЛ НОМЕРОВ</span><button class="dots" id="duel-close">✕</button></div>
+    <div class="duel-arena">
+      <div class="duel-side"><span class="duel-who">ТЫ</span><div class="duel-plate" id="duel-me"></div><div class="duel-sc" id="duel-me-sc"></div></div>
+      <div class="duel-vs">VS</div>
+      <div class="duel-side"><span class="duel-who">АШОТ · ГАРАЖ №5</span><div class="duel-plate" id="duel-bot"></div><div class="duel-sc" id="duel-bot-sc"></div></div>
+    </div>
+    <div class="duel-res" id="duel-res"></div>
+    <span class="cap">СТАВКА</span>
+    <div class="seg small" id="duel-stakes"></div>
+    <button class="btn-main" id="duel-go">В бой <i>›</i></button>
+    <div class="note" id="duel-rec"></div>
   </div>
 </div>
 

@@ -176,10 +176,94 @@
     { id: 'rich', name: 'Накопи 5 000 монет', reward: 400, done: (s) => s.coins >= 5000, progress: (s) => [Math.min(s.coins, 5000), 5000] },
   ];
 
+
+  /* ---------------- заказы, уровни, колесо ---------------- */
+  // Награда за заказ ≈ 0.15 / вероятность: в среднем заказ добавляет ~1.5% отдачи на ставке ×1
+  const ORDER_K = 0.15, ORDER_MIN = 15;
+  const pickL = () => rnd.pick(LETTERS);
+  const regionGroups = (() => {
+    const g = {};
+    Object.entries(REGIONS).forEach(([code, name]) => { (g[name] = g[name] || []).push(code); });
+    delete g['Москва'];
+    delete g['Санкт-Петербург'];
+    return Object.entries(g);
+  })();
+
+  const ORDER_TEMPLATES = [
+    { w: 1, make: () => {
+      const d = String(rnd.int(1, 9)).repeat(3);
+      return { text: `Цифры ${d}`, p: 1 / 999 };
+    } },
+    { w: 2, make: () => ({ text: 'Три одинаковые цифры', p: 0.0089 }) },
+    { w: 2, make: () => {
+      const a = pickL(), b = pickL();
+      return { text: `Начинается на ${a}, кончается на ${b}`, p: 1 / 144 };
+    } },
+    { w: 2, make: () => {
+      const s = pickL() + pickL();
+      return { text: `Серия заканчивается на ${s}`, p: 1 / 144 };
+    } },
+    { w: 2, make: () => ({ text: 'Три одинаковые буквы', p: 0.007 }) },
+    { w: 2, make: () => ({ text: 'Цифры по порядку (123, 987…)', p: 0.0157 }) },
+    { w: 2, make: () => ({ text: 'Номер-слово (КОТ, РОК…)', p: 0.0155 }) },
+    { w: 1, make: () => ({ text: 'Любой «Легендарный» или выше', p: 0.0019 }) },
+    { w: 3, make: () => {
+      const [name, codes] = rnd.pick(regionGroups);
+      return {
+        text: `${name} (${codes.join(', ')}) и «Необычный»+`,
+        p: (codes.length / REGION_CODES.length) * 0.28,
+      };
+    } },
+  ];
+  const ORDER_TTL = 20 * 60000;
+  const CLIENTS = ['Ашот', 'Гоша с рынка', 'Дядя Валера', 'Тимур', 'Серёга-таксист', 'Рустам', 'Михалыч', 'Арсен', 'Батя Кирилла', 'Жека'];
+
+  function makeOrder() {
+    const total = ORDER_TEMPLATES.reduce((s, t) => s + t.w, 0);
+    let r = rnd.int(0, total - 1), tpl = ORDER_TEMPLATES[0];
+    for (const t of ORDER_TEMPLATES) { if ((r -= t.w) < 0) { tpl = t; break; } }
+    const o = tpl.make();
+    return {
+      id: Date.now().toString(36) + rnd.int(0, 1e6).toString(36),
+      tpl: ORDER_TEMPLATES.indexOf(tpl), text: o.text, client: rnd.pick(CLIENTS),
+      reward: Math.max(ORDER_MIN, Math.round(ORDER_K / o.p / 5) * 5),
+      expires: Date.now() + ORDER_TTL,
+    };
+  }
+
+  // Условие заказа восстанавливаем из текста — так заказы переживают перезапуск
+  function orderTest(order, pl, sc) {
+    const t = order.text;
+    let m;
+    if ((m = t.match(/^Цифры (\d{3})$/))) return pl.digits === m[1];
+    if (t === 'Три одинаковые цифры') return /^(\d)\1\1$/.test(pl.digits);
+    if ((m = t.match(/^Начинается на (.), кончается на (.)$/))) return pl.l1 === m[1] && pl.l2[1] === m[2];
+    if ((m = t.match(/^Серия заканчивается на (..)$/))) return pl.l2 === m[1];
+    if (t === 'Три одинаковые буквы') return pl.l1 === pl.l2[0] && pl.l2[0] === pl.l2[1];
+    if (t.startsWith('Цифры по порядку')) return '0123456789'.includes(pl.digits) || '9876543210'.includes(pl.digits);
+    if (t.startsWith('Номер-слово')) return sc.reasons.some((r) => r.key === 'word');
+    if (t.startsWith('Любой «Легендарный»')) return TIERS.indexOf(sc.tier) >= 4;
+    if ((m = t.match(/\(([\d, ]+)\) и «Необычный»\+$/))) return m[1].split(', ').includes(pl.region) && TIERS.indexOf(sc.tier) >= 1;
+    return false;
+  }
+
+  // Уровни: опыт за крутку 1 + 2×редкость, награда за уровень небольшая
+  const xpNeed = (lvl) => 40 + 20 * (lvl - 1);
+  const levelReward = (lvl) => 6 + 3 * lvl;
+  const TITLES = [
+    [1, 'Пешеход'], [3, 'Таксист'], [6, 'Бомбила'], [10, 'Перекупщик'], [15, 'Блатной'],
+    [22, 'Авторитет'], [30, 'Вор в законе'], [40, 'Смотрящий за ГИБДД'],
+  ];
+  const titleFor = (lvl) => [...TITLES].reverse().find(([l]) => lvl >= l)[1];
+
+  const JACKPOT_SEED = 500, JACKPOT_RATE = 0.03;
+  const WHEEL = [30, 50, 75, 100, 50, 150, 30, 300];
+
   const format = (p) => `${p.l1}${p.digits}${p.l2}${p.region}`;
 
   window.Plates = {
     LETTERS, DIGITS, REGIONS, REGION_CODES, TIERS, ODDS, random, score, format,
     SPIN_COST, PAYOUT, BETS, UPGRADES, SKINS, QUESTS,
+    makeOrder, orderTest, ORDER_TTL, xpNeed, levelReward, titleFor, JACKPOT_SEED, JACKPOT_RATE, WHEEL,
   };
 })();

@@ -564,6 +564,14 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '1.6.0': [
+      'Заказы клиентов: выбей нужный номер — получи награду сверху',
+      'Уровни и звания от «Пешехода» до «Смотрящего за ГИБДД»',
+      'Прогрессивный джекпот — забирает тот, кто выбьет мифик',
+      'Риск ×2 после выигрыша: орёл или решка, до 5 раз подряд',
+      'Батл с Ашотом: у кого номер блатнее — забирает ставку',
+      'Колесо фортуны вместо ежедневного бонуса и график баланса',
+    ],
     '1.5.0': [
       'Рулетка номеров стала игрой: монеты, ставки и выплаты за редкость',
       'Магазин улучшений: связи в ГИБДД, московская прописка, перекупщик, гараж с пассивным доходом, автокрутка ×10',
@@ -802,9 +810,10 @@
     spins: 0, best: [], coins: 100, upgrades: {}, skins: ['classic'], skin: 'classic', quests: {},
     tiers: {}, flags: {}, bestWin: 0, won: 0, spent: 0, daily: { last: '', streak: 0 },
     garageTs: Date.now(), batyaTs: 0, bet: 1,
+    xp: 0, level: 1, orders: [], jackpot: P.JACKPOT_SEED, hist: [], duels: { w: 0, l: 0 },
   };
   const plState = Object.assign({}, PL_DEFAULT, load('qb.plates', {}));
-  let plCurrent = null, plSpinning = false, plAuto = false;
+  let plCurrent = null, plSpinning = false, plAuto = false, riskPot = 0, riskStep = 0;
 
   const lvl = (id) => plState.upgrades[id] || 0;
   const upg = (id) => P.UPGRADES.find((u) => u.id === id);
@@ -849,15 +858,52 @@
     const streak = plState.daily.last === dayKey(y) ? plState.daily.streak + 1 : 1;
     return { streak, reward: 50 + 10 * Math.min(streak - 1, 10) };
   }
+  /* --- колесо фортуны раз в день --- */
+  const WHEEL_COLORS = ['#e4f07e', '#8ed3c6', '#e2a6c6', '#b6b0e6', '#f0d77a', '#e8b48c', '#8ed3c6', '#ff4d6d'];
+  let wheelAngle = 0, wheelBusy = false;
+  function drawWheel() {
+    const n = P.WHEEL.length, R = 100, seg = (2 * Math.PI) / n;
+    const parts = P.WHEEL.map((v, i) => {
+      const a0 = i * seg - Math.PI / 2, a1 = a0 + seg;
+      const x0 = 110 + R * Math.cos(a0), y0 = 110 + R * Math.sin(a0);
+      const x1 = 110 + R * Math.cos(a1), y1 = 110 + R * Math.sin(a1);
+      const am = a0 + seg / 2, tx = 110 + R * 0.66 * Math.cos(am), ty = 110 + R * 0.66 * Math.sin(am);
+      return `<path d="M110 110 L${x0} ${y0} A${R} ${R} 0 0 1 ${x1} ${y1} Z" fill="${WHEEL_COLORS[i]}" stroke="#111" stroke-width="1.5"/>
+        <text x="${tx}" y="${ty}" transform="rotate(${(am * 180) / Math.PI + 90} ${tx} ${ty})">${v}</text>`;
+    }).join('');
+    $('#wheel-svg').innerHTML = `<g id="wheel-rot">${parts}<circle cx="110" cy="110" r="16" fill="#111"/></g>`;
+  }
   $('#pl-daily').onclick = () => {
     const d = dailyInfo();
     if (!d) return;
-    plState.daily = { last: dayKey(), streak: d.streak };
-    setCoins(d.reward);
-    floatWin(`+${d.reward}`, '#f0b35a');
-    toast(`Бонус дня: +${d.reward} · серия ${d.streak} дн.`);
-    renderWallet();
+    drawWheel();
+    $('#wheel-streak').textContent = `Серия: ${d.streak} дн. · множитель ×${(1 + 0.1 * Math.min(d.streak - 1, 10)).toFixed(1)}`;
+    $('#wheel-res').textContent = '';
+    $('#wheel-go').hidden = false;
+    $('#wheel-modal').hidden = false;
   };
+  $('#wheel-go').onclick = () => {
+    const d = dailyInfo();
+    if (!d || wheelBusy) return;
+    wheelBusy = true;
+    $('#wheel-go').hidden = true;
+    const n = P.WHEEL.length, i = G.rnd.int(0, n - 1), seg = 360 / n;
+    // крутим так, чтобы под стрелкой (сверху) оказался сектор i
+    wheelAngle += 360 * 6 + (360 - (wheelAngle % 360)) - (i * seg + seg / 2) + G.rnd.int(-12, 12);
+    const rot = $('#wheel-rot');
+    rot.style.transition = 'transform 4.2s cubic-bezier(.12, .7, .1, 1)';
+    rot.style.transform = `rotate(${wheelAngle}deg)`;
+    setTimeout(() => {
+      const reward = Math.round(P.WHEEL[i] * (1 + 0.1 * Math.min(d.streak - 1, 10)));
+      plState.daily = { last: dayKey(), streak: d.streak };
+      setCoins(reward);
+      $('#wheel-res').innerHTML = `Выпало <b>${P.WHEEL[i]}</b> → <b><i class="coin"></i>${reward}</b>`;
+      floatWin(`+${reward}`, '#f0b35a');
+      wheelBusy = false;
+      renderWallet();
+    }, 4300);
+  };
+  $('#wheel-close').onclick = () => { if (!wheelBusy) $('#wheel-modal').hidden = true; };
 
   /* --- батя выручит, если всё проиграл --- */
   $('#pl-batya').onclick = () => {
@@ -870,8 +916,39 @@
     toast('Батя дал 30 монет. Не проиграй всё сразу');
   };
 
+  function renderSpark() {
+    const h = plState.hist;
+    if (h.length < 2) { $('#pl-spark').innerHTML = ''; return; }
+    const min = Math.min(...h), max = Math.max(...h), span = max - min || 1;
+    const pts = h.map((v, i) => `${(i / (h.length - 1)) * 120},${28 - ((v - min) / span) * 26}`).join(' ');
+    const up = h[h.length - 1] >= h[0];
+    $('#pl-spark').innerHTML = `<polyline points="${pts}" fill="none" stroke="${up ? '#5fc2ae' : '#e5484d'}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
+  }
+
+  function renderLevel() {
+    const need = P.xpNeed(plState.level);
+    $('#pl-lvl').textContent = plState.level;
+    $('#pl-title').textContent = P.titleFor(plState.level);
+    $('#pl-xp').style.width = Math.min(100, (plState.xp / need) * 100) + '%';
+    $('#pl-xp-t').textContent = `${plState.xp} / ${need} XP`;
+  }
+
+  function addXp(n) {
+    plState.xp += n;
+    while (plState.xp >= P.xpNeed(plState.level)) {
+      plState.xp -= P.xpNeed(plState.level);
+      plState.level++;
+      const r = P.levelReward(plState.level);
+      plState.coins += r;
+      toast(`Уровень ${plState.level}: «${P.titleFor(plState.level)}» · +${r}`);
+    }
+  }
+
   function renderWallet() {
     $('#pl-coins').textContent = fmt(plState.coins);
+    $('#pl-jp').textContent = fmt(plState.jackpot);
+    renderLevel();
+    renderSpark();
     $('#pl-spins').textContent = fmt(plState.spins);
     $('#pl-rtp').textContent = rtp() + '%';
     const d = dailyInfo();
@@ -971,6 +1048,39 @@
     }
   };
 
+  /* --- заказы клиентов --- */
+  function ensureOrders() {
+    const now = Date.now();
+    plState.orders = plState.orders.filter((o) => o.expires > now);
+    while (plState.orders.length < 2) plState.orders.push(P.makeOrder());
+  }
+  const ORDER_REROLL = 15;
+  function renderOrders() {
+    ensureOrders();
+    const now = Date.now();
+    $('#pl-orders').innerHTML = plState.orders.map((o, i) => {
+      const left = Math.max(0, o.expires - now), m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
+      return `
+        <div class="order">
+          <div class="order-top"><span class="order-client">${o.client}</span><span class="order-time">⏱ ${m}:${String(sec).padStart(2, '0')}</span></div>
+          <div class="order-text">${o.text}</div>
+          <div class="order-bottom">
+            <b><i class="coin"></i>${fmt(o.reward)}</b>
+            <button class="order-reroll" data-o="${i}" ${plState.coins < ORDER_REROLL ? 'disabled' : ''} title="Другой заказ">↻ <i class="coin"></i>${ORDER_REROLL}</button>
+          </div>
+        </div>`;
+    }).join('') + '<div class="note">Выбей подходящий номер — получишь награду сверху выигрыша. Заказ сгорает через 20 минут.</div>';
+    $('#pl-ostrip').innerHTML = plState.orders.map((o) => `<span class="ostrip" title="${o.client}"><em>📦</em>${o.text}<b><i class="coin"></i>${fmt(o.reward)}</b></span>`).join('');
+  }
+  $('#pl-orders').onclick = (e) => {
+    const b = e.target.closest('[data-o]');
+    if (!b || plState.coins < ORDER_REROLL) return;
+    plState.orders[+b.dataset.o] = P.makeOrder();
+    setCoins(-ORDER_REROLL);
+    renderOrders();
+  };
+  setInterval(() => { if (current === 'plates') renderOrders(); }, 1000);
+
   /* --- задания --- */
   function claimable() {
     return P.QUESTS.filter((q) => q.done(plState) && !plState.quests[q.id]).length;
@@ -1041,6 +1151,7 @@
   function refreshPlates() {
     $('#plate').className = `plate skin-${plState.skin}`;
     renderWallet();
+    renderOrders();
     renderShop();
     renderQuests();
     renderBest();
@@ -1097,8 +1208,61 @@
     w.classList.add('go');
   }
 
+  /* --- риск ×2: честные 50/50 --- */
+  function showRiskBtn() {
+    const b = $('#pl-risk-btn');
+    b.hidden = !(riskPot >= 10 && riskStep < 5);
+    b.innerHTML = `🪙 Рискнуть ×2 <em>${fmt(riskPot)} → ${fmt(riskPot * 2)}</em>`;
+  }
+  $('#pl-risk-btn').onclick = () => {
+    if (riskPot < 10 || plSpinning) return;
+    $('#pl-risk').hidden = false;
+    $('#risk-title').innerHTML = `На кону <b><i class="coin"></i>${fmt(riskPot)}</b> — угадаешь, станет ${fmt(riskPot * 2)}`;
+    $('#risk-coin').className = 'risk-coin';
+    $('#risk-pick').hidden = false;
+    $('#risk-after').hidden = true;
+  };
+  $('#risk-pick').onclick = (e) => {
+    const b = e.target.closest('[data-side]');
+    if (!b || riskPot < 10) return;
+    $('#risk-pick').hidden = true;
+    const side = b.dataset.side, res = G.rnd.int(0, 1) ? 'heads' : 'tails';
+    const stake = riskPot;
+    setCoins(-stake);
+    const coin = $('#risk-coin');
+    coin.className = 'risk-coin';
+    void coin.offsetWidth;
+    coin.classList.add('flip-' + res);
+    setTimeout(() => {
+      riskStep++;
+      if (res === side) {
+        riskPot = stake * 2;
+        setCoins(riskPot);
+        plState.won += stake;
+        plState.bestWin = Math.max(plState.bestWin, riskPot);
+        floatWin(`×2 = ${fmt(riskPot)}`, '#5fc2ae');
+        $('#risk-title').innerHTML = `Угадал! Теперь <b><i class="coin"></i>${fmt(riskPot)}</b>`;
+        $('#risk-again').hidden = riskStep >= 5;
+      } else {
+        floatWin(`−${fmt(stake)}`, '#e5484d');
+        $('#risk-title').innerHTML = 'Не повезло — всё сгорело';
+        riskPot = 0;
+        $('#risk-again').hidden = true;
+      }
+      $('#risk-after').hidden = false;
+      savePl();
+      showRiskBtn();
+      refreshPlates();
+    }, 1600);
+  };
+  $('#risk-again').onclick = () => $('#pl-risk-btn').onclick();
+  $('#risk-take').onclick = () => { $('#pl-risk').hidden = true; riskPot = 0; showRiskBtn(); };
+
   async function spinPlate(fast) {
     if (plSpinning) return false;
+    $('#pl-risk').hidden = true;
+    riskPot = 0;
+    showRiskBtn();
     const cost = spinCost();
     if (plState.coins < cost) {
       toast(plState.coins < P.SPIN_COST ? 'Монеты кончились — займи у бати или подожди гараж' : 'Не хватает на эту ставку');
@@ -1108,6 +1272,7 @@
     $('#pl-spin').disabled = true;
     setCoins(-cost);
     plState.spent += cost;
+    plState.jackpot += cost * P.JACKPOT_RATE;
 
     const card = $('#pl-card');
     card.className = 'card plate-card spinning';
@@ -1131,7 +1296,25 @@
     await Promise.all(reels.map((r, i) => spinReel(r, finals[i], pools[i], Math.round((14 + i * 4) * k), Math.round((900 + i * 210) * k))));
 
     const t = sc.tier;
-    const win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult());
+    let win = Math.round(P.PAYOUT[t.id] * plState.bet * payMult());
+    const extras = [];
+    // джекпот уходит мифику
+    if (t.id === 'mythic') {
+      const jp = Math.floor(plState.jackpot);
+      win += jp;
+      extras.push(`<span class="pl-reason jp"><b>💎</b>ДЖЕКПОТ <em>+${fmt(jp)}</em></span>`);
+      plState.jackpot = P.JACKPOT_SEED;
+    }
+    // заказы клиентов
+    ensureOrders();
+    plState.orders = plState.orders.filter((o) => {
+      if (!P.orderTest(o, p, sc)) return true;
+      win += o.reward;
+      extras.push(`<span class="pl-reason order-done"><b>📦</b>${o.client}: заказ выполнен <em>+${fmt(o.reward)}</em></span>`);
+      toast(`Заказ «${o.text}» выполнен: +${fmt(o.reward)}`);
+      return false;
+    });
+    addXp(1 + P.TIERS.indexOf(t) * 2);
     plCurrent = p;
     plState.spins++;
     plState.won += win;
@@ -1144,6 +1327,9 @@
       plState.best = plState.best.slice(0, 15);
     }
     setCoins(win);
+    plState.hist.push(plState.coins);
+    plState.hist = plState.hist.slice(-60);
+    savePl();
     record('misc', 'Номер авто', [P.format(p)]);
 
     card.className = `card plate-card tier-${t.id}`;
@@ -1156,6 +1342,7 @@
       ? sc.reasons.map((r) => `<span class="pl-reason"><b>${r.label}</b>${r.text}${r.pts ? ` <em>+${r.pts}</em>` : ''}</span>`)
       : ['<span class="pl-reason muted">Ничего особенного — обычный номер</span>'];
     if (second) chips.push('<span class="pl-reason"><b>🤝</b>связи сработали — крутка ×2</span>');
+    chips.push(...extras);
     $('#pl-reasons').innerHTML = chips.join('');
     void $('#pl-result').offsetWidth;
     $('#pl-result').classList.add('show');
@@ -1167,6 +1354,9 @@
     refreshPlates();
     plSpinning = false;
     $('#pl-spin').disabled = false;
+    riskPot = win;
+    riskStep = 0;
+    showRiskBtn();
     return order;
   }
 
@@ -1183,6 +1373,87 @@
     $('#pl-auto').classList.remove('running');
   }
 
+  /* --- батл: кто выбьет номер блатнее --- */
+  const TAUNTS_WIN = ['Ашот: «Слышь, это нечестно!»', 'Ашот: «Ладно, сегодня твой день»', 'Ашот: «Я просто разминался»', 'Ашот: «Реванш, брат, реванш!»'];
+  const TAUNTS_LOSE = ['Ашот: «Учись, пока я жив»', 'Ашот: «Номера — это искусство»', 'Ашот: «Приходи ещё, монетки нужны»', 'Ашот: «Хе-хе, гараж мой»'];
+  let duelStake = 10, duelBusy = false;
+  const DUEL_STAKES = [10, 50, 100, 500];
+
+  function renderDuelStakes() {
+    $('#duel-stakes').innerHTML = DUEL_STAKES.map((v) => `<button data-v="${v}" class="${v === duelStake ? 'on' : ''}" ${plState.coins < v ? 'disabled' : ''}>${v}</button>`).join('');
+    $('#duel-rec').textContent = `Счёт: ты ${plState.duels.w} — ${plState.duels.l} Ашот`;
+  }
+  $('#duel-stakes').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled || duelBusy) return;
+    duelStake = +b.dataset.v;
+    renderDuelStakes();
+  };
+  $('#pl-duel').onclick = () => {
+    if (duelStake > plState.coins) duelStake = 10;
+    renderDuelStakes();
+    $('#duel-res').textContent = 'Ставь монеты — и погнали';
+    $('#duel-res').className = 'duel-res';
+    ['me', 'bot'].forEach((w) => { $(`#duel-${w}`).innerHTML = '<span class="duel-q">?</span>'; $(`#duel-${w}-sc`).textContent = ''; });
+    $('#duel-modal').hidden = false;
+  };
+  $('#duel-close').onclick = () => { if (!duelBusy) $('#duel-modal').hidden = true; };
+
+  function shuffleInto(el, final, ms) {
+    return new Promise((res) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        if (Date.now() - t0 >= ms) {
+          clearInterval(iv);
+          el.innerHTML = plateHTML(final);
+          el.classList.add('landed');
+          setTimeout(() => el.classList.remove('landed'), 300);
+          return res();
+        }
+        el.innerHTML = plateHTML(P.random());
+      }, 55);
+    });
+  }
+
+  // Ничья по очкам решается цифрами, потом регионом — получаются честные 50/50
+  const duelCmp = (a, b) => a.sc.total - b.sc.total || +a.p.digits - +b.p.digits || +a.p.region - +b.p.region;
+
+  $('#duel-go').onclick = async () => {
+    if (duelBusy) return;
+    if (plState.coins < duelStake) return toast('Не хватает монет');
+    duelBusy = true;
+    $('#duel-go').disabled = true;
+    setCoins(-duelStake);
+    $('#duel-res').textContent = 'Крутим…';
+    $('#duel-res').className = 'duel-res';
+    const me = { p: P.random() }, bot = { p: P.random() };
+    me.sc = P.score(me.p);
+    bot.sc = P.score(bot.p);
+    await shuffleInto($('#duel-me'), me.p, 1100);
+    $('#duel-me-sc').innerHTML = `<b style="color:${me.sc.tier.color}">${me.sc.tier.name}</b> · ${me.sc.total} очк.`;
+    await shuffleInto($('#duel-bot'), bot.p, 900);
+    $('#duel-bot-sc').innerHTML = `<b style="color:${bot.sc.tier.color}">${bot.sc.tier.name}</b> · ${bot.sc.total} очк.`;
+    const c = duelCmp(me, bot);
+    if (c > 0) {
+      setCoins(duelStake * 2);
+      plState.duels.w++;
+      $('#duel-res').innerHTML = `Победа! +${fmt(duelStake * 2)} · ${G.rnd.pick(TAUNTS_WIN)}`;
+      $('#duel-res').className = 'duel-res win';
+    } else if (c < 0) {
+      plState.duels.l++;
+      $('#duel-res').innerHTML = `Ашот забрал ${fmt(duelStake)} · ${G.rnd.pick(TAUNTS_LOSE)}`;
+      $('#duel-res').className = 'duel-res lose';
+    } else {
+      setCoins(duelStake);
+      $('#duel-res').textContent = 'Один в один! Ставка возвращена';
+    }
+    savePl();
+    duelBusy = false;
+    $('#duel-go').disabled = false;
+    renderDuelStakes();
+    refreshPlates();
+  };
+
   $('#pl-spin').onclick = () => spinPlate();
   $('#pl-auto').onclick = () => (plAuto ? (plAuto = false) : autoSpin());
   $('#pl-copy').onclick = () => (plCurrent ? copy(P.format(plCurrent)) : toast('Сначала крутани'));
@@ -1190,6 +1461,7 @@
 
   tickGarage();
   setInterval(() => tickGarage(true), 15000);
+  if (!plState.hist.length) plState.hist.push(plState.coins);
   refreshPlates();
 
   /* ---------------- settings ---------------- */
@@ -1348,7 +1620,7 @@
       e.preventDefault();
       spinPlate();
     }
-    if (e.key === 'Escape') { $('#qr-modal').hidden = true; $('#whatsnew').hidden = true; }
+    if (e.key === 'Escape') ['#qr-modal', '#whatsnew', '#duel-modal'].forEach((m) => { $(m).hidden = true; });
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);
   });
 
