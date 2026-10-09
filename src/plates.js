@@ -172,6 +172,7 @@
     { id: 'lava', name: 'Лава', price: 120000 },
     { id: 'ice', name: 'Лёд', price: 120000 },
     { id: 'space', name: 'Космос', price: 250000 },
+    { id: 'emo', name: 'Неформал ✝', price: 1000000000 },
     // эксклюзивы — только на чёрном рынке
     { id: 'rainbow', name: 'Радуга', price: 200000, market: 'rare' },
     { id: 'blackgold', name: 'Чёрное золото', price: 350000, market: 'epic' },
