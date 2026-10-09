@@ -571,6 +571,10 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.4.0': [
+      '🎁 Промокоды в настройках — вводи и получай монеты и кристаллы',
+      '🆔 Твой ID игрока — по нему можно получить личный промокод',
+    ],
     '4.3.0': [
       '💣 Минёр в казино: поле от 3×3 до 8×8, сам выбираешь сколько мин',
       '📈 Каждая открытая клетка поднимает множитель — забирай вовремя',
@@ -3605,6 +3609,154 @@
   }, 1000);
   window.addEventListener('resize', () => renderLdk());
 
+
+  /* ======================= промокоды ======================= */
+  // Коды подписаны ключом админа (ECDSA P-256). В приложении — только открытый ключ:
+  // проверить код может любой, а создать — только тот, у кого есть секретный ключ.
+  const PROMO_PUB = { kty: 'EC', crv: 'P-256', x: 'V1Y94Kv_b1hJtOWFfd-llBFlQ0Uq73kYQjwgs1SPeoE', y: 'PR3SavG8LIH02G1aTFCuq5QZGaVUEr1T006XcuCXzVE' };
+  const ECDSA = { name: 'ECDSA', namedCurve: 'P-256' }, SIGN = { name: 'ECDSA', hash: 'SHA-256' };
+  if (!plState.promos) plState.promos = [];
+  const b64u = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unb64u = (str) => {
+    const b = atob(str.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((str.length + 3) % 4));
+    return Uint8Array.from(b, (c) => c.charCodeAt(0));
+  };
+  const hexOf = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const uuidBytes = (id) => {
+    const h = String(id).replace(/-/g, '');
+    return /^[0-9a-f]{32}$/i.test(h) ? Uint8Array.from(h.match(/../g), (x) => parseInt(x, 16)) : null;
+  };
+  let promoPubKey = null;
+  const getPub = async () => promoPubKey || (promoPubKey = await crypto.subtle.importKey('jwk', PROMO_PUB, ECDSA, false, ['verify']));
+
+  // формат: версия · id(6) · монеты(f64) · кристаллы(u32) · срок в минутах(u32) · флаг · [ID игрока(16)]
+  function promoPack({ coins, gems, exp, target }) {
+    const t = target ? uuidBytes(target) : null;
+    const buf = new Uint8Array(24 + (t ? 16 : 0)), v = new DataView(buf.buffer);
+    v.setUint8(0, 1);
+    buf.set(crypto.getRandomValues(new Uint8Array(6)), 1);
+    v.setFloat64(7, coins);
+    v.setUint32(15, gems);
+    v.setUint32(19, exp);
+    v.setUint8(23, t ? 1 : 0);
+    if (t) buf.set(t, 24);
+    return buf;
+  }
+  function promoUnpack(buf) {
+    if (buf.length < 24 || buf[0] !== 1) return null;
+    const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength), targeted = v.getUint8(23) === 1;
+    if (buf.length !== (targeted ? 40 : 24)) return null;
+    return {
+      id: hexOf(buf.slice(1, 7)), coins: v.getFloat64(7), gems: v.getUint32(15), exp: v.getUint32(19),
+      target: targeted ? hexOf(buf.slice(24, 40)) : null,
+    };
+  }
+
+  async function redeemPromo(raw) {
+    const code = String(raw).replace(/\s+/g, '');
+    const m = code.match(/^QB-([A-Za-z0-9_-]+)$/i);
+    if (!m) return { err: 'Это не промокод q-b.util — он начинается с QB-' };
+    let all;
+    try { all = unb64u(m[1]); } catch (e) { return { err: 'Промокод битый — скопируй его целиком' }; }
+    if (all.length < 24 + 64) return { err: 'Промокод битый — скопируй его целиком' };
+    const body = all.slice(0, all.length - 64), sig = all.slice(all.length - 64);
+    let ok = false;
+    try { ok = await crypto.subtle.verify(SIGN, await getPub(), sig, body); } catch (e) { ok = false; }
+    const p = ok && promoUnpack(body);
+    if (!p || !Number.isFinite(p.coins) || p.coins < 0) return { err: 'Промокод не настоящий 🤨' };
+    if (plState.promos.includes(p.id)) return { err: 'Ты уже активировал этот промокод' };
+    if (p.exp && Date.now() / 60000 > p.exp) return { err: 'Срок промокода истёк ⌛' };
+    if (p.target && p.target !== String(aucId).replace(/-/g, '').toLowerCase()) return { err: 'Этот промокод выписан на другого игрока' };
+    plState.promos.push(p.id);
+    plState.coins += Math.floor(p.coins);
+    plState.gems = (plState.gems || 0) + p.gems;
+    savePl();
+    renderWallet();
+    return { ok: true, p };
+  }
+
+  const promoLabel = (p) => [p.coins ? `${fmtShort(p.coins)} монет` : '', p.gems ? `💎 ${p.gems}` : ''].filter(Boolean).join(' + ') || 'пусто';
+  $('#promo-id').textContent = aucId;
+  $('#promo-id-copy').onclick = () => copy(aucId);
+  $('#promo-go').onclick = async () => {
+    const inp = $('#promo-code'), msg = $('#promo-msg');
+    if (!inp.value.trim()) return;
+    $('#promo-go').disabled = true;
+    const r = await redeemPromo(inp.value);
+    $('#promo-go').disabled = false;
+    msg.className = `promo-msg ${r.ok ? 'good' : 'bad'}`;
+    msg.textContent = r.ok ? `🎁 Зачислено: ${promoLabel(r.p)}` : r.err;
+    if (r.ok) {
+      inp.value = '';
+      burst('#f0c552', 60);
+      toast(`🎁 Промокод активирован: ${promoLabel(r.p)}`);
+    }
+  };
+  $('#promo-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#promo-go').click(); });
+
+  /* --- админка: только с секретным ключом --- */
+  let adminKey = null;
+  async function loadAdmin(jwk) {
+    try {
+      const key = await crypto.subtle.importKey('jwk', jwk, ECDSA, false, ['sign']);
+      // ключ должен подходить к открытому ключу приложения
+      const test = new TextEncoder().encode('qb-admin-check');
+      const ok = await crypto.subtle.verify(SIGN, await getPub(), await crypto.subtle.sign(SIGN, key, test), test);
+      if (!ok) return false;
+      adminKey = key;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function renderAdmin() {
+    $('#promo-admin').hidden = !adminKey;
+    $('#promo-admin-in').hidden = !!adminKey;
+    if (!adminKey) return;
+    const log = load('qb.adminLog', []);
+    $('#adm-log').innerHTML = log.slice(-8).reverse().map((l) => `<div><span>${esc(promoLabel(l))}${l.target ? ' · 👤 ' + esc(l.target.slice(0, 8)) : ' · для всех'}${l.days ? ` · ${l.days} дн.` : ''}</span><button class="pill pill-white" data-code="${esc(l.code)}">Копировать</button></div>`).join('') || '<div class="note">Пока не создавал</div>';
+  }
+  $('#adm-log').addEventListener('click', (e) => { const b = e.target.closest('[data-code]'); if (b) { copy(b.dataset.code); toast('Промокод скопирован'); } });
+  $('#promo-admin-in').onclick = () => $('#adm-file').click();
+  $('#adm-file').onchange = async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      if (j.type === 'qb-admin-key' && (await loadAdmin(j.priv))) {
+        store('qb.admin', j.priv);
+        toast('🔑 Админка открыта');
+      } else toast('Это не тот ключ');
+    } catch (err) { toast('Не получилось прочитать ключ'); }
+    renderAdmin();
+  };
+  $('#adm-exit').onclick = () => { adminKey = null; store('qb.admin', null); renderAdmin(); toast('Ключ удалён с этого компа'); };
+  $('#adm-make').onclick = async () => {
+    if (!adminKey) return;
+    const coins = parseStake($('#adm-coins').value || '0'), gems = Math.max(0, Math.floor(+$('#adm-gems').value || 0));
+    const target = $('#adm-target').value.trim().toLowerCase(), days = Math.max(0, Math.floor(+$('#adm-days').value || 0));
+    if (!coins && !gems) { toast('Укажи монеты или кристаллы'); return; }
+    if (target && !uuidBytes(target)) { toast('ID игрока неверный — пусть скопирует его из настроек'); return; }
+    const body = promoPack({ coins, gems, exp: days ? Math.floor(Date.now() / 60000) + days * 1440 : 0, target: target || null });
+    const sig = new Uint8Array(await crypto.subtle.sign(SIGN, adminKey, body));
+    const all = new Uint8Array(body.length + 64);
+    all.set(body);
+    all.set(sig, body.length);
+    const code = `QB-${b64u(all)}`;
+    $('#adm-out').value = code;
+    copy(code);
+    toast('🎟 Промокод создан и скопирован');
+    const log = load('qb.adminLog', []);
+    log.push({ code, coins, gems, target: target || null, days, t: Date.now() });
+    store('qb.adminLog', log.slice(-50));
+    renderAdmin();
+  };
+  (async () => {
+    const saved = load('qb.admin', null);
+    if (saved) await loadAdmin(saved);
+    renderAdmin();
+  })();
   /* ======================= уведомления Windows ======================= */
   // приходят, только когда окно свёрнуто или не в фокусе; клик ведёт в нужное место
   const NOTE_TYPES = {

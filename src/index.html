@@ -707,6 +707,26 @@
               <input class="inp" id="pf-role" maxlength="28" placeholder="Например, Design Lead" spellcheck="false">
             </label>
             <label class="tgl"><input type="checkbox" id="pf-greet" checked><i></i>Обращаться по нику на дашборде</label>
+            <div class="promo-box">
+              <span class="cap">🎁 ПРОМОКОД</span>
+              <div class="promo-row"><input class="inp" id="promo-code" placeholder="QB-…" spellcheck="false" autocomplete="off"><button class="pill pill-dark" id="promo-go">Активировать</button></div>
+              <div class="promo-msg" id="promo-msg"></div>
+              <div class="promo-id"><span>Твой ID</span><code id="promo-id"></code><button class="pill pill-white" id="promo-id-copy">Копировать</button><button class="promo-key" id="promo-admin-in" title="Админ-ключ">🔑</button></div>
+              <input type="file" id="adm-file" accept=".json,application/json" hidden>
+              <div class="promo-admin" id="promo-admin" hidden>
+                <span class="cap">👑 СОЗДАТЬ ПРОМОКОД</span>
+                <div class="promo-grid">
+                  <label class="field"><span>МОНЕТЫ</span><input class="inp" id="adm-coins" placeholder="напр. 10м" autocomplete="off"></label>
+                  <label class="field"><span>КРИСТАЛЛЫ</span><input class="inp" id="adm-gems" type="number" min="0" placeholder="0"></label>
+                  <label class="field"><span>ID ИГРОКА (пусто — для всех)</span><input class="inp" id="adm-target" placeholder="xxxxxxxx-xxxx-…" autocomplete="off" spellcheck="false"></label>
+                  <label class="field"><span>СРОК, ДНЕЙ (0 — навсегда)</span><input class="inp" id="adm-days" type="number" min="0" value="0"></label>
+                </div>
+                <button class="pill pill-dark wide" id="adm-make">Создать и скопировать</button>
+                <textarea class="inp promo-out" id="adm-out" readonly rows="3" placeholder="Тут появится промокод"></textarea>
+                <div class="adm-log" id="adm-log"></div>
+                <button class="pill pill-white wide" id="adm-exit">Убрать ключ с этого компа</button>
+              </div>
+            </div>
             <button class="pill pill-white wide" id="pf-reset">Сбросить профиль</button>
           </div>
 

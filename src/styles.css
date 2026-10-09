@@ -2467,3 +2467,25 @@ kbd {
 .cr-bets button:disabled { opacity: .35; cursor: not-allowed; }
 .mn-ico { width: 58%; height: 58%; display: block; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .4)); }
 .mn-cell.gem .mn-ico { filter: drop-shadow(0 0 10px rgba(95, 224, 196, .6)); }
+
+/* ================= 4.4: ПРОМОКОДЫ ================= */
+.promo-box { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 18px; background: var(--chip, rgba(0, 0, 0, .04)); border: 1px dashed rgba(127, 127, 127, .35); }
+.promo-row { display: flex; gap: 8px; }
+.promo-row .inp { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; }
+.promo-msg { font-size: 12px; min-height: 0; }
+.promo-msg.good { color: #2f9c86; font-weight: 700; }
+.promo-msg.bad { color: #e5484d; font-weight: 600; }
+.promo-id { display: flex; align-items: center; gap: 8px; font-size: 11px; flex-wrap: wrap; }
+.promo-id span { color: var(--muted, #8a8984); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 10px; }
+.promo-id code { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 8px; background: rgba(127, 127, 127, .12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.promo-id .pill { height: 28px; padding: 0 12px; font-size: 11px; }
+.promo-key { margin-left: auto; width: 28px; height: 28px; border-radius: 50%; opacity: .25; font-size: 13px; }
+.promo-key:hover { opacity: .8; }
+.promo-key[hidden] { display: none; }
+.promo-admin { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px dashed rgba(127, 127, 127, .35); }
+.promo-admin[hidden] { display: none; }
+.promo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.promo-out { font-family: var(--mono); font-size: 11px; resize: none; word-break: break-all; height: auto; }
+.adm-log { display: flex; flex-direction: column; gap: 4px; }
+.adm-log div:not(.note) { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; padding: 6px 10px; border-radius: 10px; background: rgba(127, 127, 127, .08); }
+.adm-log .pill { height: 26px; padding: 0 10px; font-size: 11px; }
