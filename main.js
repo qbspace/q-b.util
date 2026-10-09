@@ -32,6 +32,22 @@ function writeData() {
   fs.renameSync(tmp, dataFile);
 }
 
+// Частые сохранения (игры пишут постоянно) склеиваем: окно не ждёт диск, файл пишется через 250 мс тишины
+let writeTimer = null;
+function scheduleWrite() {
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(() => {
+    writeTimer = null;
+    try { writeData(); } catch {}
+  }, 250);
+}
+function flushData() {
+  if (!writeTimer) return;
+  clearTimeout(writeTimer);
+  writeTimer = null;
+  try { writeData(); } catch {}
+}
+
 const prefs = () => Object.assign({ tray: true, hotkey: true, autostart: true }, data['qb.settings'] || {});
 // При автозапуске с Windows стартуем свёрнутыми в трей
 const startHidden = process.argv.includes('--hidden');
@@ -40,12 +56,8 @@ ipcMain.on('store:all', (e) => { e.returnValue = data; });
 ipcMain.on('store:set', (e, key, value) => {
   if (value === undefined) delete data[key];
   else data[key] = value;
-  try {
-    writeData();
-    e.returnValue = true;
-  } catch {
-    e.returnValue = false;
-  }
+  scheduleWrite();
+  e.returnValue = true;
 });
 
 /* ---------------- окно ---------------- */
@@ -226,6 +238,7 @@ ipcMain.handle('upd:check', () => {
 ipcMain.on('upd:install', () => {
   if (updater && updState.state === 'ready') {
     quitting = true;
+    flushData();
     updater.quitAndInstall(false, true);
   }
 });
@@ -239,5 +252,5 @@ app.whenReady().then(() => {
   setupUpdater();
 });
 app.on('before-quit', () => { quitting = true; });
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => { globalShortcut.unregisterAll(); flushData(); });
 app.on('window-all-closed', () => app.quit());

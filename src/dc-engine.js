@@ -35,7 +35,24 @@
       players: {}, feed: [], boss: null, nextBoss: now + D.BOSS_FIRST, bossN: 0,
       event: null, nextEvent: now + rnd(150e3, 270e3), lastEv: '',
       bm: { w: -1, items: [] }, market: [], bounty: {}, orbit: null, viruses: {}, firsts: {}, idc: 1, awards: null,
+      allies: {}, mega: { lvl: 0, prog: 0 },
     };
+  }
+
+  // комнаты и игроки из старых версий — дозаполняем новые поля
+  function normRoom(s) {
+    if (!s.allies) s.allies = {};
+    if (!s.mega) s.mega = { lvl: 0, prog: 0 };
+    Object.values(s.players).forEach(normPlayer);
+  }
+  function normPlayer(p) {
+    if (!p.res) p.res = [];
+    if (!p.lab) p.lab = [];
+    if (p.ally === undefined) p.ally = null;
+    if (!p.sing) p.sing = 0;
+    if (p.life == null) p.life = Math.max(p.st.earned || 0, Math.pow(p.coresAll || 0, 3) * 2e5);
+    ['mega', 'ddosOk', 'hwBought', 'stars'].forEach((k) => { if (!p.st[k]) p.st[k] = 0; });
+    p.items.forEach((i) => { if (!i.s) i.s = 0; });
   }
 
   function newPlayer(id, nick) {
@@ -43,7 +60,8 @@
       id, nick, cr: 0, run: 0, score: 0, loc: 0, hw: {}, up: [], def: {}, tree: [], cores: 0, coresAll: 0,
       heat: 0, streak: 0, lastClk: 0, down: 0, ddos: 0, shield: 0, lastHit: 0, oc: 0, items: [], eq: [],
       cd: {}, ach: [], targets: [], ct: null, ctAt: 0, on: true, joined: Date.now(), cw: 0, cwN: 0,
-      st: { clicks: 0, earned: 0, stolen: 0, lost: 0, robbed: 0, attacks: 0, atkOk: 0, boss: 0, cases: 0, spent: 0, overheats: 0, reboots: 0, breaks: 0 },
+      res: [], lab: [], ally: null, sing: 0, life: 0,
+      st: { clicks: 0, earned: 0, stolen: 0, lost: 0, robbed: 0, attacks: 0, atkOk: 0, boss: 0, cases: 0, spent: 0, overheats: 0, reboots: 0, breaks: 0, mega: 0, ddosOk: 0, hwBought: 0, stars: 0 },
     };
   }
 
@@ -55,6 +73,7 @@
       assignContract(s, p, Date.now());
     }
     if (nick && p.nick !== nick) p.nick = nick.slice(0, 20);
+    normPlayer(p);
     return p;
   }
 
@@ -64,32 +83,60 @@
   const DDOS_MUL = 0.4, DDOS_LEN = 45e3, DDOS_STEAL = 0.5, VIRUS_PCT = 0.05;
   const evOf = (s, now) => (s.event && now < s.event.until ? EVENTS.find((e) => e.id === s.event.id) : null);
 
+  // бонус ядер убывающий: иначе престиж разгоняет сам себя до бесконечности
+  const coreBonus = (p) => Math.pow(1 + (p.coresAll || 0), 0.55);
+  const UPG_BY = Object.fromEntries(UPG.map((u) => [u.id, u]));
+  const RES_BY = Object.fromEntries(D.RES.map((r) => [r.id, r]));
+  // звёзды предмета: каждая ★ +50% к бонусам (+75% с Мультивселенной)
+  const starMul = (p, it) => 1 + (it.s || 0) * (p.loc >= 10 ? 0.75 : 0.5);
+
   function itemBonus(p) {
     const b = { inc: 0, click: 0, boss: 0, steal: 0, hit: 0, def: 0, prot: 0, cool: 0, luck: 0 };
     p.eq.forEach((u) => {
       const it = p.items.find((i) => i.u === u);
       const t = it && ITEMS[it.k];
-      if (t) for (const k in t.b) b[k] += t.b[k];
+      if (!t) return;
+      const m = starMul(p, it);
+      for (const k in t.b) b[k] += t.b[k] * m;
     });
     return b;
+  }
+
+  function resBonus(p) {
+    const b = { inc: 0, def: 0, sell: 0, cool: 0, cd: 0, macro: 0, luck: 0, boss: 0, cores: 0, hit: 0, incMul: 0, case: 0 };
+    (p.res || []).forEach((id) => { const r = RES_BY[id]; if (r) for (const k in r.b) b[k] += r.b[k]; });
+    return b;
+  }
+
+  // альянс: +5% дохода за каждого союзника в сети
+  function allyBonus(s, p) {
+    const a = p.ally && s.allies && s.allies[p.ally];
+    if (!a) return 0;
+    return a.members.filter((id) => id !== p.id && s.players[id] && s.players[id].on).length * 0.05;
   }
 
   function calc(p, s, now = Date.now()) {
     const b = itemBonus(p);
     const evRaw = evOf(s, now);
     const ev = evRaw && !(evRaw.bad && has(p, 'd4')) ? evRaw : {};
-    let base = 0;
-    HW.forEach((h) => { const n = p.hw[h.id] || 0; if (n) base += n * h.rate * (p.up.includes('x2_' + h.id) ? 2 : 1); });
-    let incUp = 0, clickMul = 1, macro = 0, coolUp = 0;
+    const rb = resBonus(p);
+    let incUp = 0, clickMul = 1, macro = rb.macro, coolUp = 0;
+    const hwM = {};
     p.up.forEach((id) => {
-      const u = UPG.find((x) => x.id === id);
+      const u = UPG_BY[id];
       if (!u) return;
       if (u.k === 'inc') incUp += u.v;
       if (u.k === 'click') clickMul *= u.v;
       if (u.k === 'macro') macro += u.v;
       if (u.k === 'cool') coolUp += u.v;
+      if (u.k === 'hw') hwM[u.hw] = (hwM[u.hw] || 1) * u.v;
     });
-    const incMul = (1 + incUp) * (1 + b.inc) * (1 + 0.04 * p.coresAll) * (1 + 0.01 * p.ach.length) * (has(p, 'f1') ? 1.2 : 1) * (has(p, 'f5') ? 2 : 1);
+    let base = 0;
+    HW.forEach((h) => { const n = p.hw[h.id] || 0; if (n) base += n * h.rate * (hwM[h.id] || 1); });
+    const mega = 1 + 0.1 * ((s.mega && s.mega.lvl) || 0);
+    const incMul = (1 + incUp + rb.inc) * (1 + b.inc) * coreBonus(p) * (1 + 0.01 * p.ach.length)
+      * (has(p, 'f1') ? 1.2 : 1) * (has(p, 'f5') ? 2 : 1) * (has(p, 'f6') ? 1.75 : 1) * (has(p, 'f8') ? 3 : 1)
+      * (1 + rb.incMul) * (1 + (p.sing || 0)) * mega * (1 + allyBonus(s, p));
     const stable = base * incMul * OC[p.oc].mul;
     const orbit = s.orbit && now < s.orbit.until ? (s.orbit.by === p.id ? 2 : 1.25) : 1;
     const temp = (ev.inc || 1) * orbit * (now < p.down ? 0.2 : 1) * (now < p.ddos ? DDOS_MUL : 1);
@@ -97,21 +144,25 @@
     const def = (id) => p.def[id] || 0;
     return {
       base, stable, inc: stable * temp, click, macro,
-      cool: 4 + coolUp + b.cool,
+      cool: 4 + coolUp + b.cool + rb.cool,
+      hwM, rb,
       heatGain: OC[p.oc].heat * (ev.heat || 1),
-      block: clamp(def('fw') * 0.08 + b.def + (has(p, 'd1') ? 0.1 : 0), 0, 0.65),
+      block: clamp(def('fw') * 0.08 + b.def + rb.def + (has(p, 'd1') ? 0.1 : 0), 0, 0.7),
       proxy: Math.min(0.6, def('px') * 0.12),
       ddosRed: def('ad') * 0.12,
-      prot: Math.min(0.8, def('bk') * 0.1 + b.prot),
-      steal: 0.03 + b.steal + (has(p, 'a2') ? 0.02 : 0),
-      hit: 0.7 + b.hit + (has(p, 'a3') ? 0.15 : 0),
-      cd: D.ATK_CD * (has(p, 'a1') ? 0.75 : 1),
-      slots: 2 + (p.loc >= 1) + (p.loc >= 4),
+      prot: Math.min(0.85, def('bk') * 0.1 + b.prot + (has(p, 'd7') ? 0.3 : 0)),
+      steal: (0.03 + b.steal + (has(p, 'a2') ? 0.02 : 0)) * (has(p, 'a8') ? 1.5 : 1) * (ev.stealMul || 1),
+      hit: 0.7 + b.hit + rb.hit + (has(p, 'a3') ? 0.15 : 0),
+      cd: D.ATK_CD * (has(p, 'a1') ? 0.75 : 1) * (has(p, 'a8') ? 0.5 : 1) * (1 - rb.cd) * (ev.cdMul || 1),
+      slots: 2 + (p.loc >= 1) + (p.loc >= 4) + (p.loc >= 10),
       comboCap: p.loc >= 1 ? (has(p, 'f4') ? 15 : 10) : 2,
-      bossMul: (1 + b.boss) * (has(p, 'a4') ? 2 : 1) * (ev.boss || 1),
-      luck: (1 + b.luck) * (ev.luck || 1),
+      bossMul: (1 + b.boss + rb.boss) * (has(p, 'a4') ? 2 : 1) * (ev.boss || 1),
+      luck: (1 + b.luck + rb.luck) * (ev.luck || 1),
       hwDisc: (has(p, 'f3') ? 0.9 : 1) * (ev.hwMul || 1),
-      casePrice: Math.max(300, Math.round(stable * 90 + click * 40)),
+      casePrice: Math.max(300, Math.round((stable * 90 + click * 40) * (1 - rb.case) * (ev.caseMul || 1))),
+      sellMul: 0.35 * (1 + rb.sell),
+      labSlots: p.loc >= 8 ? 2 : p.loc >= 5 ? 1 : 0,
+      ally: allyBonus(s, p),
       ev: evRaw,
     };
   }
@@ -125,12 +176,16 @@
 
   const hwCost = (p, h, c, k = 0) => Math.ceil(h.cost * Math.pow(D.HW_GROWTH, (p.hw[h.id] || 0) + k) * c.hwDisc);
   const defCost = (p, d) => Math.ceil(d.cost * Math.pow(D.DEF_GROWTH, p.def[d.id] || 0));
-  const rebootGain = (p) => Math.floor(Math.sqrt(p.run / 1e6));
+  // ядра считаются от заработка за всю ночь (кубический корень), а не за забег — так престиж не разгоняется лавиной
+  const coreMul = (p) => 1 + resBonus(p).cores + (has(p, 'f7') ? 0.5 : 0);
+  const coresTotal = (p) => Math.floor(Math.cbrt((p.life || 0) / 2e5) * coreMul(p));
+  const rebootGain = (p) => Math.max(0, coresTotal(p) - p.coresAll);
+  const nextCoreAt = (p) => Math.pow((coresTotal(p) + 1) / coreMul(p), 3) * 2e5;
 
   /* ---------------- деньги ---------------- */
   function earn(s, p, amt, kind = 'earn') {
     if (!(amt > 0)) return;
-    p.cr += amt; p.run += amt; p.score += amt; p.st.earned += amt;
+    p.cr += amt; p.run += amt; p.life = (p.life || 0) + amt; p.score += amt; p.st.earned += amt;
     if (p.ct && p.ct.type === 'earn') p.ct.prog += amt;
   }
   function spend(p, amt) {
@@ -153,10 +208,11 @@
     if (p.items.length >= 40) {
       // склад забит — сразу продаём
       const c = calc(p, s);
-      earn(s, p, Math.round(c.casePrice * R[t.r].mul * 0.35));
+      earn(s, p, Math.round(c.casePrice * R[t.r].mul * c.sellMul));
       pm(p.id, 'note', { txt: `Склад полон — ${t.n} продан автоматически` });
       return;
     }
+    if (!it.s) it.s = 0;
     p.items.push(it);
     if (p.eq.length < calc(p, s).slots) p.eq.push(it.u);
     pm(p.id, 'drop', { item: it, src });
@@ -184,6 +240,15 @@
     if (p.st.stolen >= 1e6) unlock(s, p, 'robin');
     if (p.st.robbed >= 10) unlock(s, p, 'victim');
     if (p.score >= 1e9) unlock(s, p, 'billion');
+    if (p.score >= 1e12) unlock(s, p, 'trillion');
+    if (p.st.cases >= 100) unlock(s, p, 'cases100');
+    if (p.st.hwBought >= 1000) unlock(s, p, 'hw1k');
+    if (p.st.ddosOk >= 10) unlock(s, p, 'ddos10');
+    if (p.st.mega >= 1e9) unlock(s, p, 'patron');
+    if (p.loc >= 8) unlock(s, p, 'moon');
+    if (p.loc >= 11) unlock(s, p, 'neo');
+    if (p.res.length >= 1) unlock(s, p, 'lab1');
+    if (p.res.length >= D.RES.length) unlock(s, p, 'laball');
     const others = Object.keys(s.players).filter((id) => id !== p.id);
     if (others.length >= 2 && others.every((id) => p.targets.includes(id))) unlock(s, p, 'traitor');
   }
@@ -228,7 +293,9 @@
   /* ---------------- тик ведущего ---------------- */
   function tick(s, now = Date.now()) {
     if (s.over) return;
+    if (!s.allies || !s.mega) normRoom(s);
     const dt = Math.min(5, Math.max(0, (now - (s.now || now)) / 1000));
+    const resMul = (evOf(s, now) || {}).resMul || 1;
     s.now = now;
     if (now >= s.end) return finish(s);
     const list = Object.values(s.players);
@@ -242,11 +309,12 @@
         if (p.heat >= 100) overheat(s, p, now);
       }
       if (now - p.lastClk > 1200) p.streak = 0;
+      if (p.lab && p.lab.length) labTick(s, p, dt * 1000 * resMul);
       if (doBreak && p.oc > 0 && p.on && Math.random() < OC[p.oc].brk) breakHw(s, p);
       if (s.boss && p.on) bossHit(s, p, c.inc * 0.25 * c.bossMul, true);
       const a = now < p.ddos && s.players[p.ddosBy];
       if (a) {
-        const g = (c.inc / DDOS_MUL) * (1 - DDOS_MUL) * DDOS_STEAL * dt * (p.on ? 1 : 0.5);
+        const g = (c.inc / DDOS_MUL) * (1 - DDOS_MUL) * (p.ddosFull ? 1 : DDOS_STEAL) * dt * (p.on ? 1 : 0.5);
         a.cr += g; a.score += g; a.st.stolen += g;
       }
       ctCheck(s, p, now);
@@ -270,6 +338,17 @@
     if (s.orbit && now > s.orbit.until) s.orbit = null;
   }
 
+  function labTick(s, p, ms) {
+    p.lab.forEach((j) => { j.left -= ms; });
+    p.lab.filter((j) => j.left <= 0).forEach((j) => {
+      const r = RES_BY[j.id];
+      if (!p.res.includes(j.id)) p.res.push(j.id);
+      feed(s, `🔬 ${B(p)} завершил исследование «${esc(r.name)}»`, 'loot');
+      pm(p.id, 'note', { txt: `🔬 Исследование готово: ${r.name} — ${r.d}` });
+    });
+    p.lab = p.lab.filter((j) => j.left > 0);
+  }
+
   function breakHw(s, p) {
     const h = [...HW].reverse().find((x) => (p.hw[x.id] || 0) > 0);
     if (!h) return;
@@ -288,6 +367,7 @@
     s.nextEvent = now + D.EVENT_LEN + rnd(180e3, 360e3);
     feed(s, `${e.icon} <b>${esc(e.name)}</b> — ${esc(e.d)}`, e.bad ? 'evbad' : 'ev');
     if (e.airdrop) Object.values(s.players).forEach((p) => earn(s, p, calc(p, s, now).stable * e.airdrop));
+    if (e.freeCase) Object.values(s.players).forEach((p) => giveItem(s, p, rollItem(s, calc(p, s, now).luck), 'Метеорит'));
   }
 
   function refreshBm(s, w) {
@@ -306,9 +386,12 @@
     const on = Object.values(s.players).filter((p) => p.on);
     const hp = Math.max(1500, on.reduce((a, p) => { const c = calc(p, s, now); return a + c.click * 200 + c.stable * 40; }, 0));
     s.bossN++;
-    s.boss = { name: D.BOSSES[(s.bossN - 1) % D.BOSSES.length], hp, max: hp, until: now + D.BOSS_LEN, dmg: {} };
+    const raid = s.bossN % 4 === 0;
+    const name = raid ? D.RAID_BOSSES[(s.bossN / 4 - 1) % D.RAID_BOSSES.length] : D.BOSSES[(s.bossN - 1) % D.BOSSES.length];
+    const len = raid ? 240e3 : D.BOSS_LEN;
+    s.boss = { name, hp: hp * (raid ? 5 : 1), max: hp * (raid ? 5 : 1), until: now + len, dmg: {}, raid };
     s.nextBoss = now + D.BOSS_EVERY;
-    feed(s, `☠ Появился <b>${esc(s.boss.name)}</b>! Все на рейд — 2.5 минуты`, 'boss');
+    feed(s, raid ? `☢ РЕЙД-БОСС <b>${esc(name)}</b>! ×5 здоровья, ×3 лута, у MVP гарантированная легендарка — 4 минуты` : `☠ Появился <b>${esc(s.boss.name)}</b>! Все на рейд — 2.5 минуты`, 'boss');
     pm('*', 'boss');
   }
   function bossHit(s, p, dmg, passive) {
@@ -331,9 +414,10 @@
       const p = s.players[id];
       if (!p || d <= 0) return;
       const c = calc(p, s, now);
-      const loot = Math.round(c.stable * 180 + c.click * 80);
+      const loot = Math.round((c.stable * 180 + c.click * 80) * (b.raid ? 3 : 1));
       earn(s, p, loot);
-      giveItem(s, p, rollItem(s, c.luck * (i === 0 ? 3 : 1.3), i === 0 ? 2 : 0), i === 0 ? 'Сундук MVP' : 'Лут с босса');
+      giveItem(s, p, rollItem(s, c.luck * (i === 0 ? 3 : 1.3), i === 0 ? (b.raid ? 3 : 2) : (b.raid ? 1 : 0)), i === 0 ? 'Сундук MVP' : 'Лут с босса');
+      if (b.raid) unlock(s, p, 'raid');
       pm(p.id, 'note', { txt: `Босс повержен: +${fmt(loot)}${i === 0 ? ' и сундук MVP' : ''}` });
       if (i === 0) { feed(s, `🥇 ${B(p)} — MVP рейда, ${fmt(d)} урона`, 'boss'); unlock(s, p, 'boss'); }
     });
@@ -362,6 +446,7 @@
     ctAdd(a, 'steal', 1);
     t.lastHit = Date.now();
     if (has(t, 'd2')) t.shield = Date.now() + 90e3;
+    if (has(t, 'd8')) t.shield = Date.now + 180e3;
     pm(t.id, 'hit', { txt: `${a.nick} утащил у тебя ${fmt(amt)}` });
     return amt;
   }
@@ -408,6 +493,92 @@
       else earn(s, p, c.click * mul * n);
       if (p.heat >= 100) overheat(s, p, now);
     },
+    // сплавить 3 одинаковых предмета одной звёздности в один на ★ выше
+    merge(s, p, m) {
+      const it = p.items.find((i) => i.u === m.u);
+      if (!it) return false;
+      if ((it.s || 0) >= D.STAR_MAX) return err(p, 'Уже максимум звёзд');
+      const same = p.items.filter((i) => i !== it && i.k === it.k && (i.s || 0) === (it.s || 0)).sort((a, b) => p.eq.includes(a.u) - p.eq.includes(b.u));
+      if (same.length < 2) return err(p, 'Нужно ещё 2 таких же предмета той же звёздности');
+      const gone = same.slice(0, 2).map((i) => i.u);
+      p.items = p.items.filter((i) => !gone.includes(i.u));
+      p.eq = p.eq.filter((u) => !gone.includes(u));
+      it.s = (it.s || 0) + 1;
+      p.st.stars++;
+      unlock(s, p, 'star');
+      if (it.s >= D.STAR_MAX) { unlock(s, p, 'star5'); feed(s, `⭐ ${B(p)} выковал ${esc(ITEMS[it.k].n)} ★★★★★`, 'loot'); }
+      pm(p.id, 'note', { txt: `⭐ ${ITEMS[it.k].n} теперь ${'★'.repeat(it.s)}` });
+    },
+    // исследования
+    res(s, p, m, c) {
+      const r = RES_BY[m.id];
+      if (!r) return false;
+      if (c.labSlots < 1) return err(p, 'Лаборатория — с Подземного ДЦ');
+      if (p.res.includes(r.id) || p.lab.some((j) => j.id === r.id)) return false;
+      if (p.lab.length >= c.labSlots) return err(p, 'Все слоты лаборатории заняты');
+      if (!spend(p, D.resCost(r, c.stable))) return err(p, 'Не хватает кредитов');
+      p.lab.push({ id: r.id, left: r.min * 60e3, total: r.min * 60e3 });
+      feed(s, `🧪 ${B(p)} начал исследование «${esc(r.name)}»`, 'sys');
+    },
+    // общий проект
+    mega(s, p, m) {
+      const amt = Math.floor(Math.min(m.amt, p.cr));
+      if (!(amt >= 1000)) return err(p, 'Минимум 1K');
+      if (s.mega.lvl >= D.MEGA_STAGES.length) return err(p, 'Мега-ДЦ достроен');
+      spend(p, amt);
+      p.st.mega += amt;
+      s.mega.prog += amt;
+      while (s.mega.lvl < D.MEGA_STAGES.length && s.mega.prog >= D.megaGoal(s.mega.lvl)) {
+        s.mega.prog -= D.megaGoal(s.mega.lvl);
+        s.mega.lvl++;
+        feed(s, `🏗 Мега-ДЦ: построен «${D.MEGA_STAGES[s.mega.lvl - 1]}»! Всем +10% дохода навсегда`, 'ev');
+        pm('*', 'note', { txt: `🏗 Мега-ДЦ ур. ${s.mega.lvl}: всем +10% дохода` });
+      }
+      if (amt >= 1e6) feed(s, `🏗 ${B(p)} вложил в Мега-ДЦ ${fmt(amt)}`, 'sys');
+    },
+    // альянсы
+    allyNew(s, p, m, c, now) {
+      const name = String(m.name || '').trim().slice(0, 16);
+      if (name.length < 2) return err(p, 'Название от 2 символов');
+      if (p.ally) return err(p, 'Сначала выйди из своего альянса');
+      if (now < (p.cd.ally || 0)) return err(p, 'Недавно вышел из альянса — подожди');
+      const id = 'a' + s.idc++;
+      const hues = Object.values(s.allies).map((a) => a.hue);
+      s.allies[id] = { id, name, hue: [0, 45, 120, 200, 280, 330].find((h) => !hues.includes(h)) ?? Math.floor(Math.random() * 360), members: [p.id], owner: p.id };
+      p.ally = id;
+      feed(s, `🤝 ${B(p)} основал альянс <b>[${esc(name)}]</b>`, 'sys');
+      unlock(s, p, 'ally');
+    },
+    allyJoin(s, p, m, c, now) {
+      const a = s.allies[m.id];
+      if (!a || p.ally) return false;
+      if (now < (p.cd.ally || 0)) return err(p, 'Недавно вышел из альянса — подожди');
+      const cap = Math.max(2, Math.ceil(Object.keys(s.players).length / 2));
+      if (a.members.length >= cap) return err(p, `В альянсе максимум ${cap}`);
+      a.members.push(p.id);
+      p.ally = a.id;
+      feed(s, `🤝 ${B(p)} вступил в <b>[${esc(a.name)}]</b>`, 'sys');
+      unlock(s, p, 'ally');
+    },
+    allyLeave(s, p, m, c, now) {
+      const a = s.allies[p.ally];
+      if (!a) { p.ally = null; return; }
+      a.members = a.members.filter((id) => id !== p.id);
+      p.ally = null;
+      p.cd.ally = now + 180e3;
+      feed(s, `💔 ${B(p)} покинул <b>[${esc(a.name)}]</b>`, 'bad');
+      if (!a.members.length) delete s.allies[a.id];
+      else if (a.owner === p.id) a.owner = a.members[0];
+    },
+    // Сингулярность: сброс всего, включая ядра и дерево, ради множителя дохода навсегда
+    sing(s, p) {
+      if (p.loc < 11) return err(p, 'Сингулярность — в Симуляции');
+      p.sing++;
+      Object.assign(p, { cr: 0, run: 0, life: 0, hw: {}, up: [], def: {}, loc: 0, oc: 0, heat: 0, streak: 0, down: 0, cores: 0, coresAll: 0, tree: [] });
+      feed(s, `🕳 ${B(p)} совершил СИНГУЛЯРНОСТЬ #${p.sing}: доход ×${p.sing + 1} навсегда`, 'proto');
+      unlock(s, p, 'sing');
+      pm(p.id, 'reboot', { g: 0 });
+    },
     hw(s, p, m, c) {
       const h = HW.find((x) => x.id === m.id);
       if (!h || p.loc < h.loc) return false;
@@ -421,6 +592,7 @@
       }
       if (!bought) return err(p, 'Не хватает кредитов');
       ctAdd(p, 'hw', bought);
+      p.st.hwBought += bought;
       if (h.id === 'qubit' && !s.firsts.qubit) { s.firsts.qubit = p.id; feed(s, `💎 ${B(p)} первым купил ${esc(h.name)}`, 'loot'); }
     },
     up(s, p, m) {
@@ -442,7 +614,7 @@
       if (!spend(p, L.cost)) return err(p, 'Не хватает на переезд');
       p.loc++;
       feed(s, `${L.icon} ${B(p)} переехал: <b>${esc(L.name)}</b>`, 'loc');
-      if (p.loc === LOCS.length - 1 && !s.firsts.quantum) { s.firsts.quantum = p.id; unlock(s, p, 'major'); }
+      if (p.loc === 7 && !s.firsts.quantum) { s.firsts.quantum = p.id; unlock(s, p, 'major'); }
     },
     oc(s, p, m) {
       if (p.loc < 3) return false;
@@ -460,6 +632,7 @@
       if (now < t.shield) return err(p, `${t.nick} под щитом`);
       if (now - t.lastHit < 45e3) return err(p, `${t.nick} только что ограбили — дай отдышаться`);
       if (kind !== 'hack' && !t.on) return err(p, 'DDoS и вирус — только по тем, кто в сети');
+      if (p.ally && p.ally === t.ally) return err(p, `${t.nick} — твой союзник`);
       const ct = calc(t, s, now);
       p.cd.atk = now + c.cd;
       p.st.attacks++;
@@ -471,7 +644,7 @@
         feed(s, `🛡 ${B(t)} отбил ${D.ATK.find((x) => x.id === kind).name.toLowerCase()} от ${B(p)}`, 'def');
         pm(p.id, 'err', { txt: `${t.nick} отбил атаку` });
         pm(t.id, 'note', { txt: `🛡 Ты отбил атаку ${p.nick}` });
-        if (has(t, 'd3')) { const fine = Math.floor(p.cr * 0.02); p.cr -= fine; t.cr += fine; t.score += fine; p.score -= fine; }
+        if (has(t, 'd3') || has(t, 'd6')) { const fine = Math.floor(p.cr * (has(t, 'd6') ? 0.06 : 0.02)); p.cr -= fine; t.cr += fine; t.score += fine; p.score -= fine; }
         return;
       }
       if (kind === 'hack') {
@@ -481,10 +654,18 @@
         feed(s, `🔓 ${B(p)} взломал ${B(t)} и украл ${fmt(amt)}`, 'atk');
         pm(p.id, 'note', { txt: `🔓 Украдено ${fmt(amt)} у ${t.nick}` });
         claimBounty(s, p, t);
+        // Мародёр: ещё и ненадетый предмет
+        const loose = has(p, 'a7') && t.items.filter((i) => !t.eq.includes(i.u));
+        if (loose && loose.length && p.items.length < 40) {
+          const it = pick(loose);
+          t.items = t.items.filter((i) => i !== it);
+          p.items.push(it);
+          feed(s, `🎒 ${B(p)} утащил у ${B(t)} предмет ${esc(ITEMS[it.k].n)}`, 'atk');
+        }
       } else if (kind === 'ddos') {
-        const dur = Math.round(DDOS_LEN * (1 - ct.ddosRed));
-        t.ddos = now + dur; t.ddosBy = p.id;
-        p.st.atkOk++; ctAdd(p, 'steal', 1);
+        const dur = Math.round(DDOS_LEN * (1 - ct.ddosRed) * (has(p, 'a6') ? 1.5 : 1));
+        t.ddos = now + dur; t.ddosBy = p.id; t.ddosFull = has(p, 'a6');
+        p.st.atkOk++; p.st.ddosOk++; ctAdd(p, 'steal', 1);
         feed(s, `🌊 ${B(p)} положил DDoS-ом сервер ${B(t)} на ${Math.round(dur / 1000)} с`, 'atk');
         pm(t.id, 'hit', { txt: `${p.nick} заDDoSил тебя на ${Math.round(dur / 1000)} с: клики не работают, доход −60%` });
         pm(p.id, 'note', { txt: `🌊 ${t.nick} лежит ${Math.round(dur / 1000)} с — ты перехватываешь его трафик` });
@@ -532,7 +713,7 @@
       if (!it) return false;
       p.items = p.items.filter((i) => i !== it);
       p.eq = p.eq.filter((u) => u !== it.u);
-      const v = Math.round(c.casePrice * R[ITEMS[it.k].r].mul * 0.35);
+      const v = Math.round(c.casePrice * R[ITEMS[it.k].r].mul * c.sellMul * Math.pow(3, it.s || 0));
       earn(s, p, v);
       pm(p.id, 'note', { txt: `Продано за ${fmt(v)}` });
     },
@@ -590,6 +771,7 @@
         if (has(p, n.id)) return false;
         if (i > 0 && !has(p, br.nodes[i - 1].id)) return err(p, 'Сначала прошлый узел ветки');
         if (i >= 3 && p.loc < 5) return err(p, 'Нужны исследования — Подземный ДЦ');
+        if (i >= 5 && p.loc < 9) return err(p, 'Ряды 6–8 открываются на Сфере Дайсона');
         if (p.cores < n.c) return err(p, 'Не хватает ядер');
         p.cores -= n.c;
         p.tree.push(n.id);
@@ -620,7 +802,7 @@
       p.cd.qc = now + 300e3;
       unlock(s, p, 'shrodi');
       const was = p.cr;
-      if (Math.random() < 0.55) { earn(s, p, was); feed(s, `⚛ ${B(p)} схлопнул волновую функцию: кредиты ×2 (+${fmt(was)})`, 'loot'); pm(p.id, 'note', { txt: `⚛ ×2! +${fmt(was)}` }); }
+      if (Math.random() < 0.55) { const win = Math.min(was, c.stable * 1800); earn(s, p, win); feed(s, `⚛ ${B(p)} схлопнул волновую функцию: кредиты ×2 (+${fmt(win)})`, 'loot'); pm(p.id, 'note', { txt: `⚛ ×2! +${fmt(win)}` }); }
       else { p.cr = was / 2; p.score -= was / 2; feed(s, `⚛ ${B(p)} схлопнул волновую функцию и потерял половину 💀`, 'bad'); pm(p.id, 'err', { txt: '⚛ Кот мёртв. −50%' }); }
     },
   };
@@ -633,11 +815,12 @@
     const pool = t.cr * (1 - ct.prot);
     let pct = c.steal * (has(p, 'a5') ? 2 : 1) * (1 - (has(p, 'a5') ? 0 : ct.proxy));
     if (has(t, 'd5')) pct = Math.min(pct, 0.01);
-    const dDur = DDOS_LEN * (1 - ct.ddosRed);
+    const dDur = DDOS_LEN * (1 - ct.ddosRed) * (has(p, 'a6') ? 1.5 : 1);
     return {
       chance, sure, hit: c.hit, block: ct.block, prot: ct.prot, proxy: ct.proxy, ddosRed: ct.ddosRed, pool,
       hack: { pct, amt: pool * pct },
-      ddos: { dur: dDur, gain: ct.stable * (1 - DDOS_MUL) * DDOS_STEAL * dDur / 1000, immune: has(t, 'd5') },
+      ddos: { dur: dDur, gain: ct.stable * (1 - DDOS_MUL) * (has(p, 'a6') ? 1 : DDOS_STEAL) * dDur / 1000, immune: has(t, 'd5') },
+      ally: !!(p.ally && p.ally === t.ally),
       virus: { dur: 8000 * (1 - ct.ddosRed * 0.5), pct: VIRUS_PCT * (1 - ct.proxy), amt: pool * VIRUS_PCT * (1 - ct.proxy) },
     };
   }
@@ -650,15 +833,18 @@
       const best = ps.slice().sort((x, y) => a.key(y) - a.key(x))[0];
       return best && a.key(best) > 0 ? { id: a.id, pid: best.id, nick: best.nick, v: a.key(best) } : null;
     }).filter(Boolean);
+    const best = Object.values(s.allies || {}).map((a) => ({ a, v: a.members.reduce((x, id) => x + ((s.players[id] || {}).score || 0), 0) })).sort((x, y) => y.v - x.v)[0];
+    if (best) s.awards.push({ id: 'ally', pid: null, nick: `[${best.a.name}]`, v: best.v });
     feed(s, '🌅 Утро. Сервер заморожен — итоги ночи', 'sys');
   }
 
   // догоняем время, пока в комнате никого не было: половина дохода, максимум за 30 минут
   function catchUp(s, now = Date.now()) {
+    normRoom(s);
     const gap = Math.min(1800, Math.max(0, (now - (s.now || now)) / 1000));
     if (gap > 5 && !s.over) Object.values(s.players).forEach((p) => earn(s, p, calc(p, s, now).inc * gap * 0.5));
     s.now = now;
   }
 
-  window.DCEngine = { fmt, esc, newRoom, ensurePlayer, calc, comboMul, nextCombo, hwCost, defCost, rebootGain, tick, act, drain, catchUp, itemBonus, forecast, DDOS_LEN };
+  window.DCEngine = { fmt, esc, newRoom, ensurePlayer, calc, comboMul, nextCombo, hwCost, defCost, rebootGain, nextCoreAt, coreBonus, tick, act, drain, catchUp, itemBonus, forecast, DDOS_LEN, normRoom, starMul };
 })();

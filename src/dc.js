@@ -102,8 +102,7 @@
       predicted = 0;
       if (first) { showGame(); send('hello', { nick: nick(), ver: (A.load(snapKey(code), null) || {}).ver || 0 }); }
       if (!S.players[me]) send('in', { m: { a: 'join', nick: nick() } });
-      if (Date.now() - lastSave > 5000) saveSnap();
-      render();
+      if (Date.now() - lastSave > 60000) saveSnap();
     });
     ch.on('broadcast', { event: 'in' }, ({ payload }) => {
       if (!net.host || !S) return;
@@ -166,8 +165,8 @@
     E.tick(S, Date.now());
     flushPms();
     const t = Date.now();
-    if (t - lastSent > 650 || (dirty && t - lastSent > 150)) publish();
-    if (t - lastSave > 5000) saveSnap();
+    if (t - lastSent > 1000 || (dirty && t - lastSent > 400)) publish();
+    if (t - lastSave > 20000) saveSnap();
   }, 200);
 
   /* ================= клики ================= */
@@ -192,14 +191,16 @@
   const hue = (id) => [...String(id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
   const ava = (p) => `<i class="dc-ava" style="--h:${hue(p.id)}">${ini(p.nick)}</i>`;
   const R = D.R;
-  const itemName = (it) => { const t = D.ITEMS[it.k]; return `<i class="r-${t.r}">${esc(t.n)}</i>`; };
+  const stars = (it) => (it.s ? `<i class="dc-stars">${'★'.repeat(it.s)}</i>` : '');
+  const itemName = (it) => { const t = D.ITEMS[it.k]; return `<i class="r-${t.r}">${esc(t.n)}</i>${stars(it)}`; };
+  const allyTag = (x) => { const a = x.ally && S.allies && S.allies[x.ally]; return a ? `<i class="dc-tag" style="--ah:${a.hue}">${esc(a.name)}</i>` : ''; };
   const bonusTxt = (b) => Object.entries(b).map(([k, v]) => D.BONUS_TXT[k](v)).join(', ');
   const hint = (txt) => `<div class="dc-hint">💡 ${txt}</div>`;
   const lockBox = (loc, what) => `<div class="dc-lock"><b>${D.LOCS[loc].icon}</b><div>${what} открывается в локации <b>${D.LOCS[loc].name}</b></div><small>Переезжай на карте слева</small></div>`;
 
   const TABS = [
     ['hw', '🖥', 'Железо'], ['up', '⬆', 'Апгрейды'], ['hack', '💀', 'Хакинг'], ['inv', '🎒', 'Предметы'],
-    ['mk', '🏷', 'Рынок'], ['core', '🧬', 'Ядро'], ['tasks', '📋', 'Задания'], ['stats', '📊', 'Стата'],
+    ['mk', '🏷', 'Рынок'], ['lab', '🧪', 'Лаба'], ['world', '🌐', 'Сервер'], ['core', '🧬', 'Ядро'], ['tasks', '📋', 'Задания'], ['stats', '📊', 'Стата'],
   ];
 
   /* ---------- железо стойки и зал ---------- */
@@ -211,7 +212,7 @@
     <span class="pwr"></span><i class="scr"></i></span>`;
 
   // «твой зал»: чем больше железа, тем больше стоек; цвет — по локации
-  const LOC_HUE = [70, 45, 150, 190, 210, 30, 265, 320];
+  const LOC_HUE = [70, 45, 150, 190, 210, 30, 265, 320, 220, 50, 290, 140];
   function renderHall(p) {
     const total = Object.values(p.hw).reduce((a, b) => a + b, 0);
     const n = Math.min(16, Math.max(1, Math.ceil(Math.sqrt(total))));
@@ -317,6 +318,7 @@
             <div class="dc-box dc-feed-box"><div class="dc-h">ЛЕНТА</div><div class="dc-feed" id="dc-feed"></div></div>
           </section>
         </div>
+        <div class="dc-vig"></div>
         <div class="dc-fx" id="dc-fx"></div>
         <div class="dc-ov" id="dc-ov" hidden></div>
       </div>`;
@@ -421,7 +423,7 @@
       const bty = S.bounty[x.id];
       return `<div class="lb ${x.id === me ? 'me' : ''} ${x.on ? '' : 'off'}">
         <span class="lb-n">${i + 1}</span>${ava(x)}
-        <div class="lb-main"><b>${esc(x.nick)}${clicking ? '<i class="lb-click">⚡</i>' : ''}${bty ? `<i class="lb-bty">🎯${fmt(bty.pool)}</i>` : ''}</b><small>${D.LOCS[x.loc].icon} ${fmt(c.inc)}/с${x.coresAll ? ` · 🧬${x.coresAll}` : ''}</small></div>
+        <div class="lb-main"><b>${allyTag(x)}${esc(x.nick)}${clicking ? '<i class="lb-click">⚡</i>' : ''}${bty ? `<i class="lb-bty">🎯${fmt(bty.pool)}</i>` : ''}</b><small>${D.LOCS[x.loc].icon} ${fmt(c.inc)}/с${x.coresAll ? ` · 🧬${x.coresAll}` : ''}</small></div>
         <span class="lb-s">${fmt(x.score)}</span></div>`;
     }).join(''));
   }
@@ -435,13 +437,13 @@
         ${hint('Железо приносит кредиты каждую секунду, даже когда ты не кликаешь. Каждая следующая штука дороже на 15%. Новое железо открывается при переезде.')}
         <div class="dc-list">${vis.map((h) => {
           const n = p.hw[h.id] || 0, locked = h.loc > p.loc;
-          const x2 = p.up.includes('x2_' + h.id) ? 2 : 1;
+          const x2 = (c.hwM && c.hwM[h.id]) || 1;
           let cost = 0;
           const cnt = view.hwN === 'max' ? 1 : view.hwN;
           for (let k = 0; k < cnt; k++) cost += E.hwCost(p, h, c, k);
           return `<div class="dc-row ${locked ? 'locked' : ''}">
             <span class="dc-ic">${h.icon}</span>
-            <div class="dc-rt"><b>${esc(h.name)} <em>${n}</em></b><small>${locked ? `🔒 ${D.LOCS[h.loc].name}` : `${esc(h.d)} · +${fmt(h.rate * x2)}/с за шт.`}</small></div>
+            <div class="dc-rt"><b>${esc(h.name)} <em>${n}</em></b><small>${locked ? `🔒 ${D.LOCS[h.loc].name}` : `${esc(h.d)} · +${fmt(h.rate * x2)}/с за шт.${x2 > 1 ? ` <span class="nx">тюнинг ×${x2}</span>` : ''}`}</small></div>
             ${locked ? '' : `<button class="dc-buy ${can(p, cost)}" data-hw="${h.id}">${fmt(cost)}</button>`}
           </div>`;
         }).join('')}</div>`);
@@ -480,6 +482,7 @@
           else if (t - x.lastHit < 45e3) why = `💨 только что ограбили · ${mmss(45e3 - (t - x.lastHit))}`;
           else if (view.kind !== 'hack' && !x.on) why = '⚫ не в сети — только взлом';
           else if (view.kind === 'ddos' && f.ddos.immune) why = '🏰 Крепость — DDoS не берёт';
+          if (f.ally) why = '🤝 союзник — атаковать нельзя';
           const bty = S.bounty[x.id];
           let gain = '';
           if (view.kind === 'hack') gain = `украдёшь ≈ <b>${fmt(f.hack.amt)}</b> <i>(${(f.hack.pct * 100).toFixed(1)}%)</i>`;
@@ -513,18 +516,23 @@
       const sel = p.items.find((i) => i.u === view.sel);
       const b = E.itemBonus(p);
       put('dc-panel', `<div class="dc-ph"><b>Предметы</b><small>${p.items.length}/40 · слотов ${p.eq.length}/${slots}</small></div>
-        ${hint('Бонусы дают только надетые предметы (метка ON). Нажми на предмет, чтобы надеть, продать или выставить на рынок.')}
+        ${hint('Бонусы дают только надетые предметы (метка ON). Нажми на предмет: надеть, продать, выставить на рынок или сплавить. ⚒ — есть 3 одинаковых, можно сплавить в ★.')}
         ${p.loc >= 1 ? `<button class="dc-case ${can(p, c.casePrice)}" data-case><span>📦</span><div><b>Открыть кейс</b><small>шанс прототипа 0.2% · удача ×${c.luck.toFixed(2)}</small></div><em>${fmt(c.casePrice)}</em></button>` : lockBox(1, 'Кейсы')}
         <small class="dc-note">Надето: ${bonusTxt(Object.fromEntries(Object.entries(b).filter(([, v]) => v))) || 'ничего'}</small>
         <div class="dc-inv">${p.items.slice().sort((x, y) => D.RAR.indexOf(D.ITEMS[y.k].r) - D.RAR.indexOf(D.ITEMS[x.k].r)).map((it) => {
           const t = D.ITEMS[it.k];
-          return `<button class="dc-item r-${t.r} ${p.eq.includes(it.u) ? 'eq' : ''} ${view.sel === it.u ? 'sel' : ''}" data-item="${it.u}"><span>${D.TYPE_ICON[t.t]}</span><b>${esc(t.n)}</b><small>${R[t.r].name}</small></button>`;
+          const dup = p.items.filter((i) => i.k === it.k && (i.s || 0) === (it.s || 0)).length;
+          return `<button class="dc-item r-${t.r} ${p.eq.includes(it.u) ? 'eq' : ''} ${view.sel === it.u ? 'sel' : ''}" data-item="${it.u}"><span>${D.TYPE_ICON[t.t]}</span><b>${esc(t.n)}</b><small>${R[t.r].name}${stars(it)}</small>${dup >= 3 && (it.s || 0) < D.STAR_MAX ? '<em class="dc-canmerge" title="Можно сплавить">⚒</em>' : ''}</button>`;
         }).join('') || '<div class="dc-empty">Пусто. Кейсы, боссы и контракты дают предметы.</div>'}</div>
         ${sel ? (() => {
           const t = D.ITEMS[sel.k], on = p.eq.includes(sel.u);
-          return `<div class="dc-itemcard r-${t.r}"><div><b>${esc(t.n)}</b><small>${R[t.r].name} · ${t.t} · ${bonusTxt(t.b)}</small></div>
+          const m = E.starMul(p, sel), sb = Object.fromEntries(Object.entries(t.b).map(([k, v]) => [k, v * m]));
+          const dup = p.items.filter((i) => i !== sel && i.k === sel.k && (i.s || 0) === (sel.s || 0)).length;
+          const canMerge = (sel.s || 0) < D.STAR_MAX;
+          return `<div class="dc-itemcard r-${t.r}"><div><b>${esc(t.n)} ${stars(sel)}</b><small>${R[t.r].name} · ${t.t} · ${bonusTxt(sb)}</small></div>
             <div class="dc-acts"><button class="dc-buy" data-${on ? 'uneq' : 'eq'}="${sel.u}">${on ? 'Снять' : 'Надеть'}</button>
-            <button class="dc-buy ghost" data-sell="${sel.u}">Продать · ${fmt(Math.round(c.casePrice * R[t.r].mul * 0.35))}</button>
+            ${canMerge ? `<button class="dc-buy ${dup >= 2 ? '' : 'off'}" data-merge="${sel.u}" title="3 одинаковых предмета одной звёздности → один на ★ выше (+${p.loc >= 10 ? 75 : 50}% к бонусам за звезду)">⚒ Сплавить ${dup + 1}/3</button>` : ''}
+            <button class="dc-buy ghost" data-sell="${sel.u}">Продать · ${fmt(Math.round(c.casePrice * R[t.r].mul * c.sellMul * Math.pow(3, sel.s || 0)))}</button>
             <button class="dc-buy ghost" data-list="${sel.u}">На рынок</button></div></div>`;
         })() : ''}`);
     },
@@ -549,18 +557,65 @@
     },
     core(p, c, t) {
       const g = E.rebootGain(p);
-      put('dc-panel', `<div class="dc-ph"><b>Ядро</b><small>🧬 ${p.cores} свободно · всего ${p.coresAll} (+${p.coresAll * 4}% дохода)</small></div>
-        ${hint('Reboot сбрасывает прогресс, но даёт ядра 🧬. Каждое ядро навсегда +4% дохода, а ещё их тратят на дерево ниже. Чем больше заработал за забег, тем больше ядер.')}
+      const cb = E.coreBonus(p);
+      put('dc-panel', `<div class="dc-ph"><b>Ядро</b><small>🧬 ${fmt(p.cores)} свободно · всего ${fmt(p.coresAll)} (доход ×${cb.toFixed(2)})${p.sing ? ` · 🕳 ×${p.sing + 1}` : ''}</small></div>
+        ${hint('Reboot сбрасывает прогресс, но даёт ядра 🧬. Ядра навсегда множат доход и тратятся на дерево ниже. Ядра считаются от всего, что ты заработал за ночь, поэтому ребутаться выгодно, когда ядер прибавится заметно.')}
         <div class="dc-reboot"><div><b>♻ Reboot</b><small>Сбросит кредиты, железо, апгрейды, защиту и локацию. Предметы, ядра и дерево останутся.${p.loc < 3 ? ' Доступно с Датацентра.' : ''}</small></div>
           <button class="dc-buy red ${p.loc >= 3 && g >= 1 ? '' : 'off'}" data-reboot>+${g} 🧬</button></div>
-        <small class="dc-note">Ядра = √(заработано за забег / 1M). Следующее ядро на ${fmt(Math.pow(g + 1, 2) * 1e6)}</small>
+        <small class="dc-note">Заработано за ночь ${fmt(p.life || 0)} · следующее ядро на ${fmt(E.nextCoreAt(p))}${g ? ` · после Reboot доход ×${Math.pow(1 + p.coresAll + g, 0.55).toFixed(2)}` : ''}</small>
         <div class="dc-tree">${Object.entries(D.TREE).map(([k, br]) => `<div class="dc-br" style="--c:${br.color}"><div class="dc-br-h">${br.name}</div>${br.nodes.map((n, i) => {
           const got = p.tree.includes(n.id), prev = i === 0 || p.tree.includes(br.nodes[i - 1].id);
-          const lockR = i >= 3 && p.loc < 5;
-          return `<button class="dc-nd ${got ? 'got' : prev && !lockR && p.cores >= n.c ? 'can' : 'off'}" data-tree="${n.id}"><b>${esc(n.name)}</b><small>${esc(n.d)}</small><em>${got ? '✓' : lockR ? '⛏' : n.c + ' 🧬'}</em></button>`;
+          const lockR = (i >= 3 && p.loc < 5) || (i >= 5 && p.loc < 9);
+          return `<button class="dc-nd ${got ? 'got' : prev && !lockR && p.cores >= n.c ? 'can' : 'off'}" data-tree="${n.id}" title="${lockR ? (i >= 5 ? 'Откроется на Сфере Дайсона' : 'Откроется в Подземном ДЦ') : ''}"><b>${esc(n.name)}</b><small>${esc(n.d)}</small><em>${got ? '✓' : lockR ? (i >= 5 ? '☀' : '⛏') : n.c + ' 🧬'}</em></button>`;
         }).join('')}</div>`).join('')}</div>
         ${p.loc >= 6 ? `<div class="dc-reboot"><div><b>🛰 Орбитальный бафф</b><small>Всем +25% дохода на 2 минуты, тебе ×2. Раз в 10 минут.</small></div><button class="dc-buy ${t < (p.cd.orb || 0) ? 'off' : ''}" data-orbit>${t < (p.cd.orb || 0) ? mmss(p.cd.orb - t) : 'Запуск'}</button></div>` : ''}
-        ${p.loc >= 7 ? `<div class="dc-reboot q"><div><b>⚛ Коллапс волновой функции</b><small>55% — кредиты ×2. 45% — минус половина. Раз в 5 минут.</small></div><button class="dc-buy red ${t < (p.cd.qc || 0) ? 'off' : ''}" data-qc>${t < (p.cd.qc || 0) ? mmss(p.cd.qc - t) : 'Схлопнуть'}</button></div>` : ''}`);
+        ${p.loc >= 7 ? `<div class="dc-reboot q"><div><b>⚛ Коллапс волновой функции</b><small>55% — кредиты ×2 (максимум +30 минут дохода). 45% — минус половина. Раз в 5 минут.</small></div><button class="dc-buy red ${t < (p.cd.qc || 0) ? 'off' : ''}" data-qc>${t < (p.cd.qc || 0) ? mmss(p.cd.qc - t) : 'Схлопнуть'}</button></div>` : ''}
+        ${p.loc >= 11 ? `<div class="dc-reboot q"><div><b>🕳 Сингулярность #${p.sing + 1}</b><small>Сбросит ВСЁ, включая ядра и дерево. Останутся предметы и исследования. Взамен доход ×${p.sing + 2} навсегда.</small></div><button class="dc-buy red" data-sing>Войти</button></div>` : ''}`);
+    },
+    lab(p, c, t) {
+      if (c.labSlots < 1) return put('dc-panel', lockBox(5, 'Лаборатория'));
+      const done = new Set(p.res);
+      const evRes = c.ev && c.ev.resMul;
+      put('dc-panel', `<div class="dc-ph"><b>Лаборатория</b><small>слотов ${p.lab.length}/${c.labSlots} · изучено ${p.res.length}/${D.RES.length}</small></div>
+        ${hint('Исследования идут в реальном времени и остаются навсегда — даже после Reboot. Одновременно — столько, сколько слотов (2-й слот с Лунной базы).')}
+        ${evRes ? '<div class="dc-st good">🏛 Госгрант: исследования идут ×3 быстрее</div>' : ''}
+        ${p.lab.map((j) => {
+          const r = D.RES.find((x) => x.id === j.id);
+          return `<div class="dc-lab"><span>${r.icon}</span><div><b>${esc(r.name)}</b><small>${esc(r.d)}</small><div class="bar cmb"><i style="width:${(1 - j.left / j.total) * 100}%"></i></div></div><time>${mmss(j.left)}</time></div>`;
+        }).join('')}
+        <div class="dc-cards">${D.RES.map((r) => {
+          const has = done.has(r.id), run = p.lab.some((j) => j.id === r.id);
+          const cost = D.resCost(r, c.stable);
+          return `<button class="dc-card ${has ? 'got' : run ? 'locked' : p.lab.length >= c.labSlots ? 'off' : can(p, cost)}" data-res="${r.id}"><span>${r.icon}</span><b>${esc(r.name)}</b><small>${esc(r.d)} · ${r.min} мин</small><em>${has ? '✓ изучено' : run ? 'идёт…' : fmt(cost)}</em></button>`;
+        }).join('')}</div>`);
+    },
+    world(p, c, t, ps) {
+      const allies = Object.values(S.allies || {});
+      const mega = S.mega || { lvl: 0, prog: 0 };
+      const maxed = mega.lvl >= D.MEGA_STAGES.length;
+      const goal = maxed ? 1 : D.megaGoal(mega.lvl);
+      const cap = Math.max(2, Math.ceil(ps.length / 2));
+      const myA = p.ally && S.allies[p.ally];
+      const top = ps.filter((x) => x.st.mega).sort((a, b) => b.st.mega - a.st.mega).slice(0, 5);
+      put('dc-panel', `<div class="dc-ph"><b>🏗 Мега-ДЦ</b><small>общий проект комнаты · ур. ${mega.lvl}/${D.MEGA_STAGES.length} · всем +${mega.lvl * 10}% дохода</small></div>
+        ${hint('Скидывайтесь всей комнатой: каждый построенный этап навсегда даёт ВСЕМ +10% дохода. Кто вложил больше всех — получит награду утром.')}
+        <div class="dc-mega">
+          <div class="dc-mega-stages">${D.MEGA_STAGES.map((n, i) => `<i class="${i < mega.lvl ? 'done' : i === mega.lvl ? 'cur' : ''}" title="${esc(n)}"></i>`).join('')}</div>
+          ${maxed ? '<b>Мега-ДЦ достроен! 🎉</b>' : `<b>Этап ${mega.lvl + 1}: ${esc(D.MEGA_STAGES[mega.lvl])}</b>
+          <div class="bar cmb"><i style="width:${Math.min(100, (mega.prog / goal) * 100)}%"></i></div>
+          <small>${fmt(mega.prog)} / ${fmt(goal)}</small>
+          <div class="dc-acts">${[0.1, 0.25, 0.5, 1].map((k) => `<button class="dc-buy ${p.cr >= 1000 ? '' : 'off'}" data-mega="${k}">${k === 1 ? 'ВСЁ' : k * 100 + '%'} · ${fmt(p.cr * k)}</button>`).join('')}</div>`}
+          ${top.length ? `<div class="dc-boss-top">${top.map((x, i) => `<span>${i + 1}. ${esc(x.nick)} <b>${fmt(x.st.mega)}</b></span>`).join('')}</div>` : ''}
+        </div>
+        <div class="dc-ph"><b>🤝 Альянсы</b><small>до ${cap} человек · +5% дохода за союзника в сети</small></div>
+        ${hint('Союзников нельзя атаковать. Каждый союзник в сети даёт +5% к доходу всем в альянсе. Утром — награда лучшему альянсу по сумме очков.')}
+        ${myA ? `<div class="dc-ally me" style="--ah:${myA.hue}"><div><b>[${esc(myA.name)}]</b><small>${myA.members.map((id) => esc((S.players[id] || {}).nick || '?')).join(', ')} · бонус +${Math.round(c.ally * 100)}%</small></div><button class="dc-buy ghost" data-allyleave>Выйти</button></div>`
+          : '<button class="dc-btn big ghost" data-allynew>🤝 Основать свой альянс</button>'}
+        <div class="dc-list">${allies.filter((a) => a !== myA).map((a) => {
+          const sum = a.members.reduce((x, id) => x + ((S.players[id] || {}).score || 0), 0);
+          return `<div class="dc-ally" style="--ah:${a.hue}"><div><b>[${esc(a.name)}]</b><small>${a.members.map((id) => esc((S.players[id] || {}).nick || '?')).join(', ')} · ${fmt(sum)} очков</small></div>
+            ${myA ? '' : `<button class="dc-buy ${a.members.length >= cap ? 'off' : ''}" data-allyjoin="${a.id}">${a.members.length >= cap ? 'Полный' : 'Вступить'}</button>`}</div>`;
+        }).join('') || (myA ? '' : '<div class="dc-empty">Альянсов пока нет — основай первый.</div>')}</div>`);
     },
     tasks(p, c, t) {
       const ct = p.ct;
@@ -571,7 +626,7 @@
     },
     stats(p, c, t, ps) {
       const rows = [['Очки', (x) => fmt(x.score)], ['Кликов', (x) => fmt(x.st.clicks)], ['Заработано', (x) => fmt(x.st.earned)], ['Украл', (x) => fmt(x.st.stolen)], ['Потерял', (x) => fmt(x.st.lost)],
-        ['Атак', (x) => `${x.st.attacks} (${x.st.atkOk}✓)`], ['Урон боссам', (x) => fmt(x.st.boss)], ['Кейсов', (x) => x.st.cases], ['Потратил', (x) => fmt(x.st.spent)], ['Перегревов', (x) => x.st.overheats], ['Reboot', (x) => x.st.reboots], ['Ачивок', (x) => x.ach.length]];
+        ['Атак', (x) => `${x.st.attacks} (${x.st.atkOk}✓)`], ['Урон боссам', (x) => fmt(x.st.boss)], ['Кейсов', (x) => x.st.cases], ['Потратил', (x) => fmt(x.st.spent)], ['Перегревов', (x) => x.st.overheats], ['Reboot', (x) => x.st.reboots], ['Сингулярность', (x) => x.sing || 0], ['Исследований', (x) => (x.res || []).length], ['В Мега-ДЦ', (x) => fmt(x.st.mega || 0)], ['Ачивок', (x) => x.ach.length]];
       const list = ps.slice().sort((a, b) => b.score - a.score);
       put('dc-panel', `<div class="dc-ph"><b>Статистика ночи</b></div><div class="dc-tbl"><table><tr><th></th>${list.map((x) => `<th class="${x.id === me ? 'me' : ''}">${esc(x.nick)}</th>`).join('')}</tr>
         ${rows.map(([n, f]) => `<tr><td>${n}</td>${list.map((x) => `<td class="${x.id === me ? 'me' : ''}">${f(x)}</td>`).join('')}</tr>`).join('')}</table></div>`);
@@ -582,10 +637,15 @@
   let ls = 0, lsAt = 0;
   const localStreak = () => (Date.now() - lsAt < 1200 ? ls : 0);
 
+  // эффекты кликов дешёвые и с ограничением частоты, чтобы автокликер не клал интерфейс
+  let fxRect = null, fxRectAt = 0;
+  const fxBase = () => {
+    if (!fxRect || Date.now() - fxRectAt > 500) { const fx = $('#dc-fx'); fxRect = fx && fx.getBoundingClientRect(); fxRectAt = Date.now(); }
+    return fxRect;
+  };
   function floatText(x, y, txt, cls = '') {
-    const fx = $('#dc-fx');
-    if (!fx) return;
-    const base = fx.getBoundingClientRect();
+    const fx = $('#dc-fx'), base = fxBase();
+    if (!fx || !base || fx.childElementCount > 40) return;
     const el = document.createElement('span');
     el.className = 'dc-float ' + cls;
     el.textContent = txt;
@@ -593,55 +653,64 @@
     el.style.left = `${(x - base.left) / z + (Math.random() * 30 - 15)}px`;
     el.style.top = `${(y - base.top) / z - 10}px`;
     fx.appendChild(el);
-    setTimeout(() => el.remove(), 900);
+    setTimeout(() => el.remove(), 1000);
   }
 
   // «пакеты данных» разлетаются от клика
   function packets(x, y, n, color) {
-    const fx = $('#dc-fx');
-    if (!fx) return;
-    const base = fx.getBoundingClientRect(), z = view.z || 1;
+    const fx = $('#dc-fx'), base = fxBase();
+    if (!fx || !base || fx.childElementCount > 40) return;
+    const z = view.z || 1;
     for (let i = 0; i < n; i++) {
       const el = document.createElement('i');
       el.className = 'dc-pkt';
       const a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
       el.style.cssText = `left:${(x - base.left) / z}px;top:${(y - base.top) / z}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 30}px;--c:${color}`;
       fx.appendChild(el);
-      setTimeout(() => el.remove(), 700);
+      setTimeout(() => el.remove(), 1000);
     }
   }
 
+  const CLICK_CAP = 25; // столько кликов в секунду засчитывает хост
+  const fxs = { sec: 0, n: 0, floatAt: 0, acc: 0, accMul: 1, sndAt: 0, tapAt: 0 };
   function nodeClick(x, y, boss) {
     if (!S || S.over) return;
     const p = S.players[me];
     if (!p) return;
-    const t = now();
-    if (t < p.down || t < p.ddos) { floatText(x, y, t < p.down ? '🔥 перегрев' : '🌊 DDoS', 'bad'); return; }
+    const t = now(), ms = Date.now();
+    if (t < p.down || t < p.ddos) { if (ms - fxs.floatAt > 300) { fxs.floatAt = ms; floatText(x, y, t < p.down ? '🔥 перегрев' : '🌊 DDoS', 'bad'); } return; }
+    const sec = Math.floor(ms / 1000);
+    if (fxs.sec !== sec) { fxs.sec = sec; fxs.n = 0; }
+    if (++fxs.n > CLICK_CAP) return; // лишние клики автокликера всё равно не засчитаются
     const c = E.calc(p, S, t);
-    ls = Date.now() - lsAt < 1200 ? ls + 1 : 1;
-    lsAt = Date.now();
+    ls = ms - lsAt < 1200 ? ls + 1 : 1;
+    lsAt = ms;
     const mul = E.comboMul({ streak: ls }, c.comboCap);
-    if (boss) {
-      pendBoss++;
-      floatText(x, y, `−${fmt(c.click * c.bossMul * Math.sqrt(mul))}`, 'boss');
-      packets(x, y, 3, '#ff5f5f');
-      sfx('bossHit');
-    } else {
-      pendClicks++;
-      const g = c.click * mul;
-      predicted += g;
-      floatText(x, y, `+${fmt(g)}${mul > 1 ? ` ×${mul}` : ''}`, mul >= 10 ? 'x10' : mul >= 5 ? 'x5' : '');
-      packets(x, y, mul >= 10 ? 5 : mul >= 3 ? 3 : 2, mul >= 10 ? '#ffb340' : mul >= 5 ? '#6bc9ff' : '#e4f07e');
-      sfx('click', mul);
+    const g = boss ? c.click * c.bossMul * Math.sqrt(mul) : c.click * mul;
+    if (boss) pendBoss++;
+    else { pendClicks++; predicted += g; }
+    // цифры: не чаще ~12 в секунду, остальное копим в одну
+    fxs.acc += g; fxs.accMul = mul;
+    if (ms - fxs.floatAt > 80) {
+      fxs.floatAt = ms;
+      if (boss) floatText(x, y, `−${fmt(fxs.acc)}`, 'boss');
+      else floatText(x, y, `+${fmt(fxs.acc)}${mul > 1 ? ` ×${mul}` : ''}`, mul >= 10 ? 'x10' : mul >= 5 ? 'x5' : '');
+      packets(x, y, boss ? 2 : mul >= 10 ? 4 : 2, boss ? '#ff5f5f' : mul >= 10 ? '#ffb340' : mul >= 5 ? '#6bc9ff' : '#e4f07e');
+      fxs.acc = 0;
     }
+    if (ms - fxs.sndAt > 55) { fxs.sndAt = ms; sfx(boss ? 'bossHit' : 'click', mul); }
     if (mul > (view.lastMul || 1)) {
       const pop = $('#dc-cpop');
-      if (pop) { pop.textContent = `COMBO ×${mul}`; pop.className = `dc-cpop go x${mul}`; void pop.offsetWidth; }
+      if (pop) {
+        pop.textContent = `COMBO ×${mul}`;
+        pop.className = `dc-cpop x${mul}`;
+        pop.animate([{ opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1.15, offset: 0.2 }, { opacity: 1, scale: 1, offset: 0.7 }, { opacity: 0, scale: 1.05, translate: '-50% -90%' }], { duration: 900, easing: 'cubic-bezier(.2,1.3,.4,1)' });
+      }
       sfx('combo', mul);
     }
     view.lastMul = mul;
-    const rack = $('#dc-rack');
-    if (rack && !boss) { rack.classList.remove('tap'); void rack.offsetWidth; rack.classList.add('tap'); }
+    const rack = !boss && ms - fxs.tapAt > 90 && $('#dc-rack');
+    if (rack) { fxs.tapAt = ms; rack.animate([{ transform: 'scale(1)' }, { transform: 'scale(.975)' }, { transform: 'scale(1)' }], { duration: 110 }); }
   }
   setInterval(() => { if (net.host) predicted = 0; }, 200);
 
@@ -742,7 +811,7 @@
       <small>🌅 НОЧЬ ОКОНЧЕНА · КОМНАТА ${esc(S.code)}</small>
       <h2>Итоги ночи</h2>
       <div class="dc-awards">${(S.awards || []).map((a) => {
-        const d = D.AWARDS.find((x) => x.id === a.id);
+        const d = D.AWARDS.find((x) => x.id === a.id) || { icon: '🤝', name: 'Альянс ночи', d: 'очков на команду' };
         return `<div class="dc-award ${a.id === 'king' ? 'king' : ''} ${a.pid === me ? 'me' : ''}"><span>${d.icon}</span><b>${esc(d.name)}</b><em>${esc(a.nick)}</em><small>${fmt(a.v)} ${d.d}</small></div>`;
       }).join('')}</div>
       <div class="dc-podium">${ps.map((x, i) => `<div class="${x.id === me ? 'me' : ''}"><span>${i + 1}</span>${ava(x)}<b>${esc(x.nick)}</b><em>${fmt(x.score)}</em></div>`).join('')}</div>
@@ -772,7 +841,12 @@
 
   /* ---------- лобби ---------- */
   const rooms = () => A.load('qb.dc.rooms', []);
-  function rememberRoom(code) { A.store('qb.dc.rooms', [code, ...rooms().filter((c) => c !== code)].slice(0, 6)); }
+  function rememberRoom(code) {
+    const list = [code, ...rooms().filter((c) => c !== code)];
+    // снапшоты старых комнат удаляем, чтобы файл данных не пух
+    list.slice(6).forEach((c) => A.store(snapKey(c), undefined));
+    A.store('qb.dc.rooms', list.slice(0, 6));
+  }
   const cleanCode = (v) => String(v || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9а-яё-]/g, '').slice(0, 24);
   const randCode = () => 'night-' + Math.random().toString(36).slice(2, 6);
   let lobbyHours = 6;
@@ -786,7 +860,7 @@
           <small>МУЛЬТИПЛЕЕРНЫЙ КЛИКЕР НА ОДНУ НОЧЬ</small>
           <h2>Ночной<br><span>дата-центр</span></h2>
           <p>Все на одном сервере. Кликай, скупай железо, переезжай из домашнего ПК в квантовый сервер, ддось кентов, валите вместе боссов. Утром сервер замерзает — и выясняется, кто король ночи.</p>
-          <div class="dc-feats">${['⚡ комбо до ×15', '💀 взломы и DDoS', '☠ общий босс', '🎁 кейсы и прототипы 0.2%', '🏷 рынок между игроками', '🎯 bounty', '♻ престиж', '🌅 финал утром'].map((f) => `<span>${f}</span>`).join('')}</div>
+          <div class="dc-feats">${['⚡ комбо до ×15', '💀 взломы и DDoS', '☠ боссы и рейды', '🎁 кейсы, прототипы и ★', '🏷 рынок между игроками', '🎯 bounty', '🤝 альянсы', '🧪 исследования', '🏗 общий Мега-ДЦ', '🗺 12 локаций', '♻ престиж и сингулярность', '🌅 финал утром'].map((f) => `<span>${f}</span>`).join('')}</div>
         </div>
         <div class="dc-hero-art">${[0, 1, 2].map((r) => `<div class="dc-tower">${Array.from({ length: 7 }, (_, i) => `<span class="dc-unit"><i></i><i></i><i></i><em style="--d:${(r * 7 + i) * 0.13}s"></em><em style="--d:${(r + i) * 0.29}s"></em><em style="--d:${i * 0.41}s"></em></span>`).join('')}</div>`).join('')}</div>
       </div>
@@ -854,10 +928,19 @@
       sell: () => { act({ a: 'sell', u: +d.sell }); view.sel = null; }, unlist: () => act({ a: 'unlist', id: +d.unlist }),
       buylot: () => act({ a: 'buylot', id: +d.buylot }), bm: () => act({ a: 'bm', i: +d.bm }), tree: () => act({ a: 'tree', id: d.tree }),
       reboot: () => { if (confirm('Reboot сбросит забег. Точно?')) act({ a: 'reboot' }); }, orbit: () => act({ a: 'orbit' }), qc: () => act({ a: 'qc' }),
+      merge: () => act({ a: 'merge', u: +d.merge }), res: () => act({ a: 'res', id: d.res }),
+      mega: () => act({ a: 'mega', amt: Math.floor(S.players[me].cr * +d.mega) }),
+      allynew: () => modal('<b>🤝 Новый альянс</b><small>Союзников нельзя атаковать, каждый в сети даёт +5% дохода</small><input class="dc-inp" id="dc-ally-name" maxlength="16" placeholder="Название, напр. Братва" autocomplete="off">', (ov) => {
+        const n = $('#dc-ally-name', ov).value.trim();
+        if (n.length < 2) { A.toast('Название от 2 символов'); return false; }
+        act({ a: 'allyNew', name: n });
+      }),
+      allyjoin: () => act({ a: 'allyJoin', id: d.allyjoin }), allyleave: () => { if (confirm('Выйти из альянса? Вступить снова можно через 3 минуты.')) act({ a: 'allyLeave' }); },
+      sing: () => { if (confirm('Сингулярность сбросит ВСЁ, включая ядра и дерево. Точно?')) act({ a: 'sing' }); },
     };
     const k = Object.keys(map).find((x) => x in d);
     if (!k) return;
-    if (['hw', 'up', 'def', 'loc', 'case', 'eq', 'buylot', 'bm', 'tree'].includes(k)) sfx('buy');
+    if (['hw', 'up', 'def', 'loc', 'case', 'eq', 'buylot', 'bm', 'tree', 'merge', 'res', 'mega', 'allyjoin', 'allynew'].includes(k)) sfx('buy');
     if (k === 'atk') sfx('hit');
     map[k]();
   });
