@@ -201,24 +201,103 @@
     ['mk', '🏷', 'Рынок'], ['core', '🧬', 'Ядро'], ['tasks', '📋', 'Задания'], ['stats', '📊', 'Стата'],
   ];
 
+  /* ---------- железо стойки и зал ---------- */
+  const rr = (a, b) => (a + Math.random() * (b - a)).toFixed(2);
+  // один юнит: винты, 4 корзины дисков с лампочками активности, решётка, кулер, питание
+  const rackUnit = () => `<span class="dc-srv"><i class="scr"></i>
+    <span class="bays">${[0, 1, 2, 3].map(() => `<b><u style="--k:${rr(0.25, 1.4)};--d:-${rr(0, 2)}s"></u></b>`).join('')}</span>
+    <span class="vent"></span><span class="fan"><i style="--d:-${rr(0, 1)}s"></i></span>
+    <span class="pwr"></span><i class="scr"></i></span>`;
+
+  // «твой зал»: чем больше железа, тем больше стоек; цвет — по локации
+  const LOC_HUE = [70, 45, 150, 190, 210, 30, 265, 320];
+  function renderHall(p) {
+    const total = Object.values(p.hw).reduce((a, b) => a + b, 0);
+    const n = Math.min(16, Math.max(1, Math.ceil(Math.sqrt(total))));
+    put('dc-hall', `<div class="dc-hall-h"><span>ТВОЙ ЗАЛ · ${D.LOCS[p.loc].name.toUpperCase()}</span><b>${total} ед.</b></div>
+      <div class="dc-hall-row" style="--hh:${LOC_HUE[p.loc]}">${Array.from({ length: n }, (_, i) => `<i style="--d:-${(i * 0.37) % 2}s">${'<em></em>'.repeat(5)}</i>`).join('')}</div>`);
+  }
+
+  // график дохода за последние ~2 минуты
+  const spark = [];
+  let sparkAt = 0;
+  function drawSpark(inc) {
+    if (Date.now() - sparkAt > 2000) { sparkAt = Date.now(); spark.push(inc); if (spark.length > 60) spark.shift(); }
+    const cv = $('#dc-spark');
+    if (!cv || !cv.clientWidth) return;
+    const dpr = window.devicePixelRatio || 1, w = cv.clientWidth * dpr, h = cv.clientHeight * dpr;
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const g = cv.getContext('2d');
+    g.clearRect(0, 0, w, h);
+    if (spark.length < 2) return;
+    const max = Math.max(...spark) || 1, min = Math.min(...spark);
+    const span = max - min || max;
+    const pts = spark.map((v, i) => [(i / (spark.length - 1)) * w, h - 3 * dpr - ((v - min) / span) * (h - 8 * dpr)]);
+    const grad = g.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(228,240,126,.35)'); grad.addColorStop(1, 'rgba(228,240,126,0)');
+    g.beginPath(); g.moveTo(pts[0][0], h);
+    pts.forEach(([x, y]) => g.lineTo(x, y));
+    g.lineTo(w, h); g.closePath(); g.fillStyle = grad; g.fill();
+    g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.strokeStyle = '#e4f07e'; g.lineWidth = 1.6 * dpr; g.stroke();
+    const [lx, ly] = pts[pts.length - 1];
+    g.beginPath(); g.arc(lx - 2 * dpr, ly, 2.5 * dpr, 0, 7); g.fillStyle = '#fff'; g.fill();
+  }
+
+  // плавный счётчик кредитов
+  let shown = 0, target = 0;
+  (function tween() {
+    requestAnimationFrame(tween);
+    const el = view.mode === 'game' && document.getElementById('dc-cr');
+    if (!el) return;
+    shown = Math.abs(target - shown) < 1 ? target : shown + (target - shown) * 0.22;
+    el.textContent = fmt(shown);
+  })();
+
+  /* ---------- звук ---------- */
+  const SND = window.DCSound;
+  const sndPrefs = Object.assign({ vol: 0.7, muted: false }, A.load('qb.dc.snd', {}));
+  if (SND) { SND.setVol(sndPrefs.vol); SND.setMuted(sndPrefs.muted); }
+  const sfx = (...a) => SND && SND.play(...a);
+  const soundCtl = () => SND ? `<div class="dc-snd"><button class="dc-mini" data-mute title="Звук серверной">${sndPrefs.muted ? '🔇' : '🔊'}</button><input type="range" id="dc-vol" min="0" max="100" value="${Math.round(sndPrefs.vol * 100)}" title="Громкость"></div>` : '';
+  // фон серверной звучит, только пока открыта игра
+  setInterval(() => {
+    if (!SND) return;
+    const on = view.mode === 'game' && !!root.offsetParent && !!S && !S.over;
+    SND.ambient(on);
+    const p = S && S.players[me];
+    if (on && p) SND.update({ heat: p.heat, oc: p.oc, load: Object.values(p.hw).reduce((a, b) => a + b, 0), act: Date.now() - lsAt < 1500 ? 1 : 0 });
+  }, 500);
+
   function buildGame() {
     view.mode = 'game';
     view.cache = {};
+    view.tweened = false;
+    view.evKey = undefined;
+    view.lastMul = 1;
+    setTimeout(() => sfx('boot'), 150);
     root.innerHTML = `
       <div class="dc-game">
         <header class="dc-bar">
           <div class="dc-room"><span class="dc-led"></span><span>КОМНАТА</span><b id="dc-code"></b><button class="dc-mini" data-copy title="Скопировать код">⧉</button></div>
           <div class="dc-online" id="dc-online"></div>
           <div class="dc-clock" id="dc-clock"></div>
+          ${soundCtl()}
           <button class="dc-mini dc-leave" data-leave>Выйти</button>
         </header>
         <div class="dc-grid">
           <section class="dc-col dc-left">
             <div class="dc-node">
-              <div class="dc-cr"><small>КРЕДИТЫ</small><b id="dc-cr">0</b><span id="dc-inc"></span></div>
+              <div class="dc-node-top">
+                <div class="dc-cr"><small>КРЕДИТЫ</small><b id="dc-cr">0</b><span id="dc-inc"></span></div>
+                <canvas class="dc-spark" id="dc-spark"></canvas>
+              </div>
+              <div class="dc-hall" id="dc-hall"></div>
               <button class="dc-rack" id="dc-rack" title="Клик или пробел">
-                ${[0, 1, 2, 3, 4].map((i) => `<span class="dc-unit"><i></i><i></i><i></i><em style="--d:${i * 0.17}s"></em><em style="--d:${i * 0.31}s"></em><em style="--d:${i * 0.23}s"></em></span>`).join('')}
-                <span class="dc-rack-glow"></span>
+                <span class="dc-lcd"><span id="dc-lcd-l">BOOT…</span><span id="dc-lcd-r"></span></span>
+                ${[0, 1, 2, 3, 4].map(() => rackUnit()).join('')}
+                <span class="dc-rack-glow"></span><span class="dc-rack-sheen"></span>
+                <span class="dc-cpop" id="dc-cpop"></span>
               </button>
               <div id="dc-status"></div>
               <div class="dc-meters" id="dc-meters"></div>
@@ -263,13 +342,28 @@
     put('dc-clock', S.over ? '<span>🌅 УТРО</span>' : `<span>ДО УТРА</span><b>${mmss(S.end - t)}</b>`);
 
     // нода
-    $('#dc-cr').textContent = fmt(p.cr + predicted);
+    target = p.cr + predicted;
+    if (Math.abs(target - shown) > target * 0.5 + 1e3 && !view.tweened) shown = target;
+    view.tweened = true;
     put('dc-inc', `+${fmt(c.inc)}/с · клик ${fmt(c.click)}`);
+    drawSpark(c.inc);
+    renderHall(p);
     const rack = $('#dc-rack');
     const mul = E.comboMul({ streak: localStreak() }, c.comboCap);
+    const dead = t < p.down || t < p.ddos;
+    const load = dead ? 0 : Math.min(99, Math.round(18 + Math.min(1, (t - p.lastClk < 1500 ? 0.5 : 0) + mul / 20 + p.oc / 5) * 81));
     rack.style.setProperty('--spd', `${Math.max(0.12, 1.2 / mul)}s`);
+    rack.style.setProperty('--fan', `${Math.max(0.12, 0.9 - p.heat / 140 - p.oc * 0.12)}s`);
     rack.classList.toggle('hot', p.heat > 70);
-    rack.classList.toggle('dead', t < p.down || t < p.ddos);
+    rack.classList.toggle('dead', dead);
+    rack.classList.toggle('oc', p.oc >= 2);
+    $('#dc-lcd-l').textContent = dead ? (t < p.down ? '!! THERMAL SHUTDOWN' : '!! LINK DOWN') : `LOAD ${load}%  ×${mul}`;
+    $('#dc-lcd-r').textContent = `${Math.round(24 + p.heat * 0.7)}°C`;
+    $('.dc-game', root).classList.toggle('boss-on', !!S.boss);
+    // звуки глобальных событий
+    const evKey = S.event && S.event.id + S.event.until;
+    if (view.evKey !== undefined && evKey && evKey !== view.evKey) sfx('event');
+    view.evKey = evKey || null;
     let st = '';
     if (t < p.down) st = `<div class="dc-st bad">🔥 ПЕРЕГРЕВ · ${mmss(p.down - t)}</div>`;
     else if (t < p.ddos) st = `<div class="dc-st bad">🌊 DDoS · клики не работают · ${mmss(p.ddos - t)}</div>`;
@@ -467,10 +561,26 @@
     const el = document.createElement('span');
     el.className = 'dc-float ' + cls;
     el.textContent = txt;
-    el.style.left = `${x - base.left + (Math.random() * 30 - 15)}px`;
-    el.style.top = `${y - base.top - 10}px`;
+    const z = view.z || 1;
+    el.style.left = `${(x - base.left) / z + (Math.random() * 30 - 15)}px`;
+    el.style.top = `${(y - base.top) / z - 10}px`;
     fx.appendChild(el);
     setTimeout(() => el.remove(), 900);
+  }
+
+  // «пакеты данных» разлетаются от клика
+  function packets(x, y, n, color) {
+    const fx = $('#dc-fx');
+    if (!fx) return;
+    const base = fx.getBoundingClientRect(), z = view.z || 1;
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('i');
+      el.className = 'dc-pkt';
+      const a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
+      el.style.cssText = `left:${(x - base.left) / z}px;top:${(y - base.top) / z}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 30}px;--c:${color}`;
+      fx.appendChild(el);
+      setTimeout(() => el.remove(), 700);
+    }
   }
 
   function nodeClick(x, y, boss) {
@@ -486,12 +596,22 @@
     if (boss) {
       pendBoss++;
       floatText(x, y, `−${fmt(c.click * c.bossMul * Math.sqrt(mul))}`, 'boss');
+      packets(x, y, 3, '#ff5f5f');
+      sfx('bossHit');
     } else {
       pendClicks++;
       const g = c.click * mul;
       predicted += g;
       floatText(x, y, `+${fmt(g)}${mul > 1 ? ` ×${mul}` : ''}`, mul >= 10 ? 'x10' : mul >= 5 ? 'x5' : '');
+      packets(x, y, mul >= 10 ? 5 : mul >= 3 ? 3 : 2, mul >= 10 ? '#ffb340' : mul >= 5 ? '#6bc9ff' : '#e4f07e');
+      sfx('click', mul);
     }
+    if (mul > (view.lastMul || 1)) {
+      const pop = $('#dc-cpop');
+      if (pop) { pop.textContent = `COMBO ×${mul}`; pop.className = `dc-cpop go x${mul}`; void pop.offsetWidth; }
+      sfx('combo', mul);
+    }
+    view.lastMul = mul;
     const rack = $('#dc-rack');
     if (rack && !boss) { rack.classList.remove('tap'); void rack.offsetWidth; rack.classList.add('tap'); }
   }
@@ -539,6 +659,7 @@
       const b = e.target.closest('[data-bug]');
       if (!b) return;
       b.remove();
+      sfx('squash');
       if (--left <= 0) finish(true);
     };
     setTimeout(() => finish(false), dur);
@@ -603,14 +724,15 @@
 
   /* ---------- личные сообщения ---------- */
   function onPm(m) {
-    if (m.kind === 'note' || m.kind === 'err') A.toast(m.txt);
-    else if (m.kind === 'hit') { A.toast('⚠ ' + m.txt); flash('hit'); }
-    else if (m.kind === 'drop') showDrop(m.item, m.src);
-    else if (m.kind === 'ach') A.toast(`🏆 Ачивка: ${D.ACH[m.id][0]}`);
-    else if (m.kind === 'virus') showVirus(m.vid, m.nick, m.dur);
-    else if (m.kind === 'boss') { A.toast('☠ Босс появился! Все на рейд'); if (!root.offsetParent && window.qb && window.qb.notify) window.qb.notify('Ночной дата-центр', 'Появился босс — все на рейд!', 'dc'); }
-    else if (m.kind === 'overheat') { A.toast('🔥 Перегрев! Сервер остывает 15 с'); flash('hot'); }
-    else if (m.kind === 'reboot') { A.toast(`♻ Reboot: +${m.g} ядер`); flash('reboot'); }
+    if (m.kind === 'note') { A.toast(m.txt); sfx('coin'); }
+    else if (m.kind === 'err') { A.toast(m.txt); sfx('err'); }
+    else if (m.kind === 'hit') { A.toast('⚠ ' + m.txt); flash('hit'); sfx('hit'); }
+    else if (m.kind === 'drop') { showDrop(m.item, m.src); const r = D.ITEMS[m.item.k].r; sfx(r === 'c' || r === 'r' ? 'coin' : 'drop', r); }
+    else if (m.kind === 'ach') { A.toast(`🏆 Ачивка: ${D.ACH[m.id][0]}`); sfx('event'); }
+    else if (m.kind === 'virus') { showVirus(m.vid, m.nick, m.dur); sfx('virus'); }
+    else if (m.kind === 'boss') { sfx('boss'); A.toast('☠ Босс появился! Все на рейд'); if (!root.offsetParent && window.qb && window.qb.notify) window.qb.notify('Ночной дата-центр', 'Появился босс — все на рейд!', 'dc'); }
+    else if (m.kind === 'overheat') { A.toast('🔥 Перегрев! Сервер остывает 15 с'); flash('hot'); sfx('alarm'); }
+    else if (m.kind === 'reboot') { A.toast(`♻ Reboot: +${m.g} ядер`); flash('reboot'); sfx('reboot'); }
   }
   function flash(kind) {
     const g = $('.dc-game', root);
@@ -672,6 +794,12 @@
     if ('close' in d) return closeOv();
     if ('leave' in d) return leave();
     if ('copy' in d) { A.copy(S ? S.code : ''); return; }
+    if ('mute' in d) {
+      sndPrefs.muted = !sndPrefs.muted;
+      SND.unlock(); SND.setMuted(sndPrefs.muted); A.store('qb.dc.snd', sndPrefs);
+      el.textContent = sndPrefs.muted ? '🔇' : '🔊';
+      return;
+    }
     if (d.h) { lobbyHours = +d.h; $$('#dc-hours button').forEach((b) => b.classList.toggle('on', b === el)); return; }
     if ('create' in d || 'join' in d || d.recent) {
       const n = $('#dc-nick').value.trim();
@@ -700,7 +828,10 @@
       reboot: () => { if (confirm('Reboot сбросит забег. Точно?')) act({ a: 'reboot' }); }, orbit: () => act({ a: 'orbit' }), qc: () => act({ a: 'qc' }),
     };
     const k = Object.keys(map).find((x) => x in d);
-    if (k) map[k]();
+    if (!k) return;
+    if (['hw', 'up', 'def', 'loc', 'case', 'eq', 'buylot', 'bm', 'tree'].includes(k)) sfx('buy');
+    if (k === 'atk') sfx('hit');
+    map[k]();
   });
 
   document.addEventListener('keydown', (e) => {
@@ -711,6 +842,20 @@
     const r = $('#dc-rack').getBoundingClientRect();
     nodeClick(r.left + r.width / 2, r.top + r.height / 3, false);
   }, true);
+
+  root.addEventListener('input', (e) => {
+    if (e.target.id !== 'dc-vol') return;
+    sndPrefs.vol = e.target.value / 100;
+    SND.unlock(); SND.setVol(sndPrefs.vol); A.store('qb.dc.snd', sndPrefs);
+  });
+
+  // масштаб под размер окна: на широком мониторе всё крупнее
+  new ResizeObserver(() => {
+    const w = root.clientWidth, h = root.clientHeight;
+    if (!w || !h) return;
+    view.z = Math.max(1, Math.min(1.9, w / 1060, h / 700));
+    root.style.setProperty('--z', view.z.toFixed(3));
+  }).observe(root);
 
   setInterval(render, 250);
   window.addEventListener('qb:page', (e) => { if (e.detail === 'dc') { view.cache = {}; render(); } });
