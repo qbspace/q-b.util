@@ -60,6 +60,8 @@
 
   /* ---------------- расчёт показателей ---------------- */
   const has = (p, id) => p.tree.includes(id);
+  // DDoS: доход цели ×0.4 на 45 с, половину потерянного дохода перехватывает атакующий
+  const DDOS_MUL = 0.4, DDOS_LEN = 45e3, DDOS_STEAL = 0.5, VIRUS_PCT = 0.05;
   const evOf = (s, now) => (s.event && now < s.event.until ? EVENTS.find((e) => e.id === s.event.id) : null);
 
   function itemBonus(p) {
@@ -90,7 +92,7 @@
     const incMul = (1 + incUp) * (1 + b.inc) * (1 + 0.04 * p.coresAll) * (1 + 0.01 * p.ach.length) * (has(p, 'f1') ? 1.2 : 1) * (has(p, 'f5') ? 2 : 1);
     const stable = base * incMul * OC[p.oc].mul;
     const orbit = s.orbit && now < s.orbit.until ? (s.orbit.by === p.id ? 2 : 1.25) : 1;
-    const temp = (ev.inc || 1) * orbit * (now < p.down ? 0.2 : 1) * (now < p.ddos ? 0.5 : 1);
+    const temp = (ev.inc || 1) * orbit * (now < p.down ? 0.2 : 1) * (now < p.ddos ? DDOS_MUL : 1);
     const click = (1 + stable * macro) * clickMul * (1 + b.click) * (has(p, 'f2') ? 1.5 : 1) * (ev.click || 1);
     const def = (id) => p.def[id] || 0;
     return {
@@ -99,7 +101,7 @@
       heatGain: OC[p.oc].heat * (ev.heat || 1),
       block: clamp(def('fw') * 0.08 + b.def + (has(p, 'd1') ? 0.1 : 0), 0, 0.65),
       proxy: Math.min(0.6, def('px') * 0.12),
-      ddosRed: def('ad') * 0.18,
+      ddosRed: def('ad') * 0.12,
       prot: Math.min(0.8, def('bk') * 0.1 + b.prot),
       steal: 0.03 + b.steal + (has(p, 'a2') ? 0.02 : 0),
       hit: 0.7 + b.hit + (has(p, 'a3') ? 0.15 : 0),
@@ -242,6 +244,11 @@
       if (now - p.lastClk > 1200) p.streak = 0;
       if (doBreak && p.oc > 0 && p.on && Math.random() < OC[p.oc].brk) breakHw(s, p);
       if (s.boss && p.on) bossHit(s, p, c.inc * 0.25 * c.bossMul, true);
+      const a = now < p.ddos && s.players[p.ddosBy];
+      if (a) {
+        const g = (c.inc / DDOS_MUL) * (1 - DDOS_MUL) * DDOS_STEAL * dt * (p.on ? 1 : 0.5);
+        a.cr += g; a.score += g; a.st.stolen += g;
+      }
       ctCheck(s, p, now);
       checkAch(s, p);
     });
@@ -341,7 +348,8 @@
     if (!a || !t) return;
     if (ok) { feed(s, `🧼 ${B(t)} вычистил вирус от ${B(a)}`, 'def'); return; }
     const c = calc(t, s);
-    const amt = Math.floor(t.cr * (1 - c.prot) * 0.05 * (1 - c.proxy));
+    const amt = Math.floor(t.cr * (1 - c.prot) * VIRUS_PCT * (1 - c.proxy));
+    pm(a.id, 'note', { txt: `🦠 ${t.nick} не справился с вирусом: +${fmt(amt)}` });
     transfer(s, a, t, amt);
     feed(s, `🦠 Вирус ${B(a)} съел у ${B(t)} ${fmt(amt)}`, 'atk');
     claimBounty(s, a, t);
@@ -474,13 +482,16 @@
         pm(p.id, 'note', { txt: `🔓 Украдено ${fmt(amt)} у ${t.nick}` });
         claimBounty(s, p, t);
       } else if (kind === 'ddos') {
-        t.ddos = now + 25e3 * (1 - ct.ddosRed);
+        const dur = Math.round(DDOS_LEN * (1 - ct.ddosRed));
+        t.ddos = now + dur; t.ddosBy = p.id;
         p.st.atkOk++; ctAdd(p, 'steal', 1);
-        feed(s, `🌊 ${B(p)} положил DDoS-ом сервер ${B(t)}`, 'atk');
-        pm(t.id, 'hit', { txt: `${p.nick} заDDoSил тебя — клики не работают` });
+        feed(s, `🌊 ${B(p)} положил DDoS-ом сервер ${B(t)} на ${Math.round(dur / 1000)} с`, 'atk');
+        pm(t.id, 'hit', { txt: `${p.nick} заDDoSил тебя на ${Math.round(dur / 1000)} с: клики не работают, доход −60%` });
+        pm(p.id, 'note', { txt: `🌊 ${t.nick} лежит ${Math.round(dur / 1000)} с — ты перехватываешь его трафик` });
       } else {
         const vid = String(s.idc++);
         const dur = Math.round(8000 * (1 - ct.ddosRed * 0.5));
+        pm(p.id, 'note', { txt: `🦠 Вирус у ${t.nick}: ${Math.round(dur / 1000)} с на зачистку` });
         s.viruses[vid] = { from: p.id, to: t.id, until: now + dur + 5000 };
         p.st.atkOk++; ctAdd(p, 'steal', 1);
         feed(s, `🦠 ${B(p)} закинул вирус ${B(t)}`, 'atk');
@@ -614,6 +625,23 @@
     },
   };
 
+  /* ---------------- прогноз атаки для интерфейса ---------------- */
+  function forecast(s, p, t, now = Date.now()) {
+    const c = calc(p, s, now), ct = calc(t, s, now);
+    const sure = !!(c.ev && c.ev.sureHit);
+    const chance = sure ? 1 : clamp(c.hit - ct.block, 0.1, 0.95);
+    const pool = t.cr * (1 - ct.prot);
+    let pct = c.steal * (has(p, 'a5') ? 2 : 1) * (1 - (has(p, 'a5') ? 0 : ct.proxy));
+    if (has(t, 'd5')) pct = Math.min(pct, 0.01);
+    const dDur = DDOS_LEN * (1 - ct.ddosRed);
+    return {
+      chance, sure, hit: c.hit, block: ct.block, prot: ct.prot, proxy: ct.proxy, ddosRed: ct.ddosRed, pool,
+      hack: { pct, amt: pool * pct },
+      ddos: { dur: dDur, gain: ct.stable * (1 - DDOS_MUL) * DDOS_STEAL * dDur / 1000, immune: has(t, 'd5') },
+      virus: { dur: 8000 * (1 - ct.ddosRed * 0.5), pct: VIRUS_PCT * (1 - ct.proxy), amt: pool * VIRUS_PCT * (1 - ct.proxy) },
+    };
+  }
+
   /* ---------------- финал ---------------- */
   function finish(s) {
     s.over = true;
@@ -632,5 +660,5 @@
     s.now = now;
   }
 
-  window.DCEngine = { fmt, esc, newRoom, ensurePlayer, calc, comboMul, nextCombo, hwCost, defCost, rebootGain, tick, act, drain, catchUp, itemBonus };
+  window.DCEngine = { fmt, esc, newRoom, ensurePlayer, calc, comboMul, nextCombo, hwCost, defCost, rebootGain, tick, act, drain, catchUp, itemBonus, forecast, DDOS_LEN };
 })();

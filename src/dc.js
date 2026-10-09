@@ -194,6 +194,7 @@
   const R = D.R;
   const itemName = (it) => { const t = D.ITEMS[it.k]; return `<i class="r-${t.r}">${esc(t.n)}</i>`; };
   const bonusTxt = (b) => Object.entries(b).map(([k, v]) => D.BONUS_TXT[k](v)).join(', ');
+  const hint = (txt) => `<div class="dc-hint">💡 ${txt}</div>`;
   const lockBox = (loc, what) => `<div class="dc-lock"><b>${D.LOCS[loc].icon}</b><div>${what} открывается в локации <b>${D.LOCS[loc].name}</b></div><small>Переезжай на карте слева</small></div>`;
 
   const TABS = [
@@ -366,7 +367,7 @@
     view.evKey = evKey || null;
     let st = '';
     if (t < p.down) st = `<div class="dc-st bad">🔥 ПЕРЕГРЕВ · ${mmss(p.down - t)}</div>`;
-    else if (t < p.ddos) st = `<div class="dc-st bad">🌊 DDoS · клики не работают · ${mmss(p.ddos - t)}</div>`;
+    else if (t < p.ddos) st = `<div class="dc-st bad">🌊 DDoS от ${esc((S.players[p.ddosBy] || {}).nick || '?')} · клики не работают, доход −60% · ${mmss(p.ddos - t)}</div>`;
     else if (t < p.shield) st = `<div class="dc-st good">🛡 Щит ${mmss(p.shield - t)}</div>`;
     put('dc-status', st);
     const nx = E.nextCombo({ streak: localStreak() }, c.comboCap);
@@ -431,6 +432,7 @@
     hw(p, c) {
       const vis = D.HW.filter((h) => h.loc <= p.loc + 1);
       put('dc-panel', `<div class="dc-ph"><b>Железо</b><div class="dc-seg sm">${[1, 10, 'max'].map((n) => `<button data-hwn="${n}" class="${view.hwN === n ? 'on' : ''}">${n === 'max' ? 'MAX' : '×' + n}</button>`).join('')}</div></div>
+        ${hint('Железо приносит кредиты каждую секунду, даже когда ты не кликаешь. Каждая следующая штука дороже на 15%. Новое железо открывается при переезде.')}
         <div class="dc-list">${vis.map((h) => {
           const n = p.hw[h.id] || 0, locked = h.loc > p.loc;
           const x2 = p.up.includes('x2_' + h.id) ? 2 : 1;
@@ -448,6 +450,7 @@
       const avail = D.UPG.filter((u) => !p.up.includes(u.id) && u.loc <= p.loc && (!u.need || (p.hw[u.hw] || 0) >= u.need / 2)).sort((a, b) => a.cost - b.cost);
       const done = D.UPG.filter((u) => p.up.includes(u.id));
       put('dc-panel', `<div class="dc-ph"><b>Апгрейды</b><small>куплено ${done.length}/${D.UPG.length}</small></div>
+        ${hint('Разовые покупки навсегда (до Reboot): множители клика и дохода, охлаждение. «Тюнинг» удваивает доход железа, когда его 10+ штук.')}
         <div class="dc-cards">${avail.map((u) => {
           const need = u.need && (p.hw[u.hw] || 0) < u.need;
           return `<button class="dc-card ${need ? 'locked' : can(p, u.cost)}" data-up="${u.id}"><span>${u.icon}</span><b>${esc(u.name)}</b><small>${esc(u.d)}${need ? ` · есть ${p.hw[u.hw] || 0}` : ''}</small><em>${fmt(u.cost)}</em></button>`;
@@ -457,29 +460,51 @@
     hack(p, c, t, ps) {
       if (p.loc < 2) return put('dc-panel', lockBox(2, 'Хакинг, защита и bounty'));
       const cd = Math.max(0, (p.cd.atk || 0) - t);
+      const A = D.ATK.find((a) => a.id === view.kind);
       const others = ps.filter((x) => x.id !== me).sort((a, b) => b.score - a.score);
-      put('dc-panel', `<div class="dc-ph"><b>Атака</b>${cd ? `<span class="dc-cd">⏳ ${mmss(cd)}</span>` : '<span class="dc-cd ok">● ГОТОВ</span>'}</div>
-        <div class="dc-seg wide">${D.ATK.map((a) => `<button data-kind="${a.id}" class="${view.kind === a.id ? 'on' : ''}">${a.icon} ${a.name}</button>`).join('')}</div>
-        <small class="dc-note">${esc(D.ATK.find((a) => a.id === view.kind).d)}</small>
+      const pc = (v) => `${Math.round(v * 100)}%`;
+      const sec = (ms) => `${Math.round(ms / 1000)} с`;
+      const noAtk = c.ev && c.ev.noAtk;
+      put('dc-panel', `<div class="dc-ph"><b>Хакинг</b>${cd ? `<span class="dc-cdpill">⏳ перезарядка ${mmss(cd)}</span>` : '<span class="dc-cdpill ok">● ГОТОВ К АТАКЕ</span>'}</div>
+        <div class="dc-atks">${D.ATK.map((a) => `<button data-kind="${a.id}" class="dc-atk ${view.kind === a.id ? 'on' : ''}"><span>${a.icon}</span><b>${a.name}</b><small>${a.short}</small></button>`).join('')}</div>
+        <div class="dc-how"><b>${A.icon} ${A.name} — как работает</b><ul>${A.how.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>
+          <div class="dc-mystats"><span>Сила атаки <b>${pc(c.hit)}</b></span><span>Кража <b>${(c.steal * 100).toFixed(1)}%</b></span><span>Перезарядка <b>${mmss(c.cd)}</b></span></div>
+          <small>Одна перезарядка на все атаки. Шанс = твоя сила атаки − защита цели (10–95%).</small></div>
+        ${noAtk ? '<div class="dc-st bad">🚓 Маски-шоу в датацентре — атаки временно запрещены</div>' : ''}
+        <div class="dc-ph"><b>Цели</b><small>прогноз для «${A.name}»</small></div>
         <div class="dc-list">${others.map((x) => {
-          const cx = E.calc(x, S, t);
-          const ch = Math.round(Math.max(0.1, Math.min(0.95, c.hit - cx.block)) * 100);
+          const f = E.forecast(S, p, x, t);
           let why = '';
-          if (x.loc < 2) why = '🍼 новичок';
-          else if (t < x.shield) why = '🛡 щит';
-          else if (t - x.lastHit < 45e3) why = '💨 отдыхает';
-          else if (view.kind !== 'hack' && !x.on) why = '⚫ не в сети';
+          if (x.loc < 2) why = '🍼 новичок — защищён до Серверной';
+          else if (t < x.shield) why = `🛡 под щитом ${mmss(x.shield - t)}`;
+          else if (t - x.lastHit < 45e3) why = `💨 только что ограбили · ${mmss(45e3 - (t - x.lastHit))}`;
+          else if (view.kind !== 'hack' && !x.on) why = '⚫ не в сети — только взлом';
+          else if (view.kind === 'ddos' && f.ddos.immune) why = '🏰 Крепость — DDoS не берёт';
           const bty = S.bounty[x.id];
-          return `<div class="dc-row">${ava(x)}
-            <div class="dc-rt"><b>${esc(x.nick)} ${bty ? `<i class="lb-bty">🎯 ${fmt(bty.pool)}</i>` : ''}</b><small>${fmt(x.cr)} кр · шанс ${ch}%${x.on ? '' : ' · оффлайн'}</small></div>
-            <button class="dc-buy ghost" data-bty="${x.id}" title="Назначить награду">🎯</button>
-            ${why ? `<span class="dc-why">${why}</span>` : `<button class="dc-buy red ${cd ? 'off' : ''}" data-atk="${x.id}">${D.ATK.find((a) => a.id === view.kind).icon} Атака</button>`}
+          let gain = '';
+          if (view.kind === 'hack') gain = `украдёшь ≈ <b>${fmt(f.hack.amt)}</b> <i>(${(f.hack.pct * 100).toFixed(1)}%)</i>`;
+          else if (view.kind === 'ddos') gain = `ляжет на <b>${sec(f.ddos.dur)}</b> · тебе ≈ <b>${fmt(f.ddos.gain)}</b>`;
+          else gain = `${sec(f.virus.dur)} на зачистку · провал = <b>+${fmt(f.virus.amt)}</b>`;
+          const chCls = f.chance >= 0.6 ? 'hi' : f.chance >= 0.35 ? 'mid' : 'lo';
+          const defs = [['🧱', f.block, 'отбивает'], ['🕶', f.proxy, 'Proxy режет кражу'], ['💾', f.prot, 'спрятано от кражи'], ['🛡', f.ddosRed, 'Анти-DDoS']]
+            .map(([i, v, tip]) => `<span class="${v ? '' : 'z'}" title="${tip}">${i} ${pc(v)}</span>`).join('');
+          return `<div class="dc-tgt ${why ? 'dis' : ''}">
+            <div class="dc-tgt-top">${ava(x)}
+              <div class="dc-rt"><b>${esc(x.nick)} ${bty ? `<i class="lb-bty">🎯 ${fmt(bty.pool)}</i>` : ''}${t < x.ddos ? '<i class="lb-bty">🌊 лежит</i>' : ''}</b><small>${fmt(x.cr)} кр · ${D.LOCS[x.loc].icon} ${D.LOCS[x.loc].name}${x.on ? '' : ' · оффлайн'}</small></div>
+              <button class="dc-buy ghost" data-bty="${x.id}" title="Назначить награду за взлом">🎯 Bounty</button>
+            </div>
+            <div class="dc-defs">${defs}</div>
+            ${why ? `<div class="dc-why">${why}</div>` : `<div class="dc-fc">
+              <div class="dc-chance ${chCls}"><span>шанс <b>${f.sure ? '100% ☁' : pc(f.chance)}</b></span><i><u style="width:${f.chance * 100}%"></u></i></div>
+              <span class="dc-gain">${gain}</span>
+              <button class="dc-buy red ${cd || noAtk ? 'off' : ''}" data-atk="${x.id}">${A.icon} ${A.name}</button></div>`}
           </div>`;
         }).join('') || '<div class="dc-empty">В комнате пока никого. Кинь кентам код комнаты.</div>'}</div>
-        <div class="dc-ph"><b>Защита</b><small>отбить ${Math.round(c.block * 100)}% · защищено ${Math.round(c.prot * 100)}%</small></div>
+        <div class="dc-ph"><b>Твоя защита</b><small>отбиваешь ${pc(c.block)} · спрятано ${pc(c.prot)}</small></div>
         <div class="dc-list">${D.DEF.map((d) => {
           const l = p.def[d.id] || 0, cost = E.defCost(p, d), max = l >= d.max;
-          return `<div class="dc-row"><span class="dc-ic">${d.icon}</span><div class="dc-rt"><b>${d.name} <em>${l}/${d.max}</em></b><small>${d.d(Math.min(d.max, l + (max ? 0 : 1)))}</small></div>
+          return `<div class="dc-row"><span class="dc-ic">${d.icon}</span><div class="dc-rt"><b>${d.name} <em>${l}/${d.max}</em></b>
+            <small>${l ? `Сейчас: ${d.d(l)}` : 'Нет защиты'}${max ? '' : ` → <span class="nx">${d.d(l + 1)}</span>`}</small></div>
             ${max ? '<span class="dc-why">MAX</span>' : `<button class="dc-buy ${can(p, cost)}" data-def="${d.id}">${fmt(cost)}</button>`}</div>`;
         }).join('')}</div>`);
     },
@@ -488,6 +513,7 @@
       const sel = p.items.find((i) => i.u === view.sel);
       const b = E.itemBonus(p);
       put('dc-panel', `<div class="dc-ph"><b>Предметы</b><small>${p.items.length}/40 · слотов ${p.eq.length}/${slots}</small></div>
+        ${hint('Бонусы дают только надетые предметы (метка ON). Нажми на предмет, чтобы надеть, продать или выставить на рынок.')}
         ${p.loc >= 1 ? `<button class="dc-case ${can(p, c.casePrice)}" data-case><span>📦</span><div><b>Открыть кейс</b><small>шанс прототипа 0.2% · удача ×${c.luck.toFixed(2)}</small></div><em>${fmt(c.casePrice)}</em></button>` : lockBox(1, 'Кейсы')}
         <small class="dc-note">Надето: ${bonusTxt(Object.fromEntries(Object.entries(b).filter(([, v]) => v))) || 'ничего'}</small>
         <div class="dc-inv">${p.items.slice().sort((x, y) => D.RAR.indexOf(D.ITEMS[y.k].r) - D.RAR.indexOf(D.ITEMS[x.k].r)).map((it) => {
@@ -506,6 +532,7 @@
       const lots = S.market.filter((l) => !l.to || l.to === me || l.seller === me);
       const bmLeft = 600e3 - ((t - S.created) % 600e3);
       put('dc-panel', `<div class="dc-ph"><b>Рынок игроков</b><small>комиссия 5%</small></div>
+        ${hint('Здесь лоты других игроков. Свой предмет выставляешь во вкладке «Предметы» — всем или лично одному кенту.')}
         <div class="dc-list">${lots.map((l) => {
           const t2 = D.ITEMS[l.item.k], sel = S.players[l.seller] || { nick: '?' };
           const mine = l.seller === me;
@@ -523,6 +550,7 @@
     core(p, c, t) {
       const g = E.rebootGain(p);
       put('dc-panel', `<div class="dc-ph"><b>Ядро</b><small>🧬 ${p.cores} свободно · всего ${p.coresAll} (+${p.coresAll * 4}% дохода)</small></div>
+        ${hint('Reboot сбрасывает прогресс, но даёт ядра 🧬. Каждое ядро навсегда +4% дохода, а ещё их тратят на дерево ниже. Чем больше заработал за забег, тем больше ядер.')}
         <div class="dc-reboot"><div><b>♻ Reboot</b><small>Сбросит кредиты, железо, апгрейды, защиту и локацию. Предметы, ядра и дерево останутся.${p.loc < 3 ? ' Доступно с Датацентра.' : ''}</small></div>
           <button class="dc-buy red ${p.loc >= 3 && g >= 1 ? '' : 'off'}" data-reboot>+${g} 🧬</button></div>
         <small class="dc-note">Ядра = √(заработано за забег / 1M). Следующее ядро на ${fmt(Math.pow(g + 1, 2) * 1e6)}</small>
