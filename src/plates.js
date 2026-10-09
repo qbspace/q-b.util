@@ -285,6 +285,7 @@
     { id: 'f-neon', cat: 'frame', name: 'Неоновая', price: 600000 },
     { id: 'f-diamond', cat: 'frame', name: 'Бриллиантовая', price: 3000000 },
     { id: 'f-rainbow', cat: 'frame', name: 'Радужная', price: 15000000 },
+    { id: 'f-emo', cat: 'frame', name: 'Неформал ✝', price: 1000000000 },
     { id: 'g-blue', cat: 'glow', name: 'Синяя', price: 20000 },
     { id: 'g-red', cat: 'glow', name: 'Красная', price: 60000 },
     { id: 'g-green', cat: 'glow', name: 'Кислотная', price: 150000 },

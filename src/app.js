@@ -581,6 +581,9 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.6.0': [
+      '✝ Рамка «Неформал» за 1 млрд: чёрная полупрозрачная, с крестами, шипами и цепью — ложится и поверх фоторамки',
+    ],
     '4.5.0': [
       '📁 Номера, казино, бизнес и крипта теперь в одной папке «Номера РФ» в сайдбаре — разворачивается по клику',
     ],
@@ -2232,7 +2235,7 @@
   const SW = {
     'f-chrome': 'linear-gradient(135deg,#9ea3a8,#f6f7f8,#7d8287)', 'f-carbon': 'repeating-linear-gradient(45deg,#1b1b1b 0 4px,#333 4px 8px)',
     'f-gold': 'linear-gradient(135deg,#fbeab6,#d9ab4f,#b98a31)', 'f-neon': 'linear-gradient(135deg,#2bf0ff,#ff2bd6)',
-    'f-diamond': 'conic-gradient(#e9f6ff,#c9e7ff,#fff,#d7c9ff,#e9f6ff)', 'f-rainbow': 'linear-gradient(90deg,#ff6b6b,#ffd36b,#8ef08e,#6bd3ff,#b48cff)',
+    'f-diamond': 'conic-gradient(#e9f6ff,#c9e7ff,#fff,#d7c9ff,#e9f6ff)', 'f-rainbow': 'linear-gradient(90deg,#ff6b6b,#ffd36b,#8ef08e,#6bd3ff,#b48cff)', 'f-emo': 'repeating-linear-gradient(45deg,#000 0 4px,#2a2a2a 4px 6px),#000',
     'g-blue': 'radial-gradient(#3d8bff,#0b1a3a)', 'g-red': 'radial-gradient(#ff3d3d,#3a0b0b)', 'g-green': 'radial-gradient(#7dff3d,#123a0b)',
     'g-rgb': 'conic-gradient(#ff3d3d,#ffd33d,#3dff7d,#3dd3ff,#b03dff,#ff3d3d)', 'g-void': 'radial-gradient(#000 30%,#6b2bff 70%,#000)',
     'b-gold': 'radial-gradient(circle at 35% 35%,#fff6c9,#f0c552 55%,#8a6414)', 'b-black': 'radial-gradient(circle at 35% 35%,#888,#111 60%)',
