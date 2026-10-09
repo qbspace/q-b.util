@@ -1,7 +1,7 @@
 {
   "name": "q-b.util",
   "productName": "q-b.util",
-  "version": "4.4.0",
+  "version": "4.5.0",
   "description": "Утилиты для быстрой генерации паролей, ключей, почт, телефонов и фейковых данных",
   "main": "main.js",
   "scripts": {
@@ -52,8 +52,8 @@
       }
     ],
     "releaseInfo": {
-      "releaseName": "q-b.util 4.4.0",
-      "releaseNotes": "- Промокоды в настройках: монеты и кристаллы\n- Личный ID игрока для персональных промокодов"
+      "releaseName": "q-b.util 4.5.0",
+      "releaseNotes": "- Номера, казино, бизнес и крипта собраны в папку «Номера РФ» в сайдбаре"
     }
   },
   "dependencies": {

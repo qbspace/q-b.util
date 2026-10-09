@@ -50,22 +50,31 @@
         <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M3 15h18M9 9.5V20"/></svg>
         <span>Таблицы</span>
       </button>
-      <button class="nav-item" data-go="plates">
-        <svg viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M16 7v10"/><path d="M5.5 12h2M9 12h4"/></svg>
-        <span>Номера</span>
-      </button>
-      <button class="nav-item" data-go="casino">
-        <svg viewBox="0 0 24 24"><path d="M5 19c3-1 5-4 6-9l2-6 2 6c1 5 3 8 6 9"/><path d="M9 14h6"/><circle cx="12" cy="20" r="1.2"/></svg>
-        <span>Казино</span>
-      </button>
-      <button class="nav-item" data-go="biz">
-        <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg>
-        <span>Бизнес</span>
-      </button>
-      <button class="nav-item" data-go="crypto">
-        <svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/><path d="M3 21h18"/></svg>
-        <span>Крипта</span>
-      </button>
+      <div class="nav-folder" id="nav-game">
+        <button class="nav-item nav-folder-head" id="nav-game-head" title="Игра «Номера РФ»">
+          <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span>Номера РФ</span>
+          <svg class="nav-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <div class="nav-folder-body"><div class="nav-folder-items">
+        <button class="nav-item" data-go="plates">
+          <svg viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M16 7v10"/><path d="M5.5 12h2M9 12h4"/></svg>
+          <span>Номера</span>
+        </button>
+        <button class="nav-item" data-go="casino">
+          <svg viewBox="0 0 24 24"><path d="M5 19c3-1 5-4 6-9l2-6 2 6c1 5 3 8 6 9"/><path d="M9 14h6"/><circle cx="12" cy="20" r="1.2"/></svg>
+          <span>Казино</span>
+        </button>
+        <button class="nav-item" data-go="biz">
+          <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg>
+          <span>Бизнес</span>
+        </button>
+        <button class="nav-item" data-go="crypto">
+          <svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/><path d="M3 21h18"/></svg>
+          <span>Крипта</span>
+        </button>
+        </div></div>
+      </div>
       <button class="nav-item" data-go="history">
         <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
         <span>История</span>

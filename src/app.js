@@ -177,11 +177,21 @@
   };
   let current = 'dashboard';
 
+  // папка игры «Номера РФ» в сайдбаре: сворачивается, состояние запоминаем
+  const GAME_PAGES = ['plates', 'casino', 'biz', 'crypto'];
+  const setGameOpen = (open) => {
+    $('#nav-game').classList.toggle('open', open);
+    store('qb.navGame', open);
+  };
+  setGameOpen(load('qb.navGame', false) === true);
+  $('#nav-game-head').onclick = () => setGameOpen(!$('#nav-game').classList.contains('open'));
+
   function go(page) {
     if (!PAGES[page]) return;
     current = page;
     $$('.page').forEach((p) => p.classList.toggle('active', p.dataset.page === page));
     $$('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.go === page));
+    $('#nav-game').classList.toggle('has-active', GAME_PAGES.includes(page));
     $('#page-title').textContent = page === 'dashboard' ? greeting() : PAGES[page][0];
     $('#page-crumb').innerHTML = `${PAGES[page][1]} <i>›</i>`;
     if (page === 'history') renderHistory();
@@ -571,6 +581,9 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.5.0': [
+      '📁 Номера, казино, бизнес и крипта теперь в одной папке «Номера РФ» в сайдбаре — разворачивается по клику',
+    ],
     '4.4.0': [
       '🎁 Промокоды в настройках — вводи и получай монеты и кристаллы',
       '🆔 Твой ID игрока — по нему можно получить личный промокод',

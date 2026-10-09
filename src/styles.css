@@ -2489,3 +2489,13 @@ kbd {
 .adm-log { display: flex; flex-direction: column; gap: 4px; }
 .adm-log div:not(.note) { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; padding: 6px 10px; border-radius: 10px; background: rgba(127, 127, 127, .08); }
 .adm-log .pill { height: 26px; padding: 0 10px; font-size: 11px; }
+
+/* ================= папка игры в сайдбаре ================= */
+.nav-folder { display: flex; flex-direction: column; flex-shrink: 0; }
+.nav-folder-head .nav-chev { width: 14px; height: 14px; margin-left: auto; opacity: .55; transition: transform .25s; }
+.nav-folder.open .nav-chev { transform: rotate(90deg); }
+.nav-folder.has-active:not(.open) .nav-folder-head { color: var(--accent); background: linear-gradient(90deg, rgba(228, 240, 126, .12), transparent 80%); }
+.nav-folder-body { margin-left: 20px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, .08); max-height: 0; overflow: hidden; opacity: 0; transition: max-height .3s ease, opacity .25s, margin .25s; flex-shrink: 0; }
+.nav-folder.open .nav-folder-body { max-height: 260px; opacity: 1; margin-top: 2px; }
+.nav-folder-items { display: flex; flex-direction: column; gap: 4px; }
+.nav-folder-body .nav-item.active::before { left: 0; }
