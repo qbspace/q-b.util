@@ -172,6 +172,7 @@
     casino: ['Казино', 'НАЗАД НА ДАШБОРД'],
     biz: ['Бизнес', 'НАЗАД НА ДАШБОРД'],
     crypto: ['ЛАДАКОИН', 'НАЗАД НА ДАШБОРД'],
+    dc: ['Ночной дата-центр', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -195,6 +196,7 @@
     $('#page-title').textContent = page === 'dashboard' ? greeting() : PAGES[page][0];
     $('#page-crumb').innerHTML = `${PAGES[page][1]} <i>›</i>`;
     if (page === 'history') renderHistory();
+    window.dispatchEvent(new CustomEvent('qb:page', { detail: page }));
     if (page === 'casino') { if (plState.casinoTab === 'mines') renderMines(); else renderCrash(); renderLotto(); }
     if (page === 'biz') renderBiz();
     if (page === 'crypto') renderLdk();
@@ -581,6 +583,13 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '4.8.0': [
+      '🌃 Новая игра «Ночной дата-центр» — мультиплеерный кликер на одну ночь: создай комнату и кинь код кентам',
+      '🗺 8 локаций от домашнего ПК до квантового сервера, каждая открывает новую механику',
+      '💀 Взломы, DDoS, вирусы и bounty на друзей · ☠ общий босс каждые 20 минут · 🎁 кейсы с прототипами 0.2%',
+      '🏷 Рынок и личные сделки между игроками, чёрный рынок, престиж Reboot, дерево FARM / ATTACK / DEFENCE',
+      '🌅 Утром сервер замерзает и выдаёт итоги: король ночи, главный задрот, самый невезучий и др.',
+    ],
     '4.7.0': [
       '🖤 Скин номера «Неформал ✝» за 1 млрд: тёмный полупрозрачный знак — сквозь него видно фоторамку',
     ],
@@ -2410,6 +2419,8 @@
   const aucSha = async (str) => aucHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)));
   const aucWindow = () => Math.floor(Date.now() / P.AUCTION_EVERY);
   const myNick = () => profile.nick.trim() || `Игрок ${aucId.slice(0, 4).toUpperCase()}`;
+  // мост для «Ночного дата-центра» (src/dc.js)
+  window.QBApp = { pid: aucId, nick: myNick, load, store, toast, copy };
 
   let aucCh = null, aucJoinedAt = Date.now(), aucHall = [], aucHost = false;
   let lot = null; // текущее состояние лота (у ведущего — источник правды)

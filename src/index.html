@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/500.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/600.css">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="dc.css">
 </head>
 <body>
 <div class="shell">
@@ -75,6 +76,10 @@
         </button>
         </div></div>
       </div>
+      <button class="nav-item" data-go="dc">
+        <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="6" rx="1.5"/><rect x="4" y="11" width="16" height="6" rx="1.5"/><path d="M8 6h.01M8 14h.01M12 21h0M7 21h10M12 17v4"/></svg>
+        <span>Ночной ДЦ</span>
+      </button>
       <button class="nav-item" data-go="history">
         <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4M12 8v4l3 2"/></svg>
         <span>История</span>
@@ -677,6 +682,9 @@
       </section>
 
       <!-- ---------- HISTORY ---------- -->
+      <!-- ---------- NIGHT DATACENTER ---------- -->
+      <section class="page" data-page="dc"><div class="dc" id="dc"></div></section>
+
       <section class="page" data-page="history">
         <div class="card sand results full" id="hist-results"></div>
       </section>
@@ -1099,5 +1107,8 @@
 <script src="generators.js"></script>
 <script src="plates.js"></script>
 <script src="app.js"></script>
+<script src="dc-data.js"></script>
+<script src="dc-engine.js"></script>
+<script src="dc.js"></script>
 </body>
 </html>
