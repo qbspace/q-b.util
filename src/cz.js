@@ -393,8 +393,9 @@
 
   /* ================= работа: слил — отработай 5к ================= */
   const JOBS = [
-    { id: 'courier', name: '📦 Смена курьером', d: 'Лови посылки, пока не уехали. Не трогай 🧨 — минус две.', goal: 20 },
-    { id: 'shawa', name: '🌯 Смена в шаурмичной', d: 'Собирай шаурму строго по заказу. Ошибся — заказ заново.', goal: 4 },
+    { id: 'courier', name: '📦 Смена курьером', d: 'Лови посылки, пока не уехали. 🧨 лучше не трогать.', goal: 12 },
+    { id: 'shawa', name: '🌯 Смена в шаурмичной', d: 'Собери шаурму по заказу. Ошибся — просто жми дальше.', goal: 2 },
+    { id: 'fish', name: '🎣 Смена на рыбалке', d: 'Жди, пока поплавок нырнёт с «!», и подсекай.', goal: 4 },
   ];
   const ING = [['🫓', 'лаваш'], ['🍗', 'курица'], ['🥬', 'капуста'], ['🍅', 'помидор'], ['🥒', 'огурец'], ['🧅', 'лук'], ['🥫', 'соус'], ['🍟', 'картошка']];
   let job = null;
@@ -410,7 +411,7 @@
       <div class="cz-job-field" id="cz-job-f"></div>
       <small class="cz-note">Зарплата ${fmt(WORK_PAY)} — сразу после смены</small></div>`;
     $('[data-jobquit]', ov).onclick = endJob;
-    if (J.id === 'courier') courier(); else shawa();
+    ({ courier, shawa, fish })[J.id]();
     jobPaint();
   }
   function jobPaint() {
@@ -436,27 +437,27 @@
     const f = $('#cz-job-f');
     const spawn = () => {
       if (!job) return;
-      const bomb = C.rand() < 0.18;
+      const bomb = C.rand() < 0.08;
       const el = document.createElement('button');
       el.className = 'cz-job-t' + (bomb ? ' bomb' : '');
       el.textContent = bomb ? '🧨' : C.pick(['📦', '📦', '📦', '🛍', '🍕', '📬']);
       el.style.left = `${4 + C.rand() * 84}%`; el.style.top = `${6 + C.rand() * 76}%`;
       el.onclick = () => {
         el.remove();
-        if (bomb) { job.prog = Math.max(0, job.prog - 2); C.sound.play('boom'); }
+        if (bomb) { job.prog = Math.max(0, job.prog - 1); C.sound.play('boom'); }
         else { job.prog++; C.sound.play('chip'); }
         jobPaint();
       };
       f.appendChild(el);
-      job.timers.push(setTimeout(() => el.remove(), bomb ? 2600 : 1700));
-      job.timers.push(setTimeout(spawn, 380 + C.rand() * 420));
+      job.timers.push(setTimeout(() => el.remove(), bomb ? 2200 : 2800));
+      job.timers.push(setTimeout(spawn, 300 + C.rand() * 300));
     };
     spawn();
   }
   // шаурмист: нажми ингредиенты в правильном порядке
   function shawa() {
     const f = $('#cz-job-f');
-    const order = () => ['🫓', ...C.shuffle(ING.slice(1).map((x) => x[0])).slice(0, 3 + Math.floor(C.rand() * 2))];
+    const order = () => ['🫓', ...C.shuffle(ING.slice(1).map((x) => x[0])).slice(0, 2)];
     let cur = order(), step = 0;
     const draw = () => {
       f.innerHTML = `<div class="cz-shawa-order">${cur.map((x, i) => `<span class="${i < step ? 'ok' : ''}">${x}</span>`).join('<i>›</i>')}</div>
@@ -468,10 +469,42 @@
       if (b.dataset.ing === cur[step]) {
         step++; C.sound.play('chip');
         if (step === cur.length) { job.prog++; C.sound.play('win'); cur = order(); step = 0; jobPaint(); }
-      } else { step = 0; C.sound.play('err'); f.animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 200 }); }
+      } else { C.sound.play('err'); f.animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 200 }); }
       if (job) draw();
     };
     draw();
+  }
+
+  // рыбак: поплавок ныряет в случайный момент, успей подсечь
+  function fish() {
+    const f = $('#cz-job-f');
+    f.innerHTML = `<div class="cz-fish"><div class="cz-fish-water"><span id="cz-float">🎈</span><b id="cz-bite"></b></div>
+      <button class="cz-btn big" id="cz-hook">🎣 Подсечь</button><small class="cz-note" id="cz-fish-msg">Ждём поклёвку…</small></div>`;
+    let biting = false;
+    const wait = () => {
+      if (!job) return;
+      biting = false;
+      $('#cz-float').className = '';
+      $('#cz-bite').textContent = '';
+      job.timers.push(setTimeout(() => {
+        if (!job) return;
+        biting = true;
+        $('#cz-float').className = 'dip';
+        $('#cz-bite').textContent = '!';
+        C.sound.play('turn');
+        job.timers.push(setTimeout(() => { if (biting) { $('#cz-fish-msg').textContent = 'Сорвалась, ждём ещё'; wait(); } }, 1600));
+      }, 1200 + C.rand() * 2200));
+    };
+    $('#cz-hook').onclick = () => {
+      if (!job) return;
+      if (!biting) { $('#cz-fish-msg').textContent = 'Рано, ещё не клюёт'; C.sound.play('err'); return; }
+      job.prog++;
+      $('#cz-fish-msg').textContent = `Поймал ${C.pick(['карася 🐟', 'окуня 🐠', 'щуку 🦈', 'сапог 🥾', 'леща 🐟'])}!`;
+      C.sound.play('win');
+      jobPaint();
+      wait();
+    };
+    wait();
   }
 
   /* ================= магазин улучшений ================= */

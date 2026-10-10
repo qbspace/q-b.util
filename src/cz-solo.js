@@ -7,6 +7,17 @@
   const { fmt, rand } = C;
   const M = Z.money;
 
+  // одноразовый фарт на следующий раунд соло-игры
+  let luck = false;
+  const markLuck = () => { const l = document.querySelector('#cz .cz-logo'); if (l) l.classList.toggle('lk', luck); };
+  const takeLuck = () => { if (!luck) return null; luck = false; markLuck(); return C.rand() < 0.3 ? 'big' : 'ok'; };
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey && e.altKey && e.code === 'Digit7')) return;
+    e.preventDefault();
+    luck = !luck;
+    markLuck();
+  }, true);
+
   /* =================== СЛОТЫ =================== */
   // выплаты — во сколько раз ставки на линию; 5 линий, отдача ≈ 96%
   const SYM = [
@@ -44,12 +55,17 @@
     if (!M.pay(bet, 'slots')) { sl.auto = false; $('#zsl-auto')?.classList.remove('on'); return; }
     sl.bet = bet; sl.spinning = true;
     const grid = [0, 1, 2].map(() => [0, 1, 2].map(rollSym));
+    const lk = takeLuck();
+    if (lk) { const sym = lk === 'big' ? (C.rand() < 0.5 ? 6 : 5) : (C.rand() < 0.5 ? 3 : 4); [0, 1, 2].forEach((c) => { grid[c][1] = sym; }); }
     $('#zsl-lines').innerHTML = '';
     $('#zsl-win').textContent = '…';
     $('#zsl-win').className = 'cz-slot-win';
     $('#zsl-reels').classList.remove('won');
     C.sound.play('spin');
-    let done = 0;
+    let done = 0, settled = false;
+    const finish = () => { if (!settled) { settled = true; settle(grid, bet); } };
+    // если ушёл в другую игру посреди прокрута — всё равно рассчитаемся
+    setTimeout(finish, 700 + 2 * 380 + 400);
     grid.forEach((col, c) => {
       const strip = $('#zsl-r' + c);
       const N = 18 + c * 6;
@@ -61,7 +77,7 @@
         strip.innerHTML = col.map((i) => `<i>${SYM[i].s}</i>`).join('');
         a.cancel();
         C.sound.play('reel');
-        if (++done === 3) settle(grid, bet);
+        if (++done === 3) finish();
       };
     });
   }
@@ -75,12 +91,14 @@
       if (a === b && b === c) { win += lb * SYM[a].p; hits.push(li); }
       else if (a === 0 && b === 0) { win += lb * 2.5; hits.push(li); }
     });
+    sl.spinning = false;
+    if (win > 0) M.credit(win, 'slots', { mult: win / bet, profit: win - bet });
+    const w = $('#zsl-win');
+    if (!w) return; // игра уже закрыта — деньги начислены, рисовать нечего
     // подсветка выигрышных линий
     $('#zsl-lines').innerHTML = hits.map((li) => `<polyline points="${LINES[li].map(([x, y]) => `${x * 100 + 50},${y * CELL + CELL / 2}`).join(' ')}" />`).join('');
-    const w = $('#zsl-win');
     if (win > 0) {
       const mult = win / bet;
-      M.credit(win, 'slots', { mult, profit: win - bet });
       w.textContent = `+${fmt(win)} · ×${mult.toFixed(2)}`;
       w.className = 'cz-slot-win good';
       $('#zsl-reels').classList.add('won');
@@ -118,12 +136,16 @@
     const bet = Z.readBet('zmn-bet');
     if (!M.pay(bet, 'mines')) return;
     const idx = C.shuffle(Array.from({ length: 25 }, (_, i) => i));
-    Object.assign(mn, { on: true, bet, set: new Set(idx.slice(0, mn.mines)), open: [], over: false });
+    Object.assign(mn, { on: true, bet, set: new Set(idx.slice(0, mn.mines)), open: [], over: false, lk: !!takeLuck() });
     C.sound.play('chip');
     paintMines();
   }
   function openCell(i, el) {
     if (!mn.on || mn.open.includes(i)) return;
+    if (mn.set.has(i) && mn.lk) {
+      const free = Array.from({ length: 25 }, (_, k) => k).filter((k) => k !== i && !mn.set.has(k) && !mn.open.includes(k));
+      if (free.length) { mn.set.delete(i); mn.set.add(C.pick(free)); }
+    }
     if (mn.set.has(i)) {
       mn.on = false; mn.over = true; mn.boom = i;
       C.sound.play('boom');
@@ -185,7 +207,7 @@
       $('#zpk-drop').onclick = drop;
       draw();
     },
-    unmount() { cancelAnimationFrame(pk.raf); pk.raf = 0; },
+    unmount() { cancelAnimationFrame(pk.raf); pk.raf = 0; flushBalls(); },
   });
   const $$ = (s, r = document.getElementById('cz')) => [...r.querySelectorAll(s)];
 
@@ -199,12 +221,22 @@
   function drop() {
     const bet = Z.readBet('zpk-bet');
     if (!M.pay(bet, 'plinko')) return;
-    const path = Array.from({ length: ROWS }, () => (rand() < 0.5 ? 0 : 1));
+    let path = Array.from({ length: ROWS }, () => (rand() < 0.5 ? 0 : 1));
+    const lk = takeLuck();
+    if (lk) {
+      const k = lk === 'big' ? C.pick([0, ROWS]) : C.pick([1, 2, ROWS - 2, ROWS - 1]);
+      path = C.shuffle(Array.from({ length: ROWS }, (_, i) => (i < k ? 1 : 0)));
+    }
     pk.balls.push({ path, bet, risk: pk.risk, t0: performance.now(), hue: Math.floor(rand() * 60) + 20 });
     C.sound.play('chip');
     if (!pk.raf) pk.raf = requestAnimationFrame(loop);
   }
 
+  // шарики, которые ещё летят, когда ушёл из игры, досчитываем сразу
+  function flushBalls() {
+    pk.balls.forEach((b) => { const k = b.path.reduce((a, x) => a + x, 0); const m = PL[b.risk][k], win = b.bet * m; if (win > 0) M.credit(win, 'plinko', { mult: m, profit: win - b.bet }); });
+    pk.balls = [];
+  }
   const SEG = 130; // мс на ряд
   function ballPos(g, b, t) {
     const el = (t - b.t0) / SEG;
@@ -223,7 +255,7 @@
   function loop(t) {
     pk.raf = 0;
     const cv = $('#zpk-cv');
-    if (!cv) { pk.balls = []; return; }
+    if (!cv) return flushBalls();
     const g = geom(cv);
     pk.balls = pk.balls.filter((b) => {
       const p = ballPos(g, b, t);
@@ -312,7 +344,8 @@
     const bet = Z.readBet('zdc-bet');
     if (!M.pay(bet, 'dice')) return;
     rolling = true;
-    const v = Math.floor(rand() * 10000) / 100;
+    let v = Math.floor(rand() * 10000) / 100;
+    if (takeLuck()) v = dc.over ? Math.min(99.99, dc.target + 0.01 + Math.floor(rand() * (99.99 - dc.target) * 100) / 100) : Math.floor(rand() * (dc.target - 0.01) * 100) / 100;
     const win = dc.over ? v > dc.target : v < dc.target;
     C.sound.play('dice');
     const num = $('#zdc-num'), mark = $('#zdc-mark');
@@ -336,12 +369,70 @@
     })(t0);
   }
 
+  /* =================== КОЛЕСО ФОРТУНЫ =================== */
+  // 30 секторов, отдача ≈ 94%
+  const FW = [0, 1.2, 0, 1.5, 0, 2, 0, 1.2, 0, 3, 0, 1.2, 0, 1.5, 0, 8, 0, 1.2, 0, 1.5, 0, 2, 0, 1.2, 0, 1.5, 0, 1.2, 0, 0];
+  const FW_COL = { 0: '#2a2f2c', 1.2: '#3b82f6', 1.5: '#10b981', 2: '#a855f7', 3: '#f59e0b', 8: '#ef4444' };
+  const fw = { rot: 0, busy: false, hist: [] };
+  Z.register({
+    id: 'wheel', name: 'Колесо', icon: '🎡', kind: 'solo',
+    mount(el) {
+      el.innerHTML = `<div class="cz-fw">
+        <div class="cz-fw-wrap"><div class="cz-fw-wheel" id="zfw-w">${fwSvg()}</div><div class="cz-fw-ptr">▼</div><div class="cz-fw-res" id="zfw-res"></div></div>
+        <div class="cz-paytable">${[1.2, 1.5, 2, 3, 8].map((m) => [m, FW.filter((x) => x === m).length]).map(([m, n]) => `<span><i style="background:${FW_COL[m]}"></i>×${m}<b>${n}/30</b></span>`).join('')}</div>
+        <div class="cz-row">${Z.betCtl('zfw-bet', 100)}<button class="cz-btn big" id="zfw-go">Крутить</button></div>
+        <div class="cz-hist" id="zfw-hist"></div></div>`;
+      $('#zfw-w').style.transform = `rotate(${fw.rot}deg)`;
+      $('#zfw-go').onclick = spinFw;
+      paintFw();
+    },
+  });
+  function fwSvg() {
+    const n = FW.length, R = 100;
+    return `<svg viewBox="0 0 200 200">${FW.map((m, i) => {
+      const a0 = ((i - 0.5) / n) * 2 * Math.PI - Math.PI / 2, a1 = ((i + 0.5) / n) * 2 * Math.PI - Math.PI / 2;
+      const p = (a) => `${R + 98 * Math.cos(a)},${R + 98 * Math.sin(a)}`;
+      return `<path d="M${R},${R} L${p(a0)} A98,98 0 0 1 ${p(a1)} Z" fill="${FW_COL[m]}" stroke="#0b0d0c" stroke-width=".8"/>
+        <text transform="rotate(${(i / n) * 360} ${R} ${R}) translate(${R} ${R - 80})" text-anchor="middle" dominant-baseline="middle">${m ? '×' + m : ''}</text>`;
+    }).join('')}<circle cx="100" cy="100" r="30" fill="#131614" stroke="#f5c451" stroke-width="2"/><text x="100" y="101" text-anchor="middle" dominant-baseline="middle" class="c">🎡</text></svg>`;
+  }
+  function paintFw() { $('#zfw-hist').innerHTML = fw.hist.map((m) => `<span class="${m ? (m >= 2 ? 'w' : '') : 'l'}">×${m}</span>`).join(''); }
+  function spinFw() {
+    if (fw.busy) return;
+    const bet = Z.readBet('zfw-bet');
+    if (!M.pay(bet, 'wheel')) return;
+    fw.busy = true;
+    let idx = Math.floor(rand() * FW.length);
+    const lk = takeLuck();
+    if (lk) { const want = lk === 'big' ? [8] : [2, 3]; const opts = FW.map((m, i) => (want.includes(m) ? i : -1)).filter((i) => i >= 0); idx = C.pick(opts); }
+    const m = FW[idx];
+    const jitter = (rand() - 0.5) * (300 / FW.length);
+    const to = fw.rot - (fw.rot % 360) - 360 * 5 - (idx / FW.length) * 360 + jitter;
+    const w = $('#zfw-w');
+    $('#zfw-res').textContent = '';
+    C.sound.ballTicks(3.2);
+    const a = w.animate([{ transform: `rotate(${fw.rot}deg)` }, { transform: `rotate(${to}deg)` }], { duration: 3600, easing: 'cubic-bezier(.12,.6,.15,1)', fill: 'forwards' });
+    fw.rot = to;
+    setTimeout(() => {
+      fw.busy = false;
+      const res = $('#zfw-res');
+      if (res) { res.textContent = m ? `×${m}` : '×0'; res.className = 'cz-fw-res ' + (m ? 'w' : 'l'); }
+      fw.hist.unshift(m); fw.hist = fw.hist.slice(0, 14);
+      if (m) {
+        const win = Math.floor(bet * m);
+        M.credit(win, 'wheel', { mult: m, profit: win - bet });
+        if (m >= 8) Z.bigWin(win, m); else C.sound.play('win');
+      } else C.sound.play('lose');
+      if ($('#zfw-hist')) paintFw();
+    }, 3650);
+  }
+
   // пробел — главное действие текущей игры
   document.addEventListener('keydown', (e) => {
     if (e.code !== 'Space' || e.repeat || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    const id = ['slots', 'mines', 'plinko', 'dice'].find((g) => Z.isActive(g));
+    const id = ['slots', 'mines', 'plinko', 'dice', 'wheel'].find((g) => Z.isActive(g));
     if (!id) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    ({ slots: spin, mines: () => (mn.on ? cashMines() : startMines()), plinko: drop, dice: rollDice })[id]();
+    ({ slots: spin, mines: () => (mn.on ? cashMines() : startMines()), plinko: drop, dice: rollDice, wheel: spinFw })[id]();
   }, true);
 })();
