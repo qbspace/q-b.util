@@ -583,6 +583,11 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '5.1.0': [
+      '💼 Казик: слил всё — отработай смену курьером или в шаурмичной и получи 5 000 фишек. Можно каждый раз, когда баланс на нуле',
+      '🛒 Казик: магазин улучшений. Первое — «Бесконечная автокрутка» для Номеров РФ за 100 000 фишек',
+      '♾ Номера РФ: с этим улучшением автокрутка становится ×∞ и крутит, пока не нажмёшь стоп или не кончатся монеты',
+    ],
     '5.0.0': [
       '🎰 «Ночной дата-центр» заменён на «Казик» — казино со своим балансом фишек',
       '🎮 Соло: слоты, минёр, плинко с тремя уровнями риска, кости',
@@ -1200,8 +1205,9 @@
     $('#pl-spin span').textContent = broke ? '💼 РАБОТАТЬ' : 'КРУТИТЬ';
     $('#pl-cost').hidden = broke;
     $('#pl-batya').hidden = !(plState.coins < P.SPIN_COST);
-    $('#pl-auto').hidden = !lvl('auto');
-    if (lvl('auto')) $('#pl-auto').textContent = `×${upVal(upg('auto'), lvl('auto'))}`;
+    $('#pl-auto').hidden = !lvl('auto') && !infAuto();
+    if (infAuto()) { $('#pl-auto').textContent = plAuto ? '■ стоп' : '×∞'; $('#pl-auto').title = 'Бесконечная автокрутка (куплена в Казике)'; }
+    else if (lvl('auto')) $('#pl-auto').textContent = `×${upVal(upg('auto'), lvl('auto'))}`;
     renderBets();
   }
 
@@ -1770,18 +1776,26 @@
     return order;
   }
 
+  // бесконечная автокрутка покупается в Казике за 100к фишек
+  function infAuto() { return !!(window.CZApp && window.CZApp.hasPerk && window.CZApp.hasPerk('infAuto')); }
+  window.addEventListener('qb:perks', () => renderWallet());
+
   async function autoSpin() {
     if (plAuto || plSpinning) return;
     plAuto = true;
+    const inf = infAuto();
     $('#pl-auto').classList.add('running');
-    const count = upVal(upg('auto'), lvl('auto'));
+    if (inf) $('#pl-auto').textContent = '■ стоп';
+    const count = inf ? Infinity : upVal(upg('auto'), lvl('auto'));
     for (let i = 0; i < count && plAuto; i++) {
       const order = await spinPlate(true);
-      if (order === false || order >= 4) break; // нет денег или выпала легендарка
-      await new Promise((r) => setTimeout(r, 350));
+      if (order === false) break; // нет денег
+      if (!inf && order >= 4) break; // обычная автокрутка встаёт на легендарке
+      await new Promise((r) => setTimeout(r, inf && order >= 4 ? 1500 : 350));
     }
     plAuto = false;
     $('#pl-auto').classList.remove('running');
+    renderWallet();
   }
 
   /* --- батл: кто выбьет номер блатнее --- */

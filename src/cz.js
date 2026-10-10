@@ -10,8 +10,8 @@
   const me = A.pid;
 
   /* ================= баланс ================= */
-  const START = 10000, BONUS = 2500, BONUS_EVERY = 30 * 60e3, BROKE = 1000, BROKE_EVERY = 3 * 60e3;
-  const W = Object.assign({ bal: START, bonusAt: 0, brokeAt: 0, stats: { wag: 0, won: 0, best: 0, bestG: '' }, nick: '' }, A.load('qb.cz', {}));
+  const START = 10000, BONUS = 2500, BONUS_EVERY = 30 * 60e3, WORK_PAY = 5000;
+  const W = Object.assign({ bal: START, bonusAt: 0, perks: {}, stats: { wag: 0, won: 0, best: 0, bestG: '' }, nick: '' }, A.load('qb.cz', {}));
   let saveT = 0;
   const save = () => { clearTimeout(saveT); saveT = setTimeout(() => A.store('qb.cz', W), 400); };
   const nick = () => (W.nick || A.nick()).slice(0, 20);
@@ -239,6 +239,7 @@
     const list = Object.values(GAMES);
     $('#cz-menu').innerHTML = `<div class="cz-mh">СОЛО</div>${list.filter((g) => g.kind === 'solo').map(item).join('')}
       <div class="cz-mh">СТОЛЫ С КЕНТАМИ</div>${list.filter((g) => g.kind === 'table').map(item).join('')}
+      <div class="cz-mh">ПРОКАЧКА</div>${list.filter((g) => g.kind === 'shop').map(item).join('')}
       <div class="cz-stats"><small>Поставлено</small><b>${fmt(W.stats.wag)}</b><small>Лучший выигрыш</small><b>${fmt(W.stats.best)}</b></div>`;
   }
 
@@ -255,11 +256,15 @@
     const b = $('#cz-bonus');
     if (!b) return;
     const t = Date.now();
-    const broke = W.bal < 100;
-    const left = broke ? W.brokeAt + BROKE_EVERY - t : W.bonusAt + BONUS_EVERY - t;
+    if (W.bal < 100) {
+      b.className = 'cz-bonus ready work';
+      b.innerHTML = `💼 <b>Слил? Поработай +${fmt(WORK_PAY)}</b>`;
+      return;
+    }
+    const left = W.bonusAt + BONUS_EVERY - t;
     const ready = left <= 0;
     b.className = `cz-bonus ${ready ? 'ready' : ''}`;
-    b.innerHTML = ready ? `🎁 <b>${broke ? 'Бомж-бонус' : 'Бонус'} +${fmt(broke ? BROKE : BONUS)}</b>` : `🎁 <small>${broke ? 'бомж-бонус' : 'бонус'} через ${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}</small>`;
+    b.innerHTML = ready ? `🎁 <b>Бонус +${fmt(BONUS)}</b>` : `🎁 <small>бонус через ${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}</small>`;
   }
   setInterval(paintBonus, 1000);
 
@@ -386,6 +391,125 @@
     });
   }
 
+  /* ================= работа: слил — отработай 5к ================= */
+  const JOBS = [
+    { id: 'courier', name: '📦 Смена курьером', d: 'Лови посылки, пока не уехали. Не трогай 🧨 — минус две.', goal: 20 },
+    { id: 'shawa', name: '🌯 Смена в шаурмичной', d: 'Собирай шаурму строго по заказу. Ошибся — заказ заново.', goal: 4 },
+  ];
+  const ING = [['🫓', 'лаваш'], ['🍗', 'курица'], ['🥬', 'капуста'], ['🍅', 'помидор'], ['🥒', 'огурец'], ['🧅', 'лук'], ['🥫', 'соус'], ['🍟', 'картошка']];
+  let job = null;
+  function startJob() {
+    if (W.bal >= 100 || job) return;
+    const J = C.pick(JOBS);
+    job = { J, prog: 0, t0: Date.now(), timers: [] };
+    const ov = $('#cz-ov');
+    ov.hidden = false;
+    ov.innerHTML = `<div class="cz-job">
+      <div class="cz-job-h"><b>${J.name}</b><small>${J.d}</small><button class="cz-mini" data-jobquit>Уйти со смены</button></div>
+      <div class="cz-job-bar"><i id="cz-job-bar"></i><span id="cz-job-n"></span></div>
+      <div class="cz-job-field" id="cz-job-f"></div>
+      <small class="cz-note">Зарплата ${fmt(WORK_PAY)} — сразу после смены</small></div>`;
+    $('[data-jobquit]', ov).onclick = endJob;
+    if (J.id === 'courier') courier(); else shawa();
+    jobPaint();
+  }
+  function jobPaint() {
+    $('#cz-job-bar').style.width = `${Math.min(100, (job.prog / job.J.goal) * 100)}%`;
+    $('#cz-job-n').textContent = `${job.prog} / ${job.J.goal}`;
+    if (job.prog >= job.J.goal) {
+      const secs = Math.round((Date.now() - job.t0) / 1000);
+      money.credit(WORK_PAY, 'job', { refund: true });
+      C.sound.play('cash');
+      A.toast(`💼 Смена закрыта за ${secs} с: +${fmt(WORK_PAY)}`);
+      announce(`💼 <b>${esc(nick())}</b> слил всё и пошёл работать: +${fmt(WORK_PAY)}`, 'sys');
+      endJob();
+    }
+  }
+  function endJob() {
+    if (job) job.timers.forEach(clearTimeout);
+    job = null;
+    closeOv();
+    paintBonus();
+  }
+  // курьер: посылки выскакивают в случайных местах и уезжают через пару секунд
+  function courier() {
+    const f = $('#cz-job-f');
+    const spawn = () => {
+      if (!job) return;
+      const bomb = C.rand() < 0.18;
+      const el = document.createElement('button');
+      el.className = 'cz-job-t' + (bomb ? ' bomb' : '');
+      el.textContent = bomb ? '🧨' : C.pick(['📦', '📦', '📦', '🛍', '🍕', '📬']);
+      el.style.left = `${4 + C.rand() * 84}%`; el.style.top = `${6 + C.rand() * 76}%`;
+      el.onclick = () => {
+        el.remove();
+        if (bomb) { job.prog = Math.max(0, job.prog - 2); C.sound.play('boom'); }
+        else { job.prog++; C.sound.play('chip'); }
+        jobPaint();
+      };
+      f.appendChild(el);
+      job.timers.push(setTimeout(() => el.remove(), bomb ? 2600 : 1700));
+      job.timers.push(setTimeout(spawn, 380 + C.rand() * 420));
+    };
+    spawn();
+  }
+  // шаурмист: нажми ингредиенты в правильном порядке
+  function shawa() {
+    const f = $('#cz-job-f');
+    const order = () => ['🫓', ...C.shuffle(ING.slice(1).map((x) => x[0])).slice(0, 3 + Math.floor(C.rand() * 2))];
+    let cur = order(), step = 0;
+    const draw = () => {
+      f.innerHTML = `<div class="cz-shawa-order">${cur.map((x, i) => `<span class="${i < step ? 'ok' : ''}">${x}</span>`).join('<i>›</i>')}</div>
+        <div class="cz-shawa-ing">${ING.map(([e, n]) => `<button data-ing="${e}"><span>${e}</span><small>${n}</small></button>`).join('')}</div>`;
+    };
+    f.onclick = (e) => {
+      const b = e.target.closest('[data-ing]');
+      if (!b || !job) return;
+      if (b.dataset.ing === cur[step]) {
+        step++; C.sound.play('chip');
+        if (step === cur.length) { job.prog++; C.sound.play('win'); cur = order(); step = 0; jobPaint(); }
+      } else { step = 0; C.sound.play('err'); f.animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 200 }); }
+      if (job) draw();
+    };
+    draw();
+  }
+
+  /* ================= магазин улучшений ================= */
+  const PERKS = [
+    { id: 'infAuto', icon: '♾', name: 'Бесконечная автокрутка', where: 'Номера РФ', price: 100000,
+      d: 'Кнопка автокрутки в «Номерах РФ» становится ×∞: крутит, пока не нажмёшь стоп или не кончатся монеты' },
+  ];
+  const hasPerk = (id) => !!(W.perks && W.perks[id]);
+  GAMES.shop = {
+    id: 'shop', name: 'Улучшения', icon: '🛒', kind: 'shop',
+    mount(el) { el.innerHTML = '<div class="cz-shop" id="cz-shop"></div>'; this.update(); },
+    update() {
+      const el = $('#cz-shop');
+      if (!el) return;
+      const html = `<div class="cz-shop-h"><b>🛒 Улучшения</b><small>Покупаются за фишки казика и работают в других играх приложения</small></div>
+        ${PERKS.map((p) => {
+          const got = hasPerk(p.id);
+          return `<div class="cz-perk ${got ? 'got' : ''}"><span>${p.icon}</span><div><b>${esc(p.name)}</b><small>${esc(p.where)} · ${esc(p.d)}</small>
+            ${got ? '' : `<div class="cz-perk-bar"><i style="width:${Math.min(100, (W.bal / p.price) * 100)}%"></i></div><small>Подними ${fmt(p.price)} фишек: сейчас ${fmt(W.bal)}</small>`}</div>
+            ${got ? '<em>✓ Куплено</em>' : `<button class="cz-btn ${W.bal >= p.price ? '' : 'ghost'}" data-perk="${p.id}" ${W.bal >= p.price ? '' : 'disabled'}>${fmt(p.price)}</button>`}</div>`;
+        }).join('')}`;
+      if (el._h !== html) { el._h = html; el.innerHTML = html; }
+    },
+  };
+  function buyPerk(id) {
+    const p = PERKS.find((x) => x.id === id);
+    if (!p || hasPerk(id) || W.bal < p.price) return;
+    if (!confirm(`Купить «${p.name}» за ${fmt(p.price)} фишек?`)) return;
+    if (!money.pay(p.price, 'shop')) return;
+    W.stats.wag -= p.price;
+    W.perks = { ...(W.perks || {}), [id]: true };
+    save();
+    C.sound.play('big');
+    A.toast(`${p.icon} ${p.name} — куплено!`);
+    announce(`🛒 <b>${esc(nick())}</b> купил «${esc(p.name)}»`, 'win');
+    window.dispatchEvent(new CustomEvent('qb:perks'));
+  }
+
   /* ================= события ================= */
   root.addEventListener('click', (e) => {
     const el = e.target.closest('button, [data-close]');
@@ -398,11 +522,12 @@
     if ('leave' in d) return leaveRoom();
     if ('copy' in d) return A.copy(net.code || '');
     if (d.give) return giveModal(d.give);
+    if (d.perk) return buyPerk(d.perk);
     if ('mute' in d) { C.sound.setMuted(!C.sound.muted); W.muted = C.sound.muted; save(); el.textContent = C.sound.muted ? '🔇' : '🔊'; return; }
     if ('bonus' in d) {
-      const t = Date.now(), broke = W.bal < 100;
-      if (broke && t >= W.brokeAt + BROKE_EVERY) { W.brokeAt = t; money.credit(BROKE, 'bonus', { refund: true }); A.toast(`🎁 Бомж-бонус +${fmt(BROKE)}`); C.sound.play('cash'); }
-      else if (!broke && t >= W.bonusAt + BONUS_EVERY) { W.bonusAt = t; money.credit(BONUS, 'bonus', { refund: true }); A.toast(`🎁 Бонус +${fmt(BONUS)}`); C.sound.play('cash'); }
+      const t = Date.now();
+      if (W.bal < 100) return startJob();
+      if (t >= W.bonusAt + BONUS_EVERY) { W.bonusAt = t; money.credit(BONUS, 'bonus', { refund: true }); A.toast(`🎁 Бонус +${fmt(BONUS)}`); C.sound.play('cash'); }
       else A.toast('Бонус ещё не готов');
       save(); paintBonus();
     }
@@ -470,7 +595,7 @@
   }
 
   window.CZApp = {
-    me, nick, money, act, pm, announce, betCtl, readBet, fxText, bigWin, modal, closeOv, parseAmt,
+    me, nick, money, act, pm, announce, hasPerk, betCtl, readBet, fxText, bigWin, modal, closeOv, parseAmt,
     register(g) { GAMES[g.id] = g; },
     get S() { return S; }, get net() { return net; }, get z() { return view.z; }, now,
     isActive: (id) => view.game === id && !!root.offsetParent,
@@ -486,5 +611,6 @@
     C.sound.setVol(W.vol ?? 0.6);
     S = freshState();
     shell();
+    if (Object.keys(W.perks || {}).length) window.dispatchEvent(new CustomEvent('qb:perks'));
   });
 })();
