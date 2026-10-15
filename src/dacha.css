@@ -357,3 +357,63 @@
 .dc-muts { display: flex; gap: 3px; }
 .dc-muts i { width: 10px; height: 10px; border-radius: 3px; background: #f1e7d2; }
 .dc-muts i.on { background: linear-gradient(135deg, #8fff3d, #7cf0ff); box-shadow: 0 0 6px #8fff3d; }
+
+/* ================= ферма ================= */
+.dc-tabs button { flex: 1 0 18% !important; }
+.dc-farm { display: none; }
+.dc-scene.farm .dc-beds, .dc-scene.farm .dc-ghbox, .dc-scene.farm .dc-orch { display: none !important; }
+.dc-scene.farm .dc-farm { display: grid; gap: 12px; justify-content: center; align-content: center; }
+.dc-animal, .dc-pondtile {
+  position: relative; border: 0; padding: 4px 4px 22px; border-radius: 22px; aspect-ratio: 1.15; background: rgba(255, 250, 240, .55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7), 0 6px 14px rgba(74, 52, 38, .1); transition: transform .15s, background .2s;
+}
+.dc-animal:hover, .dc-pondtile:hover { transform: translateY(-3px); background: rgba(255, 250, 240, .85); }
+.dc-animal .dc-bld, .dc-pondtile .dc-bld { width: 100%; height: 100%; filter: drop-shadow(0 4px 4px rgba(74, 52, 38, .18)); }
+.dc-animal.none .dc-bld, .dc-pondtile.locked .dc-bld { filter: grayscale(1) opacity(.42); }
+.dc-animal.fed .dc-bld, .dc-animal.pet .dc-bld { animation: dc-breathe 3s ease-in-out infinite; transform-origin: 50% 90%; }
+.dc-animal.hungry .dc-bld { animation: dc-sway 1.4s ease-in-out infinite; transform-origin: 50% 90%; }
+.dc-animal.ready::after { content: ''; position: absolute; inset: 4px; border-radius: 20px; box-shadow: 0 0 0 3px rgba(255, 233, 140, .9), 0 0 22px rgba(255, 220, 110, .6); animation: dc-glow 1.8s ease-in-out infinite; pointer-events: none; }
+.dc-animal .dc-prog { bottom: 24px; }
+.a-cat .tail { animation: dc-wag 1.2s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 100%; }
+@keyframes dc-breathe { 50% { transform: scale(1.03, .98); } }
+
+/* кухня */
+.dc-stove { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 18px; background: linear-gradient(180deg, #f3ece0, #ece2cf); border: 1px solid var(--dc-line); }
+.dc-pot { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-pot > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dc-pot b { font-size: 13px; }
+.dc-pot small { font-size: 11px; color: var(--dc-ink2); }
+.dc-pot.empty { justify-content: center; color: var(--dc-ink2); font-size: 12px; border-style: dashed; background: transparent; min-height: 50px; }
+.dc-pot.done { box-shadow: 0 0 0 2px #f2c14e; }
+.dc-recipes { display: flex; flex-direction: column; gap: 6px; }
+.dc-recipe { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-recipe > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.dc-recipe b { font-size: 13px; }
+.dc-recipe > div > small { font-size: 10.5px; color: var(--dc-ink2); }
+.dc-recipe.lock { opacity: .55; }
+.dc-ingr { display: flex; gap: 4px; flex-wrap: wrap; }
+.dc-ingr span { display: flex; align-items: center; gap: 1px; padding: 2px 6px 2px 2px; border-radius: 10px; background: #f7f1e4; }
+.dc-ingr span.have { background: #e6f4d9; }
+.dc-ingr .dc-ico, .dc-ingr .dc-sp { width: 22px; height: 22px; }
+.dc-ingr small { font-size: 10px; font-weight: 700; color: var(--dc-ink2); }
+
+/* пруд */
+.dc-pondgame { position: relative; height: 150px; border-radius: 20px; overflow: hidden; cursor: pointer; background: linear-gradient(180deg, #bfe4f6, #8fd0ec 40%, #5fb3db); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6); }
+.dc-water { position: absolute; inset: 0; background: repeating-linear-gradient(180deg, transparent 0 18px, rgba(255, 255, 255, .18) 18px 20px); animation: dc-waves 4s linear infinite; }
+.dc-float-b { position: absolute; left: 50%; top: 52%; width: 16px; height: 26px; margin-left: -8px; border-radius: 8px 8px 6px 6px; background: linear-gradient(180deg, #ea5443 0 50%, #fff 50%); border: 2px solid #5a3d2b; opacity: 0; transition: opacity .2s; }
+.dc-ripple { position: absolute; left: 50%; top: 62%; width: 40px; height: 12px; margin-left: -20px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .8); opacity: 0; }
+.dc-pondgame.st-wait .dc-float-b { opacity: 1; animation: dc-bob 1.6s ease-in-out infinite; }
+.dc-pondgame.st-wait .dc-ripple { opacity: .7; animation: dc-ripple 1.6s ease-out infinite; }
+.dc-pondgame.st-bite .dc-float-b { opacity: 1; animation: dc-dip .25s ease-in-out infinite; }
+.dc-pondgame.st-bite .dc-ripple { opacity: 1; animation: dc-ripple .5s ease-out infinite; }
+.dc-pondgame.st-bite { box-shadow: inset 0 0 0 3px #f2c14e; }
+.dc-pond-msg { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(255, 250, 240, .92); font-size: 12.5px; text-align: center; }
+.dc-pond-msg .dc-ico { width: 28px; height: 28px; }
+@keyframes dc-waves { to { background-position: 0 20px; } }
+@keyframes dc-ripple { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
+@keyframes dc-dip { 50% { transform: translateY(10px); } }
+.dc-fishbook { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.dc-fishbook div { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: 14px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-fishbook div.lock .dc-ico, .dc-fishbook div:not(.got) .dc-ico { filter: brightness(0) opacity(.25); }
+.dc-fishbook b { font-size: 12px; }
+.dc-fishbook small { font-size: 10px; color: var(--dc-ink2); }
