@@ -75,8 +75,13 @@
   const shopDef = (id) => SHOP.find((x) => x.id === id);
   const STOCK_T = 2 * HOUR;
   const crop = (id) => CROPS.find((c) => c.id === id);
-  const itemName = (id) => (crop(id) || GOODS[id] || {}).name || id;
-  const basePrice = (id) => (crop(id) || GOODS[id] || {}).price || 0;
+  // точки расширения: модули (погода, кухня, пруд…) подключаются сюда
+  const H = { growMul: [], yieldAdd: [], priceMul: [], onHarvest: [], tick: [], bedExtra: [], bedClick: [], buffs: [], scene: [], tabs: [], click: [], itemInfo: [] };
+  const sumH = (k, ...a) => H[k].reduce((acc, f) => acc + (+f(...a) || 0), 0);
+  const mulH = (k, ...a) => H[k].reduce((acc, f) => { const v = f(...a); return acc * (v == null ? 1 : v); }, 1);
+  const info = (id) => { for (const f of H.itemInfo) { const r = f(id); if (r) return r; } return crop(id) || GOODS[id] || null; };
+  const itemName = (id) => (info(id) || {}).name || id;
+  const basePrice = (id) => (info(id) || {}).price || 0;
 
   const BUILD = [
     { id: 'coop', name: 'Курятник', lvl: 3, price: 4000, desc: 'Куры несут яйца раз в 40 минут' },
@@ -140,17 +145,17 @@
     for (let i = 0; i < d.length; i++) h = (h * 31 + d.charCodeAt(i)) >>> 0;
     return pool[h % pool.length].id;
   }
-  const sellPrice = (id) => Math.round(basePrice(id) * dayMult(id) * (id === hotItem() ? 1.5 : 1) * (1 + cozy() / 100) * (steaming() ? 1.2 : 1));
+  const sellPrice = (id) => Math.round(basePrice(id) * dayMult(id) * (id === hotItem() ? 1.5 : 1) * (1 + cozy() / 100) * (steaming() ? 1.2 : 1) * mulH('priceMul', id));
 
   // грядка: длительность и стадия
-  const growMs = (bed, gh) => crop(bed.c).grow * MIN / (gh ? 1.5 : 1);
+  const growMs = (bed, gh) => (bed.g || crop(bed.c).grow * MIN) / (gh ? 1.5 : 1);
   function stage(bed, gh) {
     if (!bed.c) return -1;
     const p = (Date.now() - bed.t) / growMs(bed, gh);
     return p >= 1 ? 3 : p >= 0.6 ? 2 : p >= 0.2 ? 1 : 0;
   }
   const leftMs = (bed, gh) => Math.max(0, bed.t + growMs(bed, gh) - Date.now());
-  const yieldOf = (bed) => Math.max(1, 2 + (bed.w ? 1 : 0) + (bed.cp || 0) - (bed.weed ? 1 : 0) - (bed.s || 0));
+  const yieldOf = (bed) => Math.max(1, 2 + (bed.w ? 1 : 0) + (bed.cp || 0) - (bed.weed ? 1 : 0) - (bed.s || 0) + sumH('yieldAdd', bed));
   const fmtLeft = (ms) => {
     const m = Math.ceil(ms / MIN);
     if (m >= 60) return `${Math.floor(m / 60)} ч ${m % 60 ? (m % 60) + ' мин' : ''}`.trim();
@@ -212,7 +217,7 @@
       if (!(S.tools[c.seedItem] > 0)) { if (!quiet) A.toast('Семена золотой тыквы бывают только в сельпо'); return false; }
       S.tools[c.seedItem]--;
     } else if (!pay(c.seed)) return false;
-    Object.assign(bed, { c: c.id, t: Date.now(), w: !!S.b.well, s: 0, cp: 0 });
+    Object.assign(bed, { c: c.id, t: Date.now(), w: !!S.b.well, s: 0, cp: 0, g: Math.round(c.grow * MIN * mulH('growMul', c, bed)) });
     if (!quiet) sfx.plant();
     return true;
   }
@@ -221,7 +226,8 @@
     addItem(id, n);
     addXp(c.xp);
     S.stats.harvest += n;
-    Object.assign(bed, { c: null, t: 0, w: false, weed: false, s: 0, cp: 0 });
+    H.onHarvest.forEach((f) => f(id, n, bed, el));
+    Object.assign(bed, { c: null, t: 0, w: false, weed: false, s: 0, cp: 0, g: 0 });
     if (el) floatAt(el, `+${n}`, id);
     sfx.pop();
   }
@@ -229,6 +235,7 @@
     if (visit) return onVisitBed(key, el);
     const { bed, gh } = bedAt(key);
     const st = stage(bed, gh);
+    if (H.bedClick.some((f) => f(bed, gh, el))) { save(); render(); return; }
     if (S.arm && S.arm !== 'treefert' && st >= 0 && st < 3) { useTool(bed, gh, el); save(); render(); return; }
     if (bed.weed && st !== 3) { bed.weed = false; addXp(1); sfx.pull(); floatAt(el, '🌿', null); }
     else if (st === 3) harvestBed(bed, el);
@@ -505,7 +512,6 @@
     </div>
     <aside class="dc-side">
       <div class="dc-tabs" id="dc-tabs">
-        <button data-t="seeds">Семена</button><button data-t="barn">Амбар</button><button data-t="orders">Заказы</button><button data-t="shop">Сельпо</button><button data-t="deco">Уют</button><button data-t="friends">Соседи</button>
       </div>
       <div class="dc-panel" id="dc-panel"></div>
     </aside>`;
@@ -520,6 +526,7 @@
     const cls = ['dc-bed', st === -1 ? 'empty' : '', st === 3 ? 'ripe' : '', b.w ? 'wet' : '', b.weed ? 'weedy' : ''].join(' ');
     let inner = st >= 0 ? ART.plant(b.c, st) : '';
     if (b.weed) inner += ART.weed();
+    if (!readonly) inner += H.bedExtra.map((f) => f(b, gh) || '').join('');
     let tip = '';
     if (!readonly) {
       if (st === -1) tip = b.weed ? 'Выдернуть сорняк' : `Посадить: ${crop(S.seed).name} · ${crop(S.seed).seed} ₽`;
@@ -557,7 +564,8 @@
     scene.classList.toggle('visiting', !!visit);
     setHTML($('#dc-sun'), timeOfDay() === 'night' ? ART.moon() : ART.sun());
     const beds = visit ? visit.beds : S.beds;
-    const cols = beds.length <= 6 ? 3 : beds.length <= 12 ? (beds.length <= 9 ? 3 : 4) : beds.length <= 16 ? 4 : 5;
+    const total = beds.length + (!visit && LAND[S.land + 1] ? 1 : 0);
+    const cols = total <= 6 ? 3 : total <= 9 ? 3 : total <= 12 ? 4 : total <= 15 ? 5 : total <= 18 ? 6 : 7;
     const box = $('#dc-beds');
     box.style.setProperty('--cols', cols);
     const parts = beds.map((b, i) => bedHTML(b, `b:${i}`, false, !!visit));
@@ -618,7 +626,8 @@
     const cs = getComputedStyle(field);
     const h = field.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
     const rows = Math.ceil(n / cols), gap = 12;
-    const size = Math.max(40, Math.min(112, (h - gap * (rows - 1)) / rows));
+    const wAvail = field.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (gh.hidden ? 0 : gh.offsetWidth + 18);
+    const size = Math.max(36, Math.min(112, (h - gap * (rows - 1)) / rows, (wAvail - gap * (cols - 1)) / cols));
     box.style.width = `${cols * size + gap * (cols - 1)}px`;
     const ghSize = Math.max(36, Math.min(size, (h - 46 - 20) / 3));
     gh.style.width = `${ghSize + 20}px`;
@@ -637,14 +646,23 @@
     guardsActive().forEach((id) => buffs.push(`<span class="dc-buff guard" title="${esc(shopDef(id).desc)}">${ART.item(id)}${esc(shopDef(id).name)} · ${fmtLeft(S.guards[id] - Date.now())}</span>`));
     if (S.b.dog || guardsActive().length) buffs.push(`<span class="dc-buff shield">🛡 защита ${Math.round(protection() * 100)}%${guardOn('trap') ? ' + капкан' : ''}</span>`);
     if (S.arm) buffs.push(`<button class="dc-buff armed" data-disarm="1">${ART.item(S.arm)}${esc(shopDef(S.arm).name)} × ${S.tools[S.arm] || 0} — жми на ${S.arm === 'treefert' ? 'дерево' : 'грядку'} · ✕</button>`);
+    H.buffs.forEach((f) => buffs.push(...(f() || [])));
     setHTML($('#dc-buffs'), buffs.join(''));
   }
 
   /* ================= боковая панель ================= */
   const trend = (id) => { const m = dayMult(id) * (id === hotItem() ? 1.5 : 1); return m >= 1.12 ? '<i class="up">▲</i>' : m <= 0.9 ? '<i class="down">▼</i>' : ''; };
-  function renderPanel() {
+  const CORE_TABS = [['seeds', 'Семена'], ['barn', 'Амбар'], ['orders', 'Заказы'], ['shop', 'Сельпо'], ['deco', 'Уют'], ['friends', 'Соседи']];
+  function renderTabs() {
+    const all = [...CORE_TABS, ...H.tabs.map((x) => [x.id, x.label])];
+    setHTML($('#dc-tabs'), all.map(([id, l]) => `<button data-t="${id}">${l}</button>`).join(''));
     $$('#dc-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === tab));
+  }
+  function renderPanel() {
+    renderTabs();
     const P = $('#dc-panel');
+    const ext = H.tabs.find((x) => x.id === tab);
+    if (ext) { ext.render(P); return; }
     if (tab === 'seeds' && S.view === 'orchard' && !visit) {
       P.innerHTML = `<div class="dc-note">Саженцы сажаются один раз и плодоносят всегда. Выбери и жми на пустое место в саду.</div>
         <div class="dc-seeds">${TREES.map((d) => {
@@ -704,6 +722,7 @@
     if (!root.closest('.page.active')) return;
     renderHud();
     renderScene();
+    H.scene.forEach((f) => f($('#dc-scene')));
     renderPanel();
   }
 
@@ -738,6 +757,7 @@
   /* ================= события ================= */
   root.addEventListener('click', (e) => {
     const t = e.target;
+    if (H.click.some((f) => f(t, e))) return;
     const bed = t.closest('.dc-bed[data-k]');
     if (bed) return onBed(bed.dataset.k, bed);
     if (t.closest('[data-land]')) {
@@ -896,6 +916,7 @@
   /* ================= такт ================= */
   let lastRipe = -1, lastLvl = S.lvl;
   function tick() {
+    H.tick.forEach((f) => f());
     weedTick();
     ordersTick();
     if (S.lvl !== lastLvl) { lastLvl = S.lvl; track(); }
@@ -906,9 +927,16 @@
     if (!root.closest('.page.active')) return;
     renderHud();
     renderScene();
-    if (tab === 'orders' && S.orders.length < 3) renderPanel();
+    H.scene.forEach((f) => f($('#dc-scene')));
+    const ext = H.tabs.find((x) => x.id === tab);
+    if ((tab === 'orders' && S.orders.length < 3) || (ext && ext.live)) renderPanel();
   }
   window.addEventListener('qb:page', (e) => { if (e.detail === 'dacha') { visit = null; render(); } });
+  window.DachaCore = {
+    S, H, A, ART, CROPS, GOODS, TREES, MIN, HOUR, crop, itemName, basePrice, sellPrice, stage, allBeds, growMs, leftMs, fmtLeft,
+    save, render, renderPanel, addItem, addXp, pay, rub, sfx, floatAt, celebrate, rnd, esc, $, $$,
+    get tab() { return tab; }, setTab: (t) => { tab = t; render(); }, get visit() { return visit; },
+  };
   setInterval(tick, 1000);
   ordersTick();
   join();

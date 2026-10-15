@@ -90,7 +90,7 @@
 
 /* --- огород --- */
 .dc-field { grid-row: 2; display: flex; align-items: center; justify-content: center; gap: 18px; padding: 22px 24px 12px; min-height: 0; overflow: hidden; }
-.dc-beds { --cols: 3; display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 12px; max-width: 100%; flex: none; }
+.dc-beds { --cols: 3; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 12px; max-width: 100%; flex: none; }
 .dc-bed {
   position: relative; width: 100%; aspect-ratio: 1; border-radius: 18px; border: 0; padding: 0; background: none;
   transition: transform .15s ease; -webkit-tap-highlight-color: transparent;
@@ -280,3 +280,80 @@
 .dc-buff.armed { border: 0; background: #fff3c4; color: #7a5a12; cursor: pointer; animation: dc-bob 1.6s ease-in-out infinite; box-shadow: 0 0 0 2px #f2c14e; }
 .dc-tabs { grid-template-columns: repeat(6, 1fr) !important; }
 .dc-tabs button { font-size: 10.5px !important; padding: 0 2px; }
+
+/* ================= живой мир ================= */
+.dc-tabs { display: flex !important; flex-wrap: wrap; }
+.dc-tabs button { flex: 1 0 22%; }
+.dc-pest { position: absolute; z-index: 3; width: 46%; height: 46%; right: 2%; bottom: 8%; animation: dc-crawl 1.6s ease-in-out infinite; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3)); }
+.dc-pest.p-mole { width: 56%; height: 56%; left: 22%; right: auto; bottom: 2%; animation: dc-bob 1.2s ease-in-out infinite; }
+@keyframes dc-crawl { 0%, 100% { transform: translate(0, 0) rotate(-6deg); } 50% { transform: translate(-6px, -3px) rotate(6deg); } }
+.dc-hailmark { position: absolute; left: 6%; top: 6%; z-index: 3; width: 18px; height: 18px; border-radius: 50%; background: #e9eef3; box-shadow: inset 0 -2px 0 #a9b4c2, 0 0 0 2px rgba(90, 61, 43, .6); }
+.dc-hailmark::after { content: '−1'; position: absolute; left: 20px; top: 1px; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 0 #4a3426; }
+.dc-sp { position: relative; display: inline-flex; flex: none; }
+.dc-sp.sp-giant .dc-ico { transform: scale(1.18); filter: drop-shadow(0 0 6px rgba(255, 210, 80, .8)); }
+.dc-sp.sp-giant::after { content: 'XL'; position: absolute; right: -4px; bottom: -2px; font-size: 9px; font-weight: 900; padding: 1px 4px; border-radius: 6px; background: #f2c14e; color: #4a3426; }
+.dc-sp.sp-glow .dc-ico { filter: drop-shadow(0 0 4px #c8ff6b) drop-shadow(0 0 10px #8fff3d) brightness(1.15); animation: dc-glowpulse 1.6s ease-in-out infinite; }
+.dc-sp.sp-square .dc-ico { clip-path: inset(10% round 14%); background: rgba(255, 255, 255, .35); border-radius: 8px; }
+.dc-sp.sp-crystal .dc-ico { filter: hue-rotate(160deg) saturate(1.6) drop-shadow(0 0 6px #7cf0ff); opacity: .9; }
+@keyframes dc-glowpulse { 50% { filter: drop-shadow(0 0 2px #c8ff6b) drop-shadow(0 0 5px #8fff3d) brightness(1.05); } }
+
+/* сезоны */
+.dc-scene[data-season="autumn"] { filter: sepia(.12) saturate(1.1) hue-rotate(-12deg); }
+.dc-scene[data-season="winter"]::before { opacity: 1; background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(240, 248, 255, .32)), radial-gradient(circle at 30% 40%, #fff 0 2px, transparent 3px) 0 0 / 40px 34px; }
+.dc-scene[data-season="winter"] .dc-hills { filter: brightness(1.6) saturate(.2); }
+.dc-scene[data-season="spring"] .dc-hills::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle, #f7a8c4 0 2px, transparent 3px) 0 0 / 22px 14px; opacity: .8; }
+
+/* погода поверх сцены */
+.dc-weather { position: absolute; inset: 0; pointer-events: none; z-index: 6; opacity: 0; transition: opacity 1.2s; overflow: hidden; }
+.dc-weather i { position: absolute; inset: -100% 0 0; }
+.dc-scene[data-wx="rain"] .dc-weather, .dc-scene[data-wx="hail"] .dc-weather, .dc-scene[data-wx="snow"] .dc-weather, .dc-scene[data-wx="drought"] .dc-weather { opacity: 1; }
+.dc-scene[data-wx="rain"] .dc-weather { background: linear-gradient(180deg, rgba(60, 80, 110, .22), rgba(60, 80, 110, .08)); }
+.dc-scene[data-wx="rain"] .dc-weather i { background: repeating-linear-gradient(105deg, transparent 0 22px, rgba(170, 200, 235, .55) 22px 23.5px, transparent 23.5px 46px); background-size: 46px 60px; animation: dc-rain .45s linear infinite; }
+.dc-scene[data-wx="rain"] .dc-weather .l2 { opacity: .6; animation-duration: .7s; background-size: 70px 90px; }
+.dc-scene[data-wx="hail"] .dc-weather { background: linear-gradient(180deg, rgba(80, 90, 110, .28), rgba(80, 90, 110, .1)); }
+.dc-scene[data-wx="hail"] .dc-weather i { background: radial-gradient(circle, #fff 0 2.5px, transparent 3.5px) 0 0 / 38px 44px; animation: dc-rain .5s linear infinite; }
+.dc-scene[data-wx="hail"] .dc-weather .l2 { background-size: 52px 60px; animation-duration: .8s; }
+.dc-scene[data-wx="snow"] .dc-weather i { background: radial-gradient(circle, #fff 0 2px, transparent 3px) 0 0 / 46px 52px; animation: dc-snow 6s linear infinite; }
+.dc-scene[data-wx="snow"] .dc-weather .l2 { background-size: 70px 80px; animation-duration: 9s; opacity: .7; }
+.dc-scene[data-wx="drought"] .dc-weather { background: radial-gradient(120% 80% at 80% 0%, rgba(255, 160, 60, .28), transparent 60%), linear-gradient(180deg, rgba(255, 190, 90, .12), rgba(255, 170, 60, .16)); }
+.dc-scene[data-wx="drought"] .dc-soil { filter: saturate(.6) brightness(1.12); }
+@keyframes dc-rain { to { transform: translateY(50%); } }
+@keyframes dc-snow { from { transform: translate(0, 0); } to { transform: translate(-30px, 50%); } }
+
+/* плашки */
+.dc-buff.season, .dc-buff.wx { cursor: pointer; background: #fff; border: 1px solid var(--dc-line); color: var(--dc-ink); }
+.dc-buff.wx-rain { background: #e8f0fb; }
+.dc-buff.wx-drought { background: #ffeed6; color: #8a4a12; }
+.dc-buff.wx-hail { background: #eceff3; color: #3d4a5a; }
+.dc-buff.pest { background: #fdeccc; color: #8a5a1a; }
+
+/* вкладка «Погода» */
+.dc-wxcard { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 18px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-wxcard > div { display: flex; flex-direction: column; gap: 2px; }
+.dc-wxcard b { font-size: 15px; }
+.dc-wxcard small { font-size: 12px; color: var(--dc-ink2); line-height: 1.35; }
+.dc-wxcard i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--dc-green2); }
+.dc-wxcard.wx-rain { background: linear-gradient(90deg, #e8f0fb, #fff); }
+.dc-wxcard.wx-drought { background: linear-gradient(90deg, #ffeed6, #fff); }
+.dc-wxcard.wx-hail, .dc-wxcard.wx-snow { background: linear-gradient(90deg, #eef2f7, #fff); }
+.dc-wxico { width: 52px; height: 52px; flex: none; }
+.dc-cap { font-size: 10px; font-weight: 800; letter-spacing: .12em; color: var(--dc-ink2); padding: 4px 4px 0; }
+.dc-forecast { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.dc-forecast div { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; border-radius: 14px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-forecast div.now { border-color: var(--dc-green); box-shadow: 0 0 0 2px rgba(109, 180, 80, .2); }
+.dc-forecast .dc-wxico { width: 34px; height: 34px; }
+.dc-forecast b { font-size: 11px; }
+.dc-forecast small { font-size: 10px; color: var(--dc-ink2); }
+
+/* «Книга дачника» */
+.dc-book { display: flex; flex-direction: column; gap: 6px; }
+.dc-bookrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-bookrow > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dc-bookrow b { font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dc-bookrow small { font-size: 10.5px; color: var(--dc-ink2); }
+.dc-medal { font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px; color: #4a3426; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .15); }
+.dc-medalbar { height: 5px; border-radius: 5px; background: #f1e7d2; overflow: hidden; }
+.dc-medalbar em { display: block; height: 100%; background: linear-gradient(90deg, #f2c14e, #e8a33a); border-radius: inherit; }
+.dc-muts { display: flex; gap: 3px; }
+.dc-muts i { width: 10px; height: 10px; border-radius: 3px; background: #f1e7d2; }
+.dc-muts i.on { background: linear-gradient(135deg, #8fff3d, #7cf0ff); box-shadow: 0 0 6px #8fff3d; }
