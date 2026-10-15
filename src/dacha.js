@@ -13,64 +13,64 @@
   /* ================= справочник ================= */
   // grow — минуты; yield базово 2 шт., полив +1, сорняк −1
   const CROPS = [
-    { id: 'radish', name: 'Редиска', grow: 2, seed: 5, price: 12, xp: 1, lvl: 1 },
-    { id: 'carrot', name: 'Морковь', grow: 5, seed: 10, price: 26, xp: 2, lvl: 1 },
-    { id: 'dill', name: 'Укроп', grow: 10, seed: 16, price: 42, xp: 3, lvl: 2 },
-    { id: 'potato', name: 'Картошка', grow: 30, seed: 30, price: 95, xp: 5, lvl: 3 },
-    { id: 'cucumber', name: 'Огурцы', grow: 60, seed: 50, price: 170, xp: 8, lvl: 4 },
-    { id: 'tomato', name: 'Помидоры', grow: 120, seed: 80, price: 300, xp: 12, lvl: 5 },
-    { id: 'strawberry', name: 'Клубника', grow: 240, seed: 140, price: 560, xp: 18, lvl: 7 },
-    { id: 'cabbage', name: 'Капуста', grow: 360, seed: 170, price: 720, xp: 22, lvl: 8 },
-    { id: 'pumpkin', name: 'Тыква', grow: 480, seed: 220, price: 1000, xp: 30, lvl: 10 },
-    { id: 'sunflower', name: 'Подсолнух', grow: 720, seed: 300, price: 1500, xp: 40, lvl: 12 },
-    { id: 'watermelon', name: 'Арбуз', grow: 1440, seed: 500, price: 2800, xp: 60, lvl: 15 },
-    { id: 'onion', name: 'Лук', grow: 15, seed: 20, price: 55, xp: 3, lvl: 2 },
-    { id: 'beet', name: 'Свёкла', grow: 20, seed: 25, price: 70, xp: 4, lvl: 3 },
-    { id: 'garlic', name: 'Чеснок', grow: 45, seed: 40, price: 140, xp: 6, lvl: 4 },
-    { id: 'peas', name: 'Горох', grow: 90, seed: 60, price: 230, xp: 10, lvl: 5 },
-    { id: 'zucchini', name: 'Кабачок', grow: 180, seed: 110, price: 420, xp: 15, lvl: 6 },
-    { id: 'pepper', name: 'Перец', grow: 300, seed: 150, price: 640, xp: 20, lvl: 9 },
-    { id: 'eggplant', name: 'Баклажан', grow: 420, seed: 200, price: 900, xp: 26, lvl: 11 },
-    { id: 'corn', name: 'Кукуруза', grow: 600, seed: 260, price: 1250, xp: 34, lvl: 13 },
-    { id: 'raspberry', name: 'Малина', grow: 840, seed: 320, price: 1700, xp: 44, lvl: 14 },
-    { id: 'melon', name: 'Дыня', grow: 1080, seed: 400, price: 2200, xp: 52, lvl: 17 },
-    { id: 'lavender', name: 'Лаванда', grow: 1200, seed: 380, price: 2300, xp: 56, lvl: 18 },
-    { id: 'rose', name: 'Розы', grow: 1800, seed: 600, price: 4000, xp: 80, lvl: 20 },
-    { id: 'blueberry', name: 'Голубика', grow: 2160, seed: 700, price: 5000, xp: 95, lvl: 22 },
-    { id: 'goldpumpkin', name: 'Золотая тыква', grow: 2880, seed: 0, price: 12000, xp: 200, lvl: 15, seedItem: 'goldseed' },
+    { id: 'radish', name: 'Редиска', grow: 2, seed: 1, price: 4, xp: 1, lvl: 1 },
+    { id: 'carrot', name: 'Морковь', grow: 5, seed: 2, price: 10, xp: 2, lvl: 1 },
+    { id: 'dill', name: 'Укроп', grow: 10, seed: 7, price: 33, xp: 3, lvl: 2 },
+    { id: 'potato', name: 'Картошка', grow: 30, seed: 30, price: 145, xp: 5, lvl: 3 },
+    { id: 'cucumber', name: 'Огурцы', grow: 60, seed: 80, price: 383, xp: 8, lvl: 4 },
+    { id: 'tomato', name: 'Помидоры', grow: 120, seed: 210, price: 972, xp: 12, lvl: 5 },
+    { id: 'strawberry', name: 'Клубника', grow: 240, seed: 585, price: 2730, xp: 18, lvl: 7 },
+    { id: 'cabbage', name: 'Капуста', grow: 360, seed: 1010, price: 4720, xp: 22, lvl: 8 },
+    { id: 'pumpkin', name: 'Тыква', grow: 480, seed: 1685, price: 7860, xp: 30, lvl: 10 },
+    { id: 'sunflower', name: 'Подсолнух', grow: 720, seed: 3065, price: 14300, xp: 40, lvl: 12 },
+    { id: 'watermelon', name: 'Арбуз', grow: 1440, seed: 7865, price: 36700, xp: 60, lvl: 15 },
+    { id: 'onion', name: 'Лук', grow: 15, seed: 11, price: 51, xp: 3, lvl: 2 },
+    { id: 'beet', name: 'Свёкла', grow: 20, seed: 20, price: 94, xp: 4, lvl: 3 },
+    { id: 'garlic', name: 'Чеснок', grow: 45, seed: 60, price: 282, xp: 6, lvl: 4 },
+    { id: 'peas', name: 'Горох', grow: 90, seed: 155, price: 716, xp: 10, lvl: 5 },
+    { id: 'zucchini', name: 'Кабачок', grow: 180, seed: 375, price: 1750, xp: 15, lvl: 6 },
+    { id: 'pepper', name: 'Перец', grow: 300, seed: 930, price: 4340, xp: 20, lvl: 9 },
+    { id: 'eggplant', name: 'Баклажан', grow: 420, seed: 1595, price: 7450, xp: 26, lvl: 11 },
+    { id: 'corn', name: 'Кукуруза', grow: 600, seed: 2725, price: 12710, xp: 34, lvl: 13 },
+    { id: 'raspberry', name: 'Малина', grow: 840, seed: 4170, price: 19460, xp: 44, lvl: 14 },
+    { id: 'melon', name: 'Дыня', grow: 1080, seed: 6540, price: 30520, xp: 52, lvl: 17 },
+    { id: 'lavender', name: 'Лаванда', grow: 1200, seed: 7720, price: 36020, xp: 56, lvl: 18 },
+    { id: 'rose', name: 'Розы', grow: 1800, seed: 13100, price: 61130, xp: 80, lvl: 20 },
+    { id: 'blueberry', name: 'Голубика', grow: 2160, seed: 17400, price: 81200, xp: 95, lvl: 22 },
+    { id: 'goldpumpkin', name: 'Золотая тыква', grow: 2880, seed: 0, price: 177710, xp: 200, lvl: 15, seedItem: 'goldseed' },
   ].sort((a, b) => a.lvl - b.lvl || a.grow - b.grow);
   const GOODS = {
-    egg: { name: 'Яйца', price: 60 }, honey: { name: 'Мёд', price: 420 },
-    apple: { name: 'Яблоки', price: 60 }, cherry: { name: 'Вишня', price: 70 }, pear: { name: 'Груши', price: 140 }, plum: { name: 'Сливы', price: 160 },
-    apricot: { name: 'Абрикосы', price: 280 }, peach: { name: 'Персики', price: 420 }, walnut: { name: 'Грецкие орехи', price: 600 }, orange: { name: 'Апельсины', price: 900 },
+    egg: { name: 'Яйца', price: 300 }, honey: { name: 'Мёд', price: 2100 },
+    apple: { name: 'Яблоки', price: 300 }, cherry: { name: 'Вишня', price: 350 }, pear: { name: 'Груши', price: 700 }, plum: { name: 'Сливы', price: 800 },
+    apricot: { name: 'Абрикосы', price: 1400 }, peach: { name: 'Персики', price: 2100 }, walnut: { name: 'Грецкие орехи', price: 3000 }, orange: { name: 'Апельсины', price: 4500 },
   };
   // деревья: сажаешь раз, потом плодоносят бесконечно. grow и every — минуты
   const TREES = [
-    { id: 'apple', name: 'Яблоня', lvl: 4, price: 400, grow: 180, every: 120, n: 4 },
-    { id: 'cherry', name: 'Вишня', lvl: 6, price: 900, grow: 240, every: 180, n: 6 },
-    { id: 'pear', name: 'Груша', lvl: 8, price: 1500, grow: 360, every: 180, n: 4 },
-    { id: 'plum', name: 'Слива', lvl: 10, price: 2500, grow: 480, every: 240, n: 5 },
-    { id: 'apricot', name: 'Абрикос', lvl: 13, price: 5000, grow: 720, every: 300, n: 5 },
-    { id: 'peach', name: 'Персик', lvl: 16, price: 9000, grow: 960, every: 360, n: 5 },
-    { id: 'walnut', name: 'Грецкий орех', lvl: 20, price: 20000, grow: 1440, every: 480, n: 6 },
-    { id: 'orange', name: 'Апельсин', lvl: 24, price: 40000, grow: 1440, every: 360, n: 6 },
+    { id: 'apple', name: 'Яблоня', lvl: 4, price: 2000, grow: 180, every: 120, n: 4 },
+    { id: 'cherry', name: 'Вишня', lvl: 6, price: 4500, grow: 240, every: 180, n: 6 },
+    { id: 'pear', name: 'Груша', lvl: 8, price: 7500, grow: 360, every: 180, n: 4 },
+    { id: 'plum', name: 'Слива', lvl: 10, price: 12500, grow: 480, every: 240, n: 5 },
+    { id: 'apricot', name: 'Абрикос', lvl: 13, price: 25000, grow: 720, every: 300, n: 5 },
+    { id: 'peach', name: 'Персик', lvl: 16, price: 45000, grow: 960, every: 360, n: 5 },
+    { id: 'walnut', name: 'Грецкий орех', lvl: 20, price: 100000, grow: 1440, every: 480, n: 6 },
+    { id: 'orange', name: 'Апельсин', lvl: 24, price: 200000, grow: 1440, every: 360, n: 6 },
   ];
   const treeDef = (id) => TREES.find((t) => t.id === id);
   // места под деревья: 2 бесплатно, дальше докупаются
-  const ORCH = [{ price: 3000, lvl: 4 }, { price: 10000, lvl: 6 }, { price: 30000, lvl: 9 }, { price: 80000, lvl: 12 }, { price: 200000, lvl: 16 }, { price: 500000, lvl: 20 }];
+  const ORCH = [{ price: 15000, lvl: 4 }, { price: 50000, lvl: 6 }, { price: 150000, lvl: 9 }, { price: 400000, lvl: 12 }, { price: 1000000, lvl: 16 }, { price: 2500000, lvl: 20 }];
   // сельпо: инструменты, редкие семена и защита от воров
   const SHOP = [
-    { id: 'fert', kind: 'tool', name: 'Удобрение', price: 150, always: true, desc: 'Грядка дорастает вдвое быстрее' },
-    { id: 'compost', kind: 'tool', name: 'Компост', price: 120, always: true, desc: '+1 к урожаю грядки' },
-    { id: 'scarecrow', kind: 'guard', name: 'Пугало', price: 300, always: true, hours: 2, p: 0.3, desc: 'Отпугивает воров: 30% на 2 часа' },
-    { id: 'grow', kind: 'tool', name: 'Золотая лейка', price: 900, desc: 'Грядка созревает мгновенно' },
-    { id: 'treefert', kind: 'tool', name: 'Подкормка для сада', price: 1500, desc: 'Дерево сразу дорастает и даёт плоды' },
-    { id: 'goldseed', kind: 'tool', name: 'Семена золотой тыквы', price: 2500, lvl: 15, desc: 'Бывают только в сельпо. Тыква — 12 000 ₽ за штуку' },
-    { id: 'trap', kind: 'guard', name: 'Капкан', price: 800, hours: 24, p: 1, once: true, desc: 'Ловит первого же вора (сутки)' },
-    { id: 'camera', kind: 'guard', name: 'Камера', price: 1500, hours: 6, p: 0.55, desc: 'Воры палятся: 55% на 6 часов' },
-    { id: 'alarm', kind: 'guard', name: 'Сигнализация', price: 4000, hours: 12, p: 0.7, desc: 'Орёт на всю округу: 70% на 12 часов' },
-    { id: 'watch', kind: 'guard', name: 'Дорогие часы на заборе', price: 9000, hours: 8, p: 0.75, desc: 'Вор залипает на часы и попадается: 75% на 8 часов' },
-    { id: 'guard', kind: 'guard', name: 'Сторож дядя Вася', price: 20000, hours: 24, p: 0.88, desc: 'Сторожит сутки: 88%' },
+    { id: 'fert', kind: 'tool', name: 'Удобрение', price: 750, always: true, desc: 'Грядка дорастает вдвое быстрее' },
+    { id: 'compost', kind: 'tool', name: 'Компост', price: 600, always: true, desc: '+1 к урожаю грядки' },
+    { id: 'scarecrow', kind: 'guard', name: 'Пугало', price: 1500, always: true, hours: 2, p: 0.3, desc: 'Отпугивает воров: 30% на 2 часа' },
+    { id: 'grow', kind: 'tool', name: 'Золотая лейка', price: 4500, desc: 'Грядка созревает мгновенно' },
+    { id: 'treefert', kind: 'tool', name: 'Подкормка для сада', price: 7500, desc: 'Дерево сразу дорастает и даёт плоды' },
+    { id: 'goldseed', kind: 'tool', name: 'Семена золотой тыквы', price: 40000, lvl: 15, desc: 'Бывают только в сельпо. Тыква — 177 000 ₽ за штуку' },
+    { id: 'trap', kind: 'guard', name: 'Капкан', price: 4000, hours: 24, p: 1, once: true, desc: 'Ловит первого же вора (сутки)' },
+    { id: 'camera', kind: 'guard', name: 'Камера', price: 7500, hours: 6, p: 0.55, desc: 'Воры палятся: 55% на 6 часов' },
+    { id: 'alarm', kind: 'guard', name: 'Сигнализация', price: 20000, hours: 12, p: 0.7, desc: 'Орёт на всю округу: 70% на 12 часов' },
+    { id: 'watch', kind: 'guard', name: 'Дорогие часы на заборе', price: 45000, hours: 8, p: 0.75, desc: 'Вор залипает на часы и попадается: 75% на 8 часов' },
+    { id: 'guard', kind: 'guard', name: 'Сторож дядя Вася', price: 100000, hours: 24, p: 0.88, desc: 'Сторожит сутки: 88%' },
   ];
   const shopDef = (id) => SHOP.find((x) => x.id === id);
   const STOCK_T = 2 * HOUR;
@@ -79,27 +79,27 @@
   const basePrice = (id) => (crop(id) || GOODS[id] || {}).price || 0;
 
   const BUILD = [
-    { id: 'coop', name: 'Курятник', lvl: 3, price: 800, desc: 'Куры несут яйца раз в 40 минут' },
-    { id: 'well', name: 'Колодец', lvl: 4, price: 1500, desc: 'Всё, что сажаешь, сразу полито' },
-    { id: 'dog', name: 'Будка с Бубликом', lvl: 5, price: 2500, desc: 'Бублик гоняет воров с грядок' },
-    { id: 'hive', name: 'Пасека', lvl: 6, price: 4000, desc: 'Банка мёда раз в 2 часа' },
-    { id: 'greenhouse', name: 'Теплица', lvl: 8, price: 9000, desc: '+3 грядки, растут в 1.5 раза быстрее' },
-    { id: 'banya', name: 'Баня', lvl: 10, price: 16000, desc: 'Попарился — 30 минут продаёшь на 20% дороже' },
+    { id: 'coop', name: 'Курятник', lvl: 3, price: 4000, desc: 'Куры несут яйца раз в 40 минут' },
+    { id: 'well', name: 'Колодец', lvl: 4, price: 7500, desc: 'Всё, что сажаешь, сразу полито' },
+    { id: 'dog', name: 'Будка с Бубликом', lvl: 5, price: 12500, desc: 'Бублик гоняет воров с грядок' },
+    { id: 'hive', name: 'Пасека', lvl: 6, price: 20000, desc: 'Банка мёда раз в 2 часа' },
+    { id: 'greenhouse', name: 'Теплица', lvl: 8, price: 45000, desc: '+3 грядки, растут в 1.5 раза быстрее' },
+    { id: 'banya', name: 'Баня', lvl: 10, price: 80000, desc: 'Попарился — 30 минут продаёшь на 20% дороже' },
   ];
   const DECO = [
-    { id: 'gnome', name: 'Садовый гном', price: 2000, cozy: 1 },
-    { id: 'flowers', name: 'Клумба', price: 5000, cozy: 2 },
-    { id: 'bench', name: 'Скамейка', price: 10000, cozy: 2 },
-    { id: 'grill', name: 'Мангал', price: 25000, cozy: 3 },
-    { id: 'swing', name: 'Качели', price: 60000, cozy: 4 },
-    { id: 'fountain', name: 'Фонтан', price: 150000, cozy: 5 },
-    { id: 'gazebo', name: 'Беседка', price: 400000, cozy: 6 },
-    { id: 'pool', name: 'Бассейн', price: 1000000, cozy: 8 },
+    { id: 'gnome', name: 'Садовый гном', price: 20000, cozy: 1 },
+    { id: 'flowers', name: 'Клумба', price: 50000, cozy: 2 },
+    { id: 'bench', name: 'Скамейка', price: 100000, cozy: 2 },
+    { id: 'grill', name: 'Мангал', price: 250000, cozy: 3 },
+    { id: 'swing', name: 'Качели', price: 600000, cozy: 4 },
+    { id: 'fountain', name: 'Фонтан', price: 1500000, cozy: 5 },
+    { id: 'gazebo', name: 'Беседка', price: 4000000, cozy: 6 },
+    { id: 'pool', name: 'Бассейн', price: 10000000, cozy: 8 },
   ];
   // участок: сколько грядок, цена и уровень
-  const LAND = [{ n: 6, price: 0, lvl: 1 }, { n: 9, price: 500, lvl: 2 }, { n: 12, price: 2000, lvl: 4 }, { n: 16, price: 6000, lvl: 7 }, { n: 20, price: 15000, lvl: 10 }];
+  const LAND = [{ n: 6, price: 0, lvl: 1 }, { n: 9, price: 2500, lvl: 2 }, { n: 12, price: 10000, lvl: 4 }, { n: 16, price: 30000, lvl: 7 }, { n: 20, price: 75000, lvl: 10 }];
   const EGG_T = 40 * MIN, HONEY_T = 2 * HOUR, WEED_T = 10 * MIN, STEAM_LEN = 30 * MIN, STEAM_CD = 4 * HOUR;
-  const COOP_MAX = 6, COOP_HEN = (n) => 600 * 2 ** n; // докупить курицу
+  const COOP_MAX = 6, COOP_HEN = (n) => 3000 * 2 ** n; // докупить курицу
   const NEIGHBORS = [
     { name: 'Баба Валя', color: '#ec6a8c' }, { name: 'Дед Михалыч', color: '#5b8def' }, { name: 'Сосед Толик', color: '#f2a93b' },
     { name: 'Тётя Люба', color: '#9a6cf0' }, { name: 'Председатель', color: '#5fae8f' },
@@ -671,7 +671,7 @@
           const perH = Math.round(((c.price * 2 - c.seed) / c.grow) * 60), gs = c.seedItem ? S.tools[c.seedItem] || 0 : 0;
           return `<button class="dc-seed ${S.seed === c.id ? 'on' : ''} ${lock ? 'lock' : ''}" data-seed="${c.id}" ${lock ? 'disabled' : ''}>
             ${ART.item(c.id)}<b>${c.name}</b><small>${lock ? `🔒 ${c.lvl} уровень` : c.seedItem ? `${fmtLeft(c.grow * MIN)} · семян: ${gs}` : `${fmtLeft(c.grow * MIN)} · ${c.seed} ₽`}</small>
-            ${lock ? '' : `<em>≈ ${perH.toLocaleString('ru-RU')} ₽/ч</em>`}</button>`;
+            ${lock ? '' : `<em>+${rub(c.price * 2 - c.seed)} · ≈ ${perH.toLocaleString('ru-RU')} ₽/ч</em>`}</button>`;
         }).join('')}</div>`;
     } else if (tab === 'barn') {
       const items = Object.entries(S.inv).filter(([, n]) => n > 0);
@@ -866,7 +866,7 @@
         addItem(payload.item, 1); S.stats.stolen++; addXp(2); sfx.pop();
         A.toast(`🤫 Стащил: ${crop(payload.item).name}`);
       } else if (payload.caught) {
-        const fine = Math.min(S.rub, 50 + S.lvl * 20);
+        const fine = Math.min(S.rub, 300 + S.lvl * 150);
         S.rub -= fine; sfx.woof();
         const how = { trap: 'Попал в капкан!', guard: 'Дядя Вася поймал тебя!', watch: 'Залип на дорогие часы и попался!', alarm: 'Сработала сигнализация!', camera: 'Тебя сняла камера!', scarecrow: 'Испугался пугала!', dog: 'Бублик укусил за штанину!' }[payload.by] || 'Поймали!';
         A.toast(`🚨 ${how} Штраф ${rub(fine)}`);
