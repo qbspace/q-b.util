@@ -24,8 +24,56 @@
     { id: 'pumpkin', name: 'Тыква', grow: 480, seed: 220, price: 1000, xp: 30, lvl: 10 },
     { id: 'sunflower', name: 'Подсолнух', grow: 720, seed: 300, price: 1500, xp: 40, lvl: 12 },
     { id: 'watermelon', name: 'Арбуз', grow: 1440, seed: 500, price: 2800, xp: 60, lvl: 15 },
+    { id: 'onion', name: 'Лук', grow: 15, seed: 20, price: 55, xp: 3, lvl: 2 },
+    { id: 'beet', name: 'Свёкла', grow: 20, seed: 25, price: 70, xp: 4, lvl: 3 },
+    { id: 'garlic', name: 'Чеснок', grow: 45, seed: 40, price: 140, xp: 6, lvl: 4 },
+    { id: 'peas', name: 'Горох', grow: 90, seed: 60, price: 230, xp: 10, lvl: 5 },
+    { id: 'zucchini', name: 'Кабачок', grow: 180, seed: 110, price: 420, xp: 15, lvl: 6 },
+    { id: 'pepper', name: 'Перец', grow: 300, seed: 150, price: 640, xp: 20, lvl: 9 },
+    { id: 'eggplant', name: 'Баклажан', grow: 420, seed: 200, price: 900, xp: 26, lvl: 11 },
+    { id: 'corn', name: 'Кукуруза', grow: 600, seed: 260, price: 1250, xp: 34, lvl: 13 },
+    { id: 'raspberry', name: 'Малина', grow: 840, seed: 320, price: 1700, xp: 44, lvl: 14 },
+    { id: 'melon', name: 'Дыня', grow: 1080, seed: 400, price: 2200, xp: 52, lvl: 17 },
+    { id: 'lavender', name: 'Лаванда', grow: 1200, seed: 380, price: 2300, xp: 56, lvl: 18 },
+    { id: 'rose', name: 'Розы', grow: 1800, seed: 600, price: 4000, xp: 80, lvl: 20 },
+    { id: 'blueberry', name: 'Голубика', grow: 2160, seed: 700, price: 5000, xp: 95, lvl: 22 },
+    { id: 'goldpumpkin', name: 'Золотая тыква', grow: 2880, seed: 0, price: 12000, xp: 200, lvl: 15, seedItem: 'goldseed' },
+  ].sort((a, b) => a.lvl - b.lvl || a.grow - b.grow);
+  const GOODS = {
+    egg: { name: 'Яйца', price: 60 }, honey: { name: 'Мёд', price: 420 },
+    apple: { name: 'Яблоки', price: 60 }, cherry: { name: 'Вишня', price: 70 }, pear: { name: 'Груши', price: 140 }, plum: { name: 'Сливы', price: 160 },
+    apricot: { name: 'Абрикосы', price: 280 }, peach: { name: 'Персики', price: 420 }, walnut: { name: 'Грецкие орехи', price: 600 }, orange: { name: 'Апельсины', price: 900 },
+  };
+  // деревья: сажаешь раз, потом плодоносят бесконечно. grow и every — минуты
+  const TREES = [
+    { id: 'apple', name: 'Яблоня', lvl: 4, price: 400, grow: 180, every: 120, n: 4 },
+    { id: 'cherry', name: 'Вишня', lvl: 6, price: 900, grow: 240, every: 180, n: 6 },
+    { id: 'pear', name: 'Груша', lvl: 8, price: 1500, grow: 360, every: 180, n: 4 },
+    { id: 'plum', name: 'Слива', lvl: 10, price: 2500, grow: 480, every: 240, n: 5 },
+    { id: 'apricot', name: 'Абрикос', lvl: 13, price: 5000, grow: 720, every: 300, n: 5 },
+    { id: 'peach', name: 'Персик', lvl: 16, price: 9000, grow: 960, every: 360, n: 5 },
+    { id: 'walnut', name: 'Грецкий орех', lvl: 20, price: 20000, grow: 1440, every: 480, n: 6 },
+    { id: 'orange', name: 'Апельсин', lvl: 24, price: 40000, grow: 1440, every: 360, n: 6 },
   ];
-  const GOODS = { egg: { name: 'Яйца', price: 60 }, honey: { name: 'Мёд', price: 420 } };
+  const treeDef = (id) => TREES.find((t) => t.id === id);
+  // места под деревья: 2 бесплатно, дальше докупаются
+  const ORCH = [{ price: 3000, lvl: 4 }, { price: 10000, lvl: 6 }, { price: 30000, lvl: 9 }, { price: 80000, lvl: 12 }, { price: 200000, lvl: 16 }, { price: 500000, lvl: 20 }];
+  // сельпо: инструменты, редкие семена и защита от воров
+  const SHOP = [
+    { id: 'fert', kind: 'tool', name: 'Удобрение', price: 150, always: true, desc: 'Грядка дорастает вдвое быстрее' },
+    { id: 'compost', kind: 'tool', name: 'Компост', price: 120, always: true, desc: '+1 к урожаю грядки' },
+    { id: 'scarecrow', kind: 'guard', name: 'Пугало', price: 300, always: true, hours: 2, p: 0.3, desc: 'Отпугивает воров: 30% на 2 часа' },
+    { id: 'grow', kind: 'tool', name: 'Золотая лейка', price: 900, desc: 'Грядка созревает мгновенно' },
+    { id: 'treefert', kind: 'tool', name: 'Подкормка для сада', price: 1500, desc: 'Дерево сразу дорастает и даёт плоды' },
+    { id: 'goldseed', kind: 'tool', name: 'Семена золотой тыквы', price: 2500, lvl: 15, desc: 'Бывают только в сельпо. Тыква — 12 000 ₽ за штуку' },
+    { id: 'trap', kind: 'guard', name: 'Капкан', price: 800, hours: 24, p: 1, once: true, desc: 'Ловит первого же вора (сутки)' },
+    { id: 'camera', kind: 'guard', name: 'Камера', price: 1500, hours: 6, p: 0.55, desc: 'Воры палятся: 55% на 6 часов' },
+    { id: 'alarm', kind: 'guard', name: 'Сигнализация', price: 4000, hours: 12, p: 0.7, desc: 'Орёт на всю округу: 70% на 12 часов' },
+    { id: 'watch', kind: 'guard', name: 'Дорогие часы на заборе', price: 9000, hours: 8, p: 0.75, desc: 'Вор залипает на часы и попадается: 75% на 8 часов' },
+    { id: 'guard', kind: 'guard', name: 'Сторож дядя Вася', price: 20000, hours: 24, p: 0.88, desc: 'Сторожит сутки: 88%' },
+  ];
+  const shopDef = (id) => SHOP.find((x) => x.id === id);
+  const STOCK_T = 2 * HOUR;
   const crop = (id) => CROPS.find((c) => c.id === id);
   const itemName = (id) => (crop(id) || GOODS[id] || {}).name || id;
   const basePrice = (id) => (crop(id) || GOODS[id] || {}).price || 0;
@@ -63,8 +111,11 @@
     rub: 300, xp: 0, lvl: 1, land: 0, beds: [], gh: [], b: {}, hens: 0, coopAt: 0, hiveAt: 0,
     steamAt: 0, steamUntil: 0, inv: {}, orders: [], orderNext: 0, weedAt: Date.now(), seed: 'radish', deco: [],
     stats: { harvest: 0, earned: 0, stolen: 0, caught: 0 }, steals: {},
+    view: 'garden', orch: [], orchSlots: 0, sapling: 'apple', tools: {}, guards: {}, arm: null, stockW: 0, bought: {},
   }, A.load('qb.dacha', {}));
   const fixBeds = () => {
+    const slots = 2 + S.orchSlots;
+    while (S.orch.length < slots) S.orch.push({ tr: null, t: 0, fAt: 0 });
     const n = LAND[S.land].n;
     while (S.beds.length < n) S.beds.push({ c: null, t: 0, w: false, weed: false, s: 0 });
     if (S.b.greenhouse) while (S.gh.length < 3) S.gh.push({ c: null, t: 0, w: false, weed: false, s: 0 });
@@ -83,7 +134,7 @@
     return 0.82 + ((h >>> 0) % 1000) / 1000 * 0.36;
   }
   function hotItem() {
-    const pool = CROPS.filter((c) => c.lvl <= Math.max(3, S.lvl));
+    const pool = CROPS.filter((c) => c.lvl <= Math.max(3, S.lvl) && !c.seedItem);
     const d = new Date().toISOString().slice(0, 10);
     let h = 0;
     for (let i = 0; i < d.length; i++) h = (h * 31 + d.charCodeAt(i)) >>> 0;
@@ -99,7 +150,7 @@
     return p >= 1 ? 3 : p >= 0.6 ? 2 : p >= 0.2 ? 1 : 0;
   }
   const leftMs = (bed, gh) => Math.max(0, bed.t + growMs(bed, gh) - Date.now());
-  const yieldOf = (bed) => Math.max(1, 2 + (bed.w ? 1 : 0) - (bed.weed ? 1 : 0) - (bed.s || 0));
+  const yieldOf = (bed) => Math.max(1, 2 + (bed.w ? 1 : 0) + (bed.cp || 0) - (bed.weed ? 1 : 0) - (bed.s || 0));
   const fmtLeft = (ms) => {
     const m = Math.ceil(ms / MIN);
     if (m >= 60) return `${Math.floor(m / 60)} ч ${m % 60 ? (m % 60) + ' мин' : ''}`.trim();
@@ -157,8 +208,11 @@
   function plantBed(bed, quiet) {
     const c = crop(S.seed);
     if (!c || c.lvl > S.lvl || bed.c || bed.weed) return false;
-    if (!pay(c.seed)) return false;
-    Object.assign(bed, { c: c.id, t: Date.now(), w: !!S.b.well, s: 0 });
+    if (c.seedItem) {
+      if (!(S.tools[c.seedItem] > 0)) { if (!quiet) A.toast('Семена золотой тыквы бывают только в сельпо'); return false; }
+      S.tools[c.seedItem]--;
+    } else if (!pay(c.seed)) return false;
+    Object.assign(bed, { c: c.id, t: Date.now(), w: !!S.b.well, s: 0, cp: 0 });
     if (!quiet) sfx.plant();
     return true;
   }
@@ -167,7 +221,7 @@
     addItem(id, n);
     addXp(c.xp);
     S.stats.harvest += n;
-    Object.assign(bed, { c: null, t: 0, w: false, weed: false, s: 0 });
+    Object.assign(bed, { c: null, t: 0, w: false, weed: false, s: 0, cp: 0 });
     if (el) floatAt(el, `+${n}`, id);
     sfx.pop();
   }
@@ -175,6 +229,7 @@
     if (visit) return onVisitBed(key, el);
     const { bed, gh } = bedAt(key);
     const st = stage(bed, gh);
+    if (S.arm && S.arm !== 'treefert' && st >= 0 && st < 3) { useTool(bed, gh, el); save(); render(); return; }
     if (bed.weed && st !== 3) { bed.weed = false; addXp(1); sfx.pull(); floatAt(el, '🌿', null); }
     else if (st === 3) harvestBed(bed, el);
     else if (st === -1) { if (!plantBed(bed)) { if (crop(S.seed).lvl > S.lvl) A.toast('Эти семена откроются позже'); } }
@@ -187,6 +242,7 @@
   function harvestAll() {
     let n = 0;
     allBeds().forEach(([b, gh]) => { if (stage(b, gh) === 3) { harvestBed(b); n++; } });
+    S.orch.forEach((o) => { if (treeStage(o) === 3) { const d = treeDef(o.tr); addItem(d.id, d.n); addXp(Math.round(d.n * 3 + d.lvl)); S.stats.harvest += d.n; o.fAt = Date.now(); n++; } });
     if (n) { A.toast(`🧺 Собрано с ${n} грядок`); save(); render(); } else A.toast('Пока нечего собирать');
   }
   function waterAll() {
@@ -209,6 +265,117 @@
     if (now - S.weedAt > WEED_T) S.weedAt = now;
     while (steps--) allBeds().forEach(([b, gh]) => { if (!b.weed && stage(b, gh) !== 3 && rnd() < 0.05) b.weed = true; });
     save();
+  }
+
+
+  /* ================= сельпо и инструменты ================= */
+  const stockWin = () => Math.floor(Date.now() / STOCK_T);
+  // сток одинаковый у всех кентов: считается из номера окна
+  function stock() {
+    const w = stockWin();
+    let h = 2166136261 ^ w;
+    const next = () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+    const list = [];
+    SHOP.forEach((x) => {
+      if (x.always) list.push({ id: x.id, qty: Infinity });
+      else if (next() < 0.6) list.push({ id: x.id, qty: 1 + Math.floor(next() * (x.kind === 'guard' ? 2 : 4)) });
+    });
+    return list;
+  }
+  function stockLeft(id, qty) {
+    if (S.stockW !== stockWin()) { S.stockW = stockWin(); S.bought = {}; }
+    return qty - (S.bought[id] || 0);
+  }
+  const guardOn = (id) => (S.guards[id] || 0) > Date.now();
+  function buyShop(id) {
+    const x = shopDef(id), it = stock().find((s) => s.id === id);
+    if (!x || !it) return;
+    if (x.lvl && S.lvl < x.lvl) { A.toast(`Откроется на ${x.lvl} уровне`); return; }
+    if (stockLeft(id, it.qty) <= 0) { A.toast('Разобрали — жди завоз'); return; }
+    if (!pay(x.price)) return;
+    S.bought[id] = (S.bought[id] || 0) + 1;
+    if (x.kind === 'guard') {
+      S.guards[id] = Math.max(S.guards[id] || 0, Date.now()) + x.hours * HOUR;
+      A.toast(`🛡 ${x.name} — дача под охраной`);
+    } else S.tools[id] = (S.tools[id] || 0) + 1;
+    sfx.coin();
+    track();
+    save(); render();
+  }
+  function useTool(bed, gh, el) {
+    const id = S.arm;
+    if (!(S.tools[id] > 0)) { S.arm = null; return; }
+    if (id === 'fert') { const left = leftMs(bed, gh); bed.t -= left / 2; }
+    else if (id === 'compost') { if ((bed.cp || 0) >= 1) { A.toast('Тут уже есть компост'); return; } bed.cp = 1; }
+    else if (id === 'grow') bed.t = Date.now() - growMs(bed, gh);
+    S.tools[id]--;
+    if (!S.tools[id]) S.arm = null;
+    sfx.water();
+    floatAt(el, '✨', null);
+  }
+  // защита: собака и всё купленное складываются
+  function protection() {
+    let miss = S.b.dog ? 0.3 : 1;
+    SHOP.filter((x) => x.kind === 'guard' && !x.once && guardOn(x.id)).forEach((x) => { miss *= 1 - x.p; });
+    return 1 - miss;
+  }
+  const guardsActive = () => SHOP.filter((x) => x.kind === 'guard' && guardOn(x.id)).map((x) => x.id);
+  const CAUGHT_BY = {
+    trap: 'попался в капкан', guard: 'нарвался на сторожа дядю Васю', watch: 'залип на твои часы и попался', alarm: 'перепугался сигнализации',
+    camera: 'попал на камеру', scarecrow: 'испугался пугала', dog: 'укушен Бубликом',
+  };
+
+  /* ================= сад ================= */
+  function treeStage(o) {
+    if (!o || !o.tr) return -1;
+    const d = treeDef(o.tr), now = Date.now(), age = now - o.t;
+    if (age < d.grow * MIN * 0.35) return 0;
+    if (age < d.grow * MIN) return 1;
+    return now - o.fAt >= d.every * MIN ? 3 : 2;
+  }
+  function treeLeft(o) {
+    const d = treeDef(o.tr), now = Date.now();
+    if (now - o.t < d.grow * MIN) return o.t + d.grow * MIN - now;
+    return Math.max(0, o.fAt + d.every * MIN - now);
+  }
+  function onTree(i, el) {
+    if (visit) return;
+    const o = S.orch[i], st = treeStage(o);
+    if (st === -1) {
+      const d = treeDef(S.sapling);
+      if (!d || d.lvl > S.lvl) { A.toast('Выбери саженец в «Семенах»'); tab = 'seeds'; render(); return; }
+      if (!pay(d.price)) return;
+      Object.assign(o, { tr: d.id, t: Date.now(), fAt: Date.now() + d.grow * MIN - d.every * MIN });
+      sfx.plant();
+    } else if (S.arm === 'treefert' && st < 3) {
+      if (!(S.tools.treefert > 0)) { S.arm = null; return; }
+      const d = treeDef(o.tr);
+      if (Date.now() - o.t < d.grow * MIN) o.t = Date.now() - d.grow * MIN;
+      o.fAt = Date.now() - d.every * MIN;
+      S.tools.treefert--;
+      if (!S.tools.treefert) S.arm = null;
+      sfx.water();
+      floatAt(el, '✨', null);
+    } else if (st === 3) {
+      const d = treeDef(o.tr);
+      addItem(d.id, d.n);
+      addXp(Math.round(d.n * 3 + d.lvl));
+      S.stats.harvest += d.n;
+      o.fAt = Date.now();
+      floatAt(el, `+${d.n}`, d.id);
+      sfx.pop();
+    } else A.toast(`${treeDef(o.tr).name}: ${st < 2 ? 'подрастёт' : 'плоды будут'} через ${fmtLeft(treeLeft(o))}`);
+    save(); render();
+  }
+  function buyOrchSlot() {
+    const nx = ORCH[S.orchSlots];
+    if (!nx) return;
+    if (S.lvl < nx.lvl) { A.toast(`Новое место в саду — с ${nx.lvl} уровня`); return; }
+    if (!pay(nx.price)) return;
+    S.orchSlots++;
+    fixBeds();
+    sfx.coin(); celebrate();
+    save(); render();
   }
 
   /* ================= двор ================= */
@@ -253,7 +420,7 @@
 
   /* ================= заказы соседей ================= */
   function newOrder() {
-    const pool = [...CROPS.filter((c) => c.lvl <= S.lvl).map((c) => c.id), ...(S.b.coop ? ['egg'] : []), ...(S.b.hive ? ['honey'] : [])];
+    const pool = [...CROPS.filter((c) => c.lvl <= S.lvl && !c.seedItem).map((c) => c.id), ...(S.b.coop ? ['egg'] : []), ...(S.b.hive ? ['honey'] : []), ...new Set(S.orch.filter((o) => o.tr).map((o) => o.tr))];
     const kinds = Math.min(pool.length, 1 + Math.floor(rnd() * 3)), want = {};
     while (Object.keys(want).length < kinds) {
       const id = pool[Math.floor(rnd() * pool.length)];
@@ -330,14 +497,15 @@
         <div class="dc-house" id="dc-house">${ART.building('house')}</div>
         <div class="dc-decos" id="dc-decos"></div>
         <div class="dc-visit" id="dc-visit" hidden></div>
-        <div class="dc-field"><div class="dc-beds" id="dc-beds"></div><div class="dc-ghbox" id="dc-gh"></div></div>
+        <div class="dc-views" id="dc-views"><button data-view="garden">🥕 Огород</button><button data-view="orchard">🌳 Сад</button></div>
+        <div class="dc-field"><div class="dc-beds" id="dc-beds"></div><div class="dc-ghbox" id="dc-gh"></div><div class="dc-orch" id="dc-orch"></div></div>
         <div class="dc-yard" id="dc-yard"></div>
         <div class="dc-fx" id="dc-fx"></div>
       </div>
     </div>
     <aside class="dc-side">
       <div class="dc-tabs" id="dc-tabs">
-        <button data-t="seeds">Семена</button><button data-t="barn">Амбар</button><button data-t="orders">Заказы</button><button data-t="deco">Уют</button><button data-t="friends">Соседи</button>
+        <button data-t="seeds">Семена</button><button data-t="barn">Амбар</button><button data-t="orders">Заказы</button><button data-t="shop">Сельпо</button><button data-t="deco">Уют</button><button data-t="friends">Соседи</button>
       </div>
       <div class="dc-panel" id="dc-panel"></div>
     </aside>`;
@@ -399,7 +567,28 @@
         <b>＋</b><span>${S.lvl < next.lvl ? `с ${next.lvl} ур.` : rub(next.price)}</span><small>${next.n - LAND[S.land].n} грядки</small></button>`);
     }
     patch(box, parts);
-    fitBeds(beds.length + (!visit && next ? 1 : 0), cols);
+    const orchard = !visit && S.view === 'orchard';
+    scene.classList.toggle('orchard', orchard);
+    $$('#dc-views button').forEach((b) => b.classList.toggle('on', b.dataset.view === (orchard ? 'orchard' : 'garden')));
+    $('#dc-views').hidden = !!visit;
+    if (orchard) {
+      const nx = ORCH[S.orchSlots];
+      patch($('#dc-orch'), [...S.orch.map((o, i) => {
+        const st = treeStage(o), d = o.tr && treeDef(o.tr);
+        const tip = st === -1 ? `Посадить: ${treeDef(S.sapling).name} · ${rub(treeDef(S.sapling).price)}` : st === 3 ? `Собрать: ${GOODS[d.id].name} × ${d.n}` : `${d.name} · ${fmtLeft(treeLeft(o))}`;
+        return `<button class="dc-treeslot ${st === 3 ? 'ripe' : ''} ${st === -1 ? 'empty' : ''}" data-tree="${i}" title="${esc(tip)}">
+          <span class="dc-mound"></span>${st >= 0 ? ART.tree(o.tr, st) : '<b>＋</b><small>саженец</small>'}
+          ${st >= 0 && st < 3 ? `<span class="dc-left">${fmtLeft(treeLeft(o))}</span>` : ''}${d ? `<span class="dc-treename">${esc(d.name)}</span>` : ''}</button>`;
+      }), ...(nx ? [`<button class="dc-treeslot dc-land" data-orchslot="1" ${S.lvl < nx.lvl ? 'disabled' : ''}><b>＋</b><span>${S.lvl < nx.lvl ? `с ${nx.lvl} ур.` : rub(nx.price)}</span><small>место в саду</small></button>`] : [])]);
+    }
+    if (orchard) {
+      // деревья под высоту сцены
+      const o = $('#dc-orch'), field = $('.dc-field'), cs = getComputedStyle(field);
+      const n = o.children.length, cols2 = n <= 5 ? Math.max(3, n) : Math.ceil(n / 2), rows = Math.ceil(n / cols2);
+      const h = field.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      o.style.gridTemplateColumns = `repeat(${cols2}, minmax(0, 1fr))`;
+      o.style.setProperty('--th', `${Math.max(70, Math.min(160, (h - 10 * (rows - 1)) / rows))}px`);
+    } else fitBeds(beds.length + (!visit && next ? 1 : 0), cols);
     const gh = visit ? visit.gh || [] : S.gh;
     const ghBox = $('#dc-gh');
     ghBox.hidden = !(visit ? visit.b.greenhouse : S.b.greenhouse);
@@ -420,7 +609,7 @@
     $('#dc-house').classList.toggle('lit', timeOfDay() !== 'day');
     const v = $('#dc-visit');
     v.hidden = !visit;
-    if (visit) setHTML(v, `<span>🏡 В гостях у <b>${esc(visit.nick)}</b> · ур. ${visit.lvl}${visit.b.dog ? ' · 🐕 тут Бублик' : ''}</span><small>Созревшее можно стащить, растущее — полить</small><button class="dc-btn" id="dc-home">Домой</button>`);
+    if (visit) setHTML(v, `<span>🏡 В гостях у <b>${esc(visit.nick)}</b> · ур. ${visit.lvl}${visit.b.dog ? ' · 🐕 тут Бублик' : ''}${(visit.guards || []).map((g) => ` · ${esc(shopDef(g).name.toLowerCase())}`).join('')}</span><small>Созревшее можно стащить, растущее — полить</small><button class="dc-btn" id="dc-home">Домой</button>`);
   }
 
   // грядки подстраиваются под высоту сцены
@@ -445,6 +634,9 @@
     const buffs = [];
     if (steaming()) buffs.push(`<span class="dc-buff">🧖 +20% к ценам · ${fmtLeft(S.steamUntil - Date.now())}</span>`);
     if (cozy()) buffs.push(`<span class="dc-buff">🌸 уют +${cozy()}%</span>`);
+    guardsActive().forEach((id) => buffs.push(`<span class="dc-buff guard" title="${esc(shopDef(id).desc)}">${ART.item(id)}${esc(shopDef(id).name)} · ${fmtLeft(S.guards[id] - Date.now())}</span>`));
+    if (S.b.dog || guardsActive().length) buffs.push(`<span class="dc-buff shield">🛡 защита ${Math.round(protection() * 100)}%${guardOn('trap') ? ' + капкан' : ''}</span>`);
+    if (S.arm) buffs.push(`<button class="dc-buff armed" data-disarm="1">${ART.item(S.arm)}${esc(shopDef(S.arm).name)} × ${S.tools[S.arm] || 0} — жми на ${S.arm === 'treefert' ? 'дерево' : 'грядку'} · ✕</button>`);
     setHTML($('#dc-buffs'), buffs.join(''));
   }
 
@@ -453,13 +645,32 @@
   function renderPanel() {
     $$('#dc-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === tab));
     const P = $('#dc-panel');
-    if (tab === 'seeds') {
+    if (tab === 'seeds' && S.view === 'orchard' && !visit) {
+      P.innerHTML = `<div class="dc-note">Саженцы сажаются один раз и плодоносят всегда. Выбери и жми на пустое место в саду.</div>
+        <div class="dc-seeds">${TREES.map((d) => {
+          const lock = d.lvl > S.lvl;
+          return `<button class="dc-seed ${S.sapling === d.id ? 'on' : ''} ${lock ? 'lock' : ''}" data-sapling="${d.id}" ${lock ? 'disabled' : ''}>
+            ${ART.item(d.id)}<b>${d.name}</b><small>${lock ? `🔒 ${d.lvl} уровень` : `${rub(d.price)} · растёт ${fmtLeft(d.grow * MIN)}`}</small>
+            ${lock ? '' : `<em>${d.n} шт. раз в ${fmtLeft(d.every * MIN)}</em>`}</button>`;
+        }).join('')}</div>`;
+    } else if (tab === 'shop') {
+      const st = stock(), left = (stockWin() + 1) * STOCK_T - Date.now();
+      P.innerHTML = `<div class="dc-note">Завоз раз в 2 часа, у всех кентов одинаковый. Следующий через <b>${fmtLeft(left)}</b>.</div>
+        <div class="dc-shop">${st.map((it) => {
+          const x = shopDef(it.id), n = it.qty === Infinity ? Infinity : stockLeft(it.id, it.qty), lock = x.lvl && S.lvl < x.lvl;
+          const have = x.kind === 'tool' ? S.tools[x.id] || 0 : 0, on = x.kind === 'guard' && guardOn(x.id);
+          return `<div class="dc-shop-row ${x.kind}">${ART.item(x.id)}<div><b>${esc(x.name)}</b><small>${esc(x.desc)}</small>
+            <i>${n === Infinity ? 'всегда в наличии' : n > 0 ? `осталось ${n}` : 'разобрали'}${have ? ` · у тебя ${have}` : ''}${on ? ` · работает ${fmtLeft(S.guards[x.id] - Date.now())}` : ''}</i></div>
+            <span class="dc-shop-btns">${have && x.id !== 'goldseed' ? `<button class="dc-mini" data-arm="${x.id}">Взять</button>` : ''}
+            <button class="dc-mini dark" data-buy="${x.id}" ${n <= 0 || lock ? 'disabled' : ''}>${lock ? `🔒 ${x.lvl} ур.` : rub(x.price)}</button></span></div>`;
+        }).join('')}</div>`;
+    } else if (tab === 'seeds') {
       P.innerHTML = `<div class="dc-note">Выбери семена и жми на пустую грядку. Политые дают +1 к урожаю.</div>
         <div class="dc-seeds">${CROPS.map((c) => {
           const lock = c.lvl > S.lvl;
-          const perH = Math.round(((c.price * 2 - c.seed) / c.grow) * 60);
+          const perH = Math.round(((c.price * 2 - c.seed) / c.grow) * 60), gs = c.seedItem ? S.tools[c.seedItem] || 0 : 0;
           return `<button class="dc-seed ${S.seed === c.id ? 'on' : ''} ${lock ? 'lock' : ''}" data-seed="${c.id}" ${lock ? 'disabled' : ''}>
-            ${ART.item(c.id)}<b>${c.name}</b><small>${lock ? `🔒 ${c.lvl} уровень` : `${fmtLeft(c.grow * MIN)} · ${c.seed} ₽`}</small>
+            ${ART.item(c.id)}<b>${c.name}</b><small>${lock ? `🔒 ${c.lvl} уровень` : c.seedItem ? `${fmtLeft(c.grow * MIN)} · семян: ${gs}` : `${fmtLeft(c.grow * MIN)} · ${c.seed} ₽`}</small>
             ${lock ? '' : `<em>≈ ${perH.toLocaleString('ru-RU')} ₽/ч</em>`}</button>`;
         }).join('')}</div>`;
     } else if (tab === 'barn') {
@@ -538,6 +749,18 @@
     if (bld) return onBuilding(bld.dataset.b, bld);
     const tb = t.closest('#dc-tabs [data-t]');
     if (tb) { tab = tb.dataset.t; renderPanel(); return; }
+    const ts = t.closest('[data-tree]');
+    if (ts) return onTree(+ts.dataset.tree, ts);
+    if (t.closest('[data-orchslot]')) return buyOrchSlot();
+    const vw = t.closest('[data-view]');
+    if (vw) { S.view = vw.dataset.view; save(); render(); return; }
+    const sp = t.closest('[data-sapling]');
+    if (sp) { S.sapling = sp.dataset.sapling; save(); render(); return; }
+    const bu = t.closest('[data-buy]');
+    if (bu) return buyShop(bu.dataset.buy);
+    const ar = t.closest('[data-arm]');
+    if (ar) { S.arm = ar.dataset.arm; if (S.arm === 'treefert') S.view = 'orchard'; else S.view = 'garden'; A.toast(`${shopDef(S.arm).name}: жми на ${S.arm === 'treefert' ? 'дерево' : 'растущую грядку'}`); save(); render(); return; }
+    if (t.closest('[data-disarm]')) { S.arm = null; save(); render(); return; }
     const sd = t.closest('[data-seed]');
     if (sd) { S.seed = sd.dataset.seed; save(); renderHud(); renderPanel(); renderScene(); return; }
     const sl = t.closest('[data-sell]');
@@ -571,7 +794,7 @@
   const STEAL_CD = 20 * MIN;
   const send = (event, payload) => net.ch && net.live && net.ch.send({ type: 'broadcast', event, payload: { ...payload, from: A.pid } });
   const snapshot = () => ({
-    nick: A.nick(), lvl: S.lvl, b: { ...S.b }, deco: S.deco.slice(0, 8),
+    nick: A.nick(), lvl: S.lvl, b: { ...S.b }, deco: S.deco.slice(0, 8), guards: guardsActive().filter((g) => g !== 'trap'),
     beds: S.beds.map((b) => ({ c: b.c, st: stage(b, false), w: b.w, weed: b.weed })),
     gh: S.gh.map((b) => ({ c: b.c, st: stage(b, true), w: b.w, weed: b.weed })),
   });
@@ -604,6 +827,7 @@
       const f = payload.farm;
       if (!Array.isArray(f.beds)) return;
       visit = { id: payload.from, nick: String(f.nick || 'Кент').slice(0, 20), lvl: +f.lvl || 1, b: f.b || {}, deco: (f.deco || []).filter((d) => DECO.some((x) => x.id === d)),
+        guards: (Array.isArray(f.guards) ? f.guards : []).filter((g) => shopDef(g)),
         beds: f.beds.slice(0, 20).map(cleanBed), gh: (f.gh || []).slice(0, 3).map(cleanBed) };
       render();
     });
@@ -616,12 +840,19 @@
       if (!b || stage(b, payload.k === 'g') !== 3 || (b.s || 0) >= 1) return reply({ ok: false, why: 'Тут уже нечего брать' });
       if (Date.now() - (S.steals[payload.from] || 0) < STEAL_CD) return reply({ ok: false, why: 'Хозяин тебя уже запомнил — приходи позже' });
       S.steals[payload.from] = Date.now();
-      if (S.b.dog && rnd() < 0.7) {
+      // капкан ловит наверняка, остальное — по шансу
+      let by = null;
+      if (guardOn('trap')) { by = 'trap'; delete S.guards.trap; }
+      else if (rnd() < protection()) {
+        const act = guardsActive().filter((id) => id !== 'trap').sort((a, b) => shopDef(b).p - shopDef(a).p);
+        by = act.length && (!S.b.dog || rnd() < 0.6) ? act[0] : S.b.dog ? 'dog' : act[0];
+      }
+      if (by) {
         S.stats.caught++;
         sfx.woof();
-        A.toast(`🐕 Бублик прогнал ${who} с грядки!`);
-        save(); render();
-        return reply({ ok: false, caught: true });
+        A.toast(`🛡 ${who} ${CAUGHT_BY[by]}! Штраф твой`);
+        save(); render(); track();
+        return reply({ ok: false, caught: true, by });
       }
       b.s = (b.s || 0) + 1;
       A.toast(`😤 ${who} стащил у тебя ${crop(b.c).name.toLowerCase()}!`);
@@ -637,7 +868,8 @@
       } else if (payload.caught) {
         const fine = Math.min(S.rub, 50 + S.lvl * 20);
         S.rub -= fine; sfx.woof();
-        A.toast(`🐕 Бублик укусил за штанину! Штраф ${rub(fine)}`);
+        const how = { trap: 'Попал в капкан!', guard: 'Дядя Вася поймал тебя!', watch: 'Залип на дорогие часы и попался!', alarm: 'Сработала сигнализация!', camera: 'Тебя сняла камера!', scarecrow: 'Испугался пугала!', dog: 'Бублик укусил за штанину!' }[payload.by] || 'Поймали!';
+        A.toast(`🚨 ${how} Штраф ${rub(fine)}`);
       } else A.toast(payload.why || 'Не вышло');
       if (visit && payload.farm) visit.beds = payload.farm.beds.slice(0, 20).map(cleanBed), visit.gh = (payload.farm.gh || []).slice(0, 3).map(cleanBed);
       save(); render();

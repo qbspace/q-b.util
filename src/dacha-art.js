@@ -41,6 +41,82 @@
     honey: `<rect x="20" y="10" width="24" height="9" rx="3" fill="#c98a52" ${sw}/><path d="M18 22c0-2 2-4 4-4h20c2 0 4 2 4 4v28c0 4-3 6-6 6H24c-3 0-6-2-6-6z" fill="#f2a93b" ${sw}/>
       <rect x="23" y="30" width="18" height="13" rx="3" fill="#fbefd8" ${sw}/><path d="M32 33l3 2v3l-3 2-3-2v-3z" fill="#f2a93b" stroke="${O}" stroke-width="1.4"/>${shine(22, 28, 2, 6, 0)}`,
   };
+  /* ---------------- новые культуры ---------------- */
+  Object.assign(ITEM, {
+    onion: `<path d="M30 20c-2-6 0-11 2-14M34 20c2-6 6-9 9-10" fill="none" stroke="#6db450" stroke-width="3" stroke-linecap="round"/>
+      <path d="M32 18c10 6 16 14 16 22 0 9-7 15-16 15s-16-6-16-15c0-8 6-16 16-22z" fill="#e9b25a" ${sw}/><path d="M32 22c-5 8-6 20-2 32M32 22c5 8 6 20 2 32" fill="none" stroke="#c48a35" stroke-width="1.6"/>${shine(25, 36, 3, 6)}`,
+    beet: `<path d="M28 22c-4-8-4-14 0-18M36 22c4-8 8-12 12-12" fill="none" stroke="#c23b6a" stroke-width="3" stroke-linecap="round"/>${leaf(28, 12, -20, '#6db450')}${leaf(46, 12, 40, '#7cc35a')}
+      <path d="M32 20c10 0 16 8 16 17 0 9-8 15-16 15s-16-6-16-15c0-9 6-17 16-17z" fill="#9b2457" ${sw}/><path d="M32 52c0 4 1 7 2 9" fill="none" ${sw}/>${shine(25, 30, 3, 6)}`,
+    garlic: `<path d="M32 8c1 6 1 10 0 14" ${sw}/><path d="M32 20c12 2 18 12 18 21 0 9-8 15-18 15s-18-6-18-15c0-9 6-19 18-21z" fill="#f7f2e7" ${sw}/>
+      <path d="M32 22c-6 6-8 20-4 33M32 22c6 6 8 20 4 33M22 30c-3 8-3 16 2 23M42 30c3 8 3 16-2 23" fill="none" stroke="#d8cdb7" stroke-width="1.6"/>`,
+    peas: `<path d="M10 40c4-14 18-24 34-26 6 0 10 2 10 6-2 14-18 26-36 26-6 0-9-2-8-6z" fill="#7cc35a" ${sw}/>
+      <g fill="#b9ec8e" stroke="${O}" stroke-width="1.4">${[[20, 38], [28, 33], [36, 28], [44, 23]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4.6"/>`).join('')}</g><path d="M54 18c3-2 5-6 4-10" fill="none" ${sw}/>`,
+    zucchini: `<path d="M10 46c-3-5 2-10 9-14l22-14c7-4 13-4 15 0s-1 9-8 13L26 46c-7 4-13 5-16 0z" fill="#a7d36f" ${sw}/>
+      <path d="M17 41l24-15M20 46l26-17" stroke="#7ab24a" stroke-width="2" stroke-linecap="round"/><path d="M52 14l6-4" ${sw}/>`,
+    pepper: `<path d="M30 16c-1-4 1-8 5-9" fill="none" ${sw}/><path d="M18 26c0-6 6-10 14-10s14 4 14 10c0 12-4 26-14 30-10-4-14-18-14-30z" fill="#e8443a" ${sw}/>
+      <path d="M22 20c4 2 16 2 20 0" fill="#6db450" ${sw}/><path d="M32 22v30" stroke="#b8332a" stroke-width="1.6"/>${shine(24, 32, 3, 8, 5)}`,
+    eggplant: `<path d="M38 10c4 0 7 3 8 6" fill="none" ${sw}/><path d="M40 16c8 4 10 14 6 22-6 12-16 20-26 18-8-2-8-10-2-18 6-8 12-14 14-22z" fill="#7b4aa8" ${sw}/>
+      <path d="M32 18c4-4 10-4 14 0-2 4-8 6-14 0z" fill="#6db450" ${sw}/>${shine(26, 40, 3, 7, 40)}`,
+    corn: `<path d="M20 30c-6 12-4 26 12 30M44 30c6 12 4 26-12 30" fill="#7cc35a" ${sw}/>
+      <path d="M32 6c8 0 12 10 12 24s-4 26-12 26-12-12-12-26S24 6 32 6z" fill="#f7cf4a" ${sw}/>
+      <g fill="#e2b030">${[14, 22, 30, 38, 46].map((y) => [27, 32, 37].map((x) => `<circle cx="${x}" cy="${y}" r="1.8"/>`).join('')).join('')}</g>`,
+    raspberry: `<g fill="#e8456a" stroke="${O}" stroke-width="1.4">${[[26, 28], [34, 26], [42, 30], [22, 36], [30, 35], [38, 35], [44, 40], [26, 44], [34, 44], [40, 48], [30, 52]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5"/>`).join('')}</g>
+      <path d="M24 22c4 2 10 2 14-2 4 4 8 4 12 2-2-6-10-8-14-6-4-4-10-2-12 6z" fill="#6db450" ${sw}/>`,
+    melon: `<ellipse cx="32" cy="36" rx="21" ry="17" fill="#f2d16b" ${sw}/><path d="M14 30c8 6 28 6 36 0M12 38c10 6 30 6 40 0M18 46c8 4 20 4 28 0M24 20c-4 10-4 22 0 32M40 20c4 10 4 22 0 32" fill="none" stroke="#c9a23e" stroke-width="1.4"/>${shine(23, 28, 5, 3)}`,
+    lavender: `${[22, 32, 42].map((x, i) => `<path d="M${x} 60V${22 + i * 2}" stroke="#6db450" stroke-width="2.4" stroke-linecap="round"/>${[0, 1, 2, 3, 4].map((k) => `<ellipse cx="${x + (k % 2 ? 2.5 : -2.5)}" cy="${16 + i * 2 + k * 5}" rx="3" ry="3.6" fill="#a37be0" stroke="${O}" stroke-width="1.2"/>`).join('')}`).join('')}`,
+    rose: `<path d="M32 40v22" stroke="#5f9e3f" stroke-width="3" stroke-linecap="round"/>${leaf(32, 54, -60, '#7cc35a', 0.8)}
+      <circle cx="32" cy="26" r="15" fill="#e63950" ${sw}/><path d="M32 18c6 0 9 4 8 8s-6 6-9 4-2-6 1-6M24 24c0 8 6 12 12 11M40 32c-4 6-12 6-16 0" fill="none" stroke="#a81f35" stroke-width="2" stroke-linecap="round"/>`,
+    blueberry: `${[[24, 36], [40, 34], [32, 46]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="10" fill="#4b6fd1" ${sw}/><path d="M${x - 3} ${y - 6}l3 2 3-2" fill="none" stroke="#2c4597" stroke-width="1.6"/>${shine(x - 3, y + 1, 2, 3, 0)}`).join('')}${leaf(32, 24, 10, '#6db450', 0.8)}`,
+    goldpumpkin: `<path d="M34 16c1-4 4-6 7-6" fill="none" ${sw}/><ellipse cx="22" cy="38" rx="12" ry="15" fill="#e8b830" ${sw}/><ellipse cx="42" cy="38" rx="12" ry="15" fill="#e8b830" ${sw}/>
+      <ellipse cx="32" cy="38" rx="11" ry="16" fill="#ffd95e" ${sw}/><path d="M30 22c0-3 2-6 4-7" fill="none" ${sw}/>${shine(28, 30, 3, 6, 10)}
+      <path d="M50 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM12 14l1.5 3.5 3.5 1.5-3.5 1.5-1.5 3.5-1.5-3.5-3.5-1.5 3.5-1.5z" fill="#fff6c9" stroke="#e8b830" stroke-width="1"/>`,
+    /* фрукты */
+    apple: `<path d="M32 16c-1-5 1-9 4-10" fill="none" ${sw}/>${leaf(36, 12, 60, '#6db450', 0.7)}<path d="M32 20c-4-3-16-4-18 8-2 14 8 26 18 24 10 2 20-10 18-24-2-12-14-11-18-8z" fill="#e8513f" ${sw}/>${shine(23, 30, 3, 7, 15)}`,
+    cherry: `<path d="M22 40c4-14 10-24 20-30M42 40c-2-12 0-22 0-30" fill="none" stroke="#5f9e3f" stroke-width="2.4" stroke-linecap="round"/>${leaf(42, 12, 50, '#7cc35a', 0.7)}
+      <circle cx="21" cy="46" r="10" fill="#c8213a" ${sw}/><circle cx="43" cy="46" r="10" fill="#d82c46" ${sw}/>${shine(17, 43, 2, 4, 0)}${shine(39, 43, 2, 4, 0)}`,
+    pear: `<path d="M32 12c0-3 2-6 4-6" fill="none" ${sw}/><path d="M32 14c6 0 8 6 8 12 6 4 10 10 10 16 0 9-8 14-18 14s-18-5-18-14c0-6 4-12 10-16 0-6 2-12 8-12z" fill="#c8d65a" ${sw}/>${shine(25, 38, 3, 7, 10)}`,
+    plum: `<path d="M32 14c0-4 2-7 5-8" fill="none" ${sw}/><ellipse cx="32" cy="36" rx="16" ry="19" fill="#7a3f8f" ${sw}/><path d="M32 18c-3 10-3 26 0 36" fill="none" stroke="#5a2a6c" stroke-width="1.6"/>${shine(25, 30, 3, 7, 10)}`,
+    apricot: `<path d="M32 16c0-4 2-6 4-7" fill="none" ${sw}/><circle cx="32" cy="36" r="17" fill="#f6a23e" ${sw}/><path d="M32 20c-4 8-4 24 0 32" fill="none" stroke="#d47d1d" stroke-width="1.6"/>${shine(24, 31, 3, 6, 15)}`,
+    peach: `${leaf(36, 18, 50, '#6db450', 0.8)}<path d="M32 20c-4-2-17-1-17 15 0 11 8 19 17 19s17-8 17-19c0-16-13-17-17-15z" fill="#f7a08a" ${sw}/><path d="M32 20c-3 10-3 22 0 34" fill="none" stroke="#e0705c" stroke-width="1.6"/>${shine(23, 33, 3, 6, 15)}`,
+    walnut: `<ellipse cx="32" cy="34" rx="18" ry="16" fill="#b98a55" ${sw}/><path d="M32 18v32M20 26c4 2 6 6 4 10-2 4 0 8 4 10M44 26c-4 2-6 6-4 10 2 4 0 8-4 10" fill="none" stroke="#8a5f35" stroke-width="1.8" stroke-linecap="round"/>`,
+    orange: `${leaf(34, 16, 40, '#5f9e3f', 0.8)}<circle cx="32" cy="36" r="17" fill="#f7942c" ${sw}/><g fill="#e07b16">${[[26, 30], [36, 28], [40, 38], [28, 42], [34, 46], [22, 38]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1"/>`).join('')}</g>${shine(25, 30, 3, 6, 15)}`,
+    /* сельпо */
+    fert: `<path d="M18 16h28l4 40H14z" fill="#7cc35a" ${sw}/><path d="M18 16l4-6h20l4 6" fill="#5aa040" ${sw}/><circle cx="32" cy="36" r="8" fill="#fff8e6" ${sw}/><path d="M32 32v8M28 36h8" stroke="#5aa040" stroke-width="2.4" stroke-linecap="round"/>`,
+    compost: `<path d="M14 26h36l-4 30H18z" fill="#8a5a3a" ${sw}/><path d="M14 26c4-8 10-10 18-10s14 2 18 10" fill="#5a3d2b" ${sw}/>${leaf(26, 20, -30, '#8fd06a', 0.6)}${leaf(38, 20, 30, '#7cc35a', 0.6)}`,
+    grow: `<path d="M14 30h26v20c0 4-3 6-6 6H20c-3 0-6-2-6-6z" fill="#f2c14e" ${sw}/><path d="M40 34l14-10 3 4-15 12" fill="#f2c14e" ${sw}/><path d="M18 30c0-6 4-10 9-10s9 4 9 10" fill="none" ${sw}/>
+      <path d="M56 18l1.5 3.5 3.5 1.5-3.5 1.5-1.5 3.5-1.5-3.5-3.5-1.5 3.5-1.5z" fill="#fff6c9" stroke="#e8b830" stroke-width="1"/>`,
+    treefert: `<path d="M20 14h24l2 42H18z" fill="#c98a52" ${sw}/><circle cx="32" cy="34" r="9" fill="#fff8e6" ${sw}/><path d="M32 40v-8" stroke="#8a5a3a" stroke-width="2.4"/><circle cx="32" cy="30" r="5" fill="#6db450"/>`,
+    goldseed: `<path d="M16 12h32v44H16z" fill="#fff8e6" ${sw}/><path d="M16 12h32v10H16z" fill="#e8b830" ${sw}/><g transform="translate(16 24) scale(.5)">${'' /* место под тыкву */}</g><circle cx="32" cy="40" r="10" fill="#ffd95e" ${sw}/><path d="M32 30c0-3 2-5 4-5" fill="none" ${sw}/>`,
+    scarecrow: `<path d="M32 22v36M14 32h36" stroke="#a5664a" stroke-width="3.5" stroke-linecap="round"/><circle cx="32" cy="20" r="8" fill="#f2d48a" ${sw}/><path d="M20 14h24l-4-6H24z" fill="#8a5a3a" ${sw}/>
+      <path d="M22 32h20l-2 14H24z" fill="#5b8def" ${sw}/><path d="M14 32l-4 6M50 32l4 6" stroke="#f2c14e" stroke-width="2.4" stroke-linecap="round"/><circle cx="29" cy="20" r="1.2" fill="${O}"/><circle cx="35" cy="20" r="1.2" fill="${O}"/>`,
+    trap: `<ellipse cx="32" cy="44" rx="22" ry="8" fill="#9aa1a8" ${sw}/><path d="M12 42c4-14 36-14 40 0" fill="none" stroke="#6c737a" stroke-width="3"/>
+      <path d="M14 42l4-8 4 6 4-8 4 6 4-8 4 6 4-8 4 6 4-6" fill="none" stroke="#cfd4d8" stroke-width="2" stroke-linejoin="round"/><circle cx="32" cy="44" r="4" fill="#ea5443" ${sw}/>`,
+    camera: `<rect x="12" y="20" width="32" height="20" rx="4" fill="#e9e6e1" ${sw}/><path d="M44 26l10-6v20l-10-6" fill="#cfd4d8" ${sw}/><circle cx="24" cy="30" r="6" fill="#3d4a5a" ${sw}/><circle cx="38" cy="25" r="2" fill="#ea5443"/><path d="M28 40v14M20 54h16" ${sw}/>`,
+    alarm: `<path d="M18 44c0-14 6-24 14-24s14 10 14 24z" fill="#ea5443" ${sw}/><rect x="14" y="44" width="36" height="8" rx="3" fill="#9aa1a8" ${sw}/>${shine(26, 32, 3, 6, 0)}
+      <path d="M10 22l-4-4M54 22l4-4M32 12V6" stroke="#f2c14e" stroke-width="3" stroke-linecap="round"/>`,
+    watch: `<rect x="24" y="4" width="16" height="14" rx="3" fill="#c9a24a" ${sw}/><rect x="24" y="46" width="16" height="14" rx="3" fill="#c9a24a" ${sw}/><circle cx="32" cy="32" r="16" fill="#f2c14e" ${sw}/><circle cx="32" cy="32" r="11" fill="#fffaf0" ${sw}/>
+      <path d="M32 25v7l5 3" fill="none" stroke="${O}" stroke-width="2" stroke-linecap="round"/><path d="M49 16l1.5 3.5 3.5 1.5-3.5 1.5-1.5 3.5-1.5-3.5-3.5-1.5 3.5-1.5z" fill="#fff6c9" stroke="#e8b830" stroke-width="1"/>`,
+    guard: `<circle cx="32" cy="22" r="10" fill="#f6d2b0" ${sw}/><path d="M20 18c2-8 22-8 24 0l-2 2H22z" fill="#3d4a5a" ${sw}/><path d="M24 26c4 4 12 4 16 0" fill="#9aa1a8" ${sw}/>
+      <path d="M14 58c0-14 8-22 18-22s18 8 18 22z" fill="#5f6f4e" ${sw}/><path d="M48 30l8 26" stroke="#7d4a35" stroke-width="3.5" stroke-linecap="round"/>`,
+  });
+
+  // дерево: стадии 0 — саженец, 1 — подрастает, 2 — взрослое, 3 — с плодами
+  const TREE_LOOK = {
+    apple: ['#7cc35a', '#e8513f'], cherry: ['#6db450', '#c8213a'], pear: ['#8fd06a', '#c8d65a'], plum: ['#5aa040', '#7a3f8f'],
+    apricot: ['#8fd06a', '#f6a23e'], peach: ['#7cc35a', '#f7a08a'], walnut: ['#5f9e3f', '#b98a55'], orange: ['#4f9a3f', '#f7942c'],
+  };
+  function tree(id, stage) {
+    const [leafC, fruitC] = TREE_LOOK[id] || TREE_LOOK.apple;
+    if (stage === 0) return svg('0 0 120 140', `<ellipse cx="60" cy="128" rx="22" ry="6" fill="#000" opacity=".12"/><path d="M60 128V96" stroke="#8a5a3a" stroke-width="4" stroke-linecap="round"/>${leaf(60, 100, -45, leafC, 1)}${leaf(60, 100, 45, '#8fd06a', 1)}${leaf(60, 98, 0, leafC, 0.9)}`, 'dc-tree s0');
+    const big = stage >= 2, s = big ? 1 : 0.68;
+    const crown = `<g transform="translate(60 ${big ? 58 : 80}) scale(${s})">
+      <circle cx="-26" cy="8" r="24" fill="${leafC}" ${sw}/><circle cx="26" cy="8" r="24" fill="${leafC}" ${sw}/><circle cx="0" cy="-14" r="30" fill="${leafC}" ${sw}/><circle cx="0" cy="14" r="26" fill="${leafC}" ${sw}/>
+      <path d="M-14-24c6-8 18-10 26-4" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".35"/>
+      ${stage === 3 ? [[-26, 6], [22, 0], [-6, -22], [10, 18], [-14, 20], [30, 18], [6, -4]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6.5" fill="${fruitC}" stroke="${O}" stroke-width="1.8"/>`).join('') : ''}</g>`;
+    return svg('0 0 120 140', `<ellipse cx="60" cy="130" rx="${big ? 40 : 28}" ry="7" fill="#000" opacity=".13"/>
+      <path d="M54 130c2-14 2-30 0-${big ? 48 : 30}h12c-2 18-2 34 0 ${big ? 48 : 30}z" fill="#9b6b47" ${sw}/>${crown}`, 'dc-tree s' + stage);
+  }
+
   const item = (id, cls = '') => svg('0 0 64 64', ITEM[id] || '', 'dc-ico ' + cls);
 
   /* ---------------- грядка: всходы по стадиям ---------------- */
@@ -108,5 +184,5 @@
   const moon = () => svg('0 0 80 80', `<path d="M48 14a26 26 0 1 0 18 40A22 22 0 0 1 48 14z" fill="#fff6d6"/>`, 'dc-sun');
   const cloud = () => svg('0 0 120 50', `<path d="M20 44c-10 0-14-12-6-17 0-11 14-15 21-8 5-12 26-12 30 1 12-4 22 6 18 15 8 2 8 9 0 9z" fill="#fff"/>`, 'dc-cloud');
 
-  window.DachaArt = { item, plant, weed, building, B, deco, sun, moon, cloud };
+  window.DachaArt = { item, plant, weed, building, B, deco, sun, moon, cloud, tree };
 })();

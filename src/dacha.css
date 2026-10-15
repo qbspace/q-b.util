@@ -26,6 +26,8 @@
 .dc-xpbar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8fd06a, #6db450); transition: width .4s; }
 .dc-buffs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
 .dc-buffs:empty { display: none; }
+.dc-buffs { order: 5; flex-basis: 100%; }
+.dc-buff { font-size: 10.5px; padding: 3px 9px; }
 .dc-buff { font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: #fdeccc; color: #8a5a1a; white-space: nowrap; }
 .dc-acts { display: flex; gap: 8px; margin-left: auto; }
 .dc-btn {
@@ -238,3 +240,43 @@
 @media (max-width: 1240px) { .dc { grid-template-columns: minmax(0, 1fr) 280px; } .dc-seeds, .dc-decolist { grid-template-columns: 1fr 1fr; } .dc-tabs button { font-size: 10.5px; } }
 @media (max-width: 960px) { .dc { grid-template-columns: 1fr; } .dc-side { max-height: 420px; } }
 @media (max-height: 820px) { .dc-bld-tile { width: 96px; height: 90px; } .dc-bname { font-size: 10px; } }
+
+/* --- огород / сад --- */
+.dc-views { position: absolute; right: 14px; top: calc(22% + 8px); z-index: 4; display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: rgba(255, 250, 240, .85); box-shadow: 0 4px 12px rgba(74, 52, 38, .15); }
+.dc-views[hidden] { display: none; }
+.dc-views button { height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: none; font-size: 12px; font-weight: 700; color: var(--dc-ink2); }
+.dc-views button.on { background: #fff; color: var(--dc-ink); box-shadow: 0 2px 6px rgba(74, 52, 38, .14); }
+.dc-orch { display: none; }
+.dc-scene.orchard .dc-beds, .dc-scene.orchard .dc-ghbox { display: none; }
+.dc-scene.orchard .dc-orch { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 14px; width: min(100%, 760px); height: 100%; align-content: center; }
+.dc-treeslot { position: relative; border: 0; padding: 0; background: none; height: var(--th, 140px); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; transition: transform .15s; }
+.dc-treeslot:hover:not(:disabled) { transform: translateY(-3px); }
+.dc-mound { position: absolute; left: 14%; right: 14%; bottom: 4%; height: 16%; border-radius: 50%; background: radial-gradient(ellipse at 50% 35%, #b07a52, #8a5a3a); box-shadow: 0 3px 0 #6f4628; }
+.dc-treeslot .dc-tree { position: relative; width: 100%; height: 100%; filter: drop-shadow(0 4px 4px rgba(74, 52, 38, .18)); }
+.dc-tree.s2, .dc-tree.s3 { animation: dc-sway 6s ease-in-out infinite; transform-origin: 50% 95%; }
+.dc-treeslot.empty { border: 2.5px dashed rgba(74, 52, 38, .28); border-radius: 22px; background: rgba(255, 250, 240, .35); justify-content: center; }
+.dc-treeslot.empty .dc-mound { display: none; }
+.dc-treeslot.empty b { font-size: 26px; font-weight: 500; color: var(--dc-green2); line-height: 1; }
+.dc-treeslot.empty small { font-size: 11px; color: var(--dc-ink2); font-weight: 600; }
+.dc-treeslot.dc-land { justify-content: center; border-radius: 22px; }
+.dc-treeslot.ripe::after { content: ''; position: absolute; inset: 0 8% 10%; border-radius: 50%; box-shadow: 0 0 30px rgba(255, 220, 110, .55); animation: dc-glow 1.8s ease-in-out infinite; pointer-events: none; }
+.dc-treename { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(255, 250, 240, .85); white-space: nowrap; }
+.dc-treeslot:hover .dc-left { opacity: 1; transform: translate(-50%, 0); }
+
+/* --- сельпо --- */
+.dc-shop { display: flex; flex-direction: column; gap: 6px; }
+.dc-shop-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 16px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-shop-row.guard { background: linear-gradient(90deg, #f3f6ff, #fff 60%); }
+.dc-shop-row > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dc-shop-row b { font-size: 13px; }
+.dc-shop-row small { font-size: 11px; color: var(--dc-ink2); line-height: 1.3; }
+.dc-shop-row i { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--dc-green2); }
+.dc-shop-btns { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.dc-mini:disabled { opacity: .4; }
+.dc-buff { display: inline-flex; align-items: center; gap: 4px; }
+.dc-buff .dc-ico { width: 18px; height: 18px; }
+.dc-buff.guard { background: #e6edff; color: #2f4a9a; }
+.dc-buff.shield { background: #2f4a9a; color: #fff; }
+.dc-buff.armed { border: 0; background: #fff3c4; color: #7a5a12; cursor: pointer; animation: dc-bob 1.6s ease-in-out infinite; box-shadow: 0 0 0 2px #f2c14e; }
+.dc-tabs { grid-template-columns: repeat(6, 1fr) !important; }
+.dc-tabs button { font-size: 10.5px !important; padding: 0 2px; }
