@@ -172,6 +172,7 @@
     casino: ['Казино', 'НАЗАД НА ДАШБОРД'],
     biz: ['Бизнес', 'НАЗАД НА ДАШБОРД'],
     crypto: ['ЛАДАКОИН', 'НАЗАД НА ДАШБОРД'],
+    dacha: ['Дача', 'НАЗАД НА ДАШБОРД'],
     cz: ['Казик', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
@@ -583,6 +584,12 @@
 
   /* ---------------- what's new ---------------- */
   const CHANGELOG = {
+    '5.3.0': [
+      '🏡 Новая игра «Дача»: грядки растут в реальном времени, даже когда приложение закрыто',
+      '🐔 Курятник, пасека, колодец, теплица, баня и пёс Бублик',
+      '📦 Заказы соседей, рынок с ценами дня, уют от декора',
+      '🤫 Ходи в гости к кентам: стащи спелое или полей грядку',
+    ],
     '5.2.0': [
       '🎡 Казик: новая игра «Колесо фортуны» — сектора до ×8',
       '🎣 Новая смена для тех, кто слил, — рыбалка',
@@ -2471,7 +2478,7 @@
   const aucWindow = () => Math.floor(Date.now() / P.AUCTION_EVERY);
   const myNick = () => profile.nick.trim() || `Игрок ${aucId.slice(0, 4).toUpperCase()}`;
   // мост для «Казика» (src/cz*.js)
-  window.QBApp = { pid: aucId, nick: myNick, load, store, toast, copy };
+  window.QBApp = { pid: aucId, nick: myNick, load, store, toast, copy, note: (type, title, body) => pushNote(type, title, body) };
 
   let aucCh = null, aucJoinedAt = Date.now(), aucHall = [], aucHost = false;
   let lot = null; // текущее состояние лота (у ведущего — источник правды)
@@ -3851,6 +3858,7 @@
     raid: '🚨 Рейдеры напали на твой бизнес',
     lotto: '🎟 Ты выиграл лотерею',
     ldk: '🪙 Памп или скам ЛАДАКОИНА (если он у тебя есть)',
+    dacha: '🏡 Дача: созрел урожай или кто-то стащил',
   };
   if (!plState.notified) plState.notified = {};
   const noteOn = (type) => settings.notify && settings.notify.on && settings.notify[type] !== false;
@@ -3914,6 +3922,7 @@
       if (tag === 'raid') go('biz');
       if (tag === 'lotto') go('casino');
       if (tag === 'ldk') go('crypto');
+      if (tag === 'dacha') go('dacha');
     });
   }
 

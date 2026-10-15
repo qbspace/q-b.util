@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="../node_modules/@fontsource/inter-tight/600.css">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="cz.css">
+  <link rel="stylesheet" href="dacha.css">
 </head>
 <body>
 <div class="shell">
@@ -76,6 +77,10 @@
         </button>
         </div></div>
       </div>
+      <button class="nav-item" data-go="dacha">
+        <svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/><path d="M2 20h20"/></svg>
+        <span>Дача</span>
+      </button>
       <button class="nav-item" data-go="cz">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.4" class="fill"/><circle cx="16" cy="16" r="1.4" class="fill"/><circle cx="12" cy="12" r="1.4" class="fill"/><circle cx="16" cy="8" r="1.4" class="fill"/><circle cx="8" cy="16" r="1.4" class="fill"/></svg>
         <span>Казик</span>
@@ -683,6 +688,7 @@
 
       <!-- ---------- HISTORY ---------- -->
       <!-- ---------- КАЗИК ---------- -->
+      <section class="page" data-page="dacha"><div class="dc" id="dc"></div></section>
       <section class="page" data-page="cz"><div class="cz" id="cz"></div></section>
 
       <section class="page" data-page="history">
@@ -1107,6 +1113,8 @@
 <script src="generators.js"></script>
 <script src="plates.js"></script>
 <script src="app.js"></script>
+<script src="dacha-art.js"></script>
+<script src="dacha.js"></script>
 <script src="cz-core.js"></script>
 <script src="cz.js"></script>
 <script src="cz-solo.js"></script>
