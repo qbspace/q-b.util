@@ -322,7 +322,7 @@
   }
   // защита: собака и всё купленное складываются
   function protection() {
-    let miss = S.b.dog ? 0.3 : 1;
+    let miss = S.b.dog ? 1 - (S.dogPower || 0.7) : 1;
     SHOP.filter((x) => x.kind === 'guard' && !x.once && guardOn(x.id)).forEach((x) => { miss *= 1 - x.p; });
     return 1 - miss;
   }
