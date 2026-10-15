@@ -461,3 +461,73 @@
 .dc-storylist .cur { border-color: #f2c14e; }
 .dc-storylist .lock { opacity: .5; }
 .dc-buff.hot { background: #ffe7a8; color: #7a5a12; cursor: pointer; }
+
+/* ================= селекция, посёлок, обмен, обустройство ================= */
+.dc-hyb { display: inline-flex; position: relative; width: 40px; height: 40px; flex: none; }
+.dc-hyb .dc-ico { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dc-hyb .dc-ico:first-child { clip-path: inset(0 50% 0 0); }
+.dc-hyb .dc-ico:last-child { clip-path: inset(0 0 0 50%); }
+.dc-hyb::after { content: ''; position: absolute; left: 50%; top: 8%; bottom: 8%; width: 2px; margin-left: -1px; background: rgba(255, 255, 255, .8); border-radius: 2px; }
+.dc-hyb.unknown { filter: grayscale(.8) opacity(.5); }
+.dc-hyb.seedpack { filter: drop-shadow(0 0 4px #b48cff); }
+.dc-seed .dc-hyb { width: 46px; height: 46px; }
+.dc-hybplant { position: absolute; inset: 6%; }
+.dc-hybplant .dc-plant { inset: 0; width: 100%; height: 100%; }
+.dc-hybplant .dc-plant:first-child { clip-path: inset(0 50% 0 0); }
+.dc-hybplant .dc-plant:last-child { clip-path: inset(0 0 0 50%); }
+.dc-village { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 18px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-village > b { font-size: 14px; }
+.dc-village small { font-size: 11.5px; color: var(--dc-ink2); line-height: 1.4; }
+.dc-village small .dc-ico { width: 20px; height: 20px; display: inline-block; vertical-align: middle; }
+.dc-medalbar.big { height: 10px; border-radius: 10px; }
+.dc-row { display: flex; gap: 8px; }
+.dc-row .dc-btn { flex: 1; }
+.dc-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.dc-pick button { display: flex; flex-direction: column; align-items: center; padding: 4px 6px; border-radius: 12px; border: 1px solid var(--dc-line); background: #fbf4e4; }
+.dc-pick button:hover { background: #fff3c4; }
+.dc-pick .dc-ico, .dc-pick .dc-sp, .dc-pick .dc-hyb { width: 30px; height: 30px; }
+.dc-pick small { font-size: 9.5px; font-weight: 800; color: var(--dc-ink2); }
+.dc-myentry { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: #fff3c4; }
+.dc-myentry > div { display: flex; flex-direction: column; }
+.dc-board { display: flex; flex-direction: column; gap: 4px; }
+.dc-board > div { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 12px; background: #f7f1e4; font-size: 12px; }
+.dc-board > div.me { background: #e6f4d9; }
+.dc-board em { font-style: normal; font-weight: 900; width: 16px; color: var(--dc-ink2); }
+.dc-board b { flex: 1; }
+.dc-board span { font-weight: 800; font-variant-numeric: tabular-nums; }
+.dc-board .dc-ico, .dc-board .dc-sp, .dc-board .dc-hyb { width: 26px; height: 26px; }
+.dc-botava { width: 26px; text-align: center; }
+.dc-offer { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 14px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-offer.in { background: #fff6e0; }
+.dc-offer > div { flex: 1; display: flex; flex-direction: column; }
+.dc-offer small { font-size: 11px; color: var(--dc-ink2); }
+.dc-tradeform { display: grid; grid-template-columns: 1fr 90px; gap: 6px 8px; padding: 10px; border-radius: 16px; background: #fff; border: 1px solid var(--dc-line); }
+.dc-tradeform label { display: flex; flex-direction: column; gap: 3px; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--dc-ink2); }
+.dc-tradeform label:first-child { grid-column: 1 / -1; }
+.dc-tradeform select, .dc-tradeform input { height: 34px; border-radius: 10px; border: 1px solid var(--dc-line); background: #fbf4e4; padding: 0 8px; font: inherit; font-size: 12.5px; text-transform: none; letter-spacing: 0; color: var(--dc-ink); }
+.dc-tradeform .dc-btn { grid-column: 1 / -1; }
+
+/* обустройство */
+.dc-decos { display: none !important; }
+.dc-layout { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.dc-li { position: absolute; width: 48px; height: 48px; filter: drop-shadow(0 4px 4px rgba(74, 52, 38, .2)); }
+.dc-li svg { width: 100%; height: 100%; }
+.dc-li.item.i-birch { width: 62px; height: 62px; }
+.dc-li.item.i-path, .dc-li.item.i-stone { filter: none; }
+.dc-scene[data-time="night"] .dc-li.i-lamp .glass, .dc-scene[data-time="eve"] .dc-li.i-lamp .glass { fill: #ffd25a; filter: drop-shadow(0 0 6px #ffd25a); }
+.dc-scene[data-time="night"] .dc-li.i-lamp { filter: drop-shadow(0 0 16px rgba(255, 210, 90, .7)); }
+.dc-layout.edit { z-index: 8; }
+.dc-layout.edit .dc-li { pointer-events: auto; cursor: grab; outline: 2px dashed rgba(255, 255, 255, .8); outline-offset: 2px; border-radius: 10px; touch-action: none; }
+.dc-li.dragging { cursor: grabbing; transform: scale(1.12); z-index: 3; }
+.dc-li-x { position: absolute; right: -8px; top: -8px; width: 18px; height: 18px; border-radius: 50%; background: #ea5443; color: #fff; font-size: 10px; display: grid; place-items: center; cursor: pointer; }
+.dc-scene.designing .dc-field, .dc-scene.designing .dc-yard { opacity: .55; pointer-events: none; }
+.dc-designbtn { position: absolute; right: 14px; top: calc(22% + 46px); z-index: 9; height: 30px; padding: 0 12px; border-radius: 999px; border: 0; background: rgba(255, 250, 240, .9); font-size: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(74, 52, 38, .15); }
+.dc-designbtn[hidden] { display: none; }
+.dc-designbar { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 9; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px 10px; border-radius: 18px; background: rgba(255, 250, 240, .96); box-shadow: 0 8px 20px rgba(74, 52, 38, .2); font-size: 11.5px; }
+.dc-designbar[hidden] { display: none; }
+.dc-designbar button { display: flex; flex-direction: column; align-items: center; width: 54px; padding: 2px; border-radius: 12px; border: 1px solid var(--dc-line); background: #fff; }
+.dc-designbar button svg { width: 34px; height: 34px; }
+.dc-designbar small { font-size: 9px; font-weight: 700; }
+.dc-designbar em { font-style: normal; font-weight: 700; color: var(--dc-green2); margin-left: auto; }
+
+.dc-tabs button { flex: 1 0 15% !important; height: 28px; font-size: 10px !important; }

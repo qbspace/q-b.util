@@ -684,7 +684,7 @@
         }).join('')}</div>`;
     } else if (tab === 'seeds') {
       P.innerHTML = `<div class="dc-note">Выбери семена и жми на пустую грядку. Политые дают +1 к урожаю.</div>
-        <div class="dc-seeds">${CROPS.map((c) => {
+        <div class="dc-seeds">${CROPS.filter((c) => !c.hyb || (S.hyb && S.hyb[c.id])).map((c) => {
           const lock = c.lvl > S.lvl;
           const perH = Math.round(((c.price * 2 - c.seed) / c.grow) * 60), gs = c.seedItem ? S.tools[c.seedItem] || 0 : 0;
           return `<button class="dc-seed ${S.seed === c.id ? 'on' : ''} ${lock ? 'lock' : ''}" data-seed="${c.id}" ${lock ? 'disabled' : ''}>
