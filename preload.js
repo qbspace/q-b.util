@@ -16,4 +16,10 @@ contextBridge.exposeInMainWorld('qb', {
   updInstall: () => ipcRenderer.send('upd:install'),
   updReleases: () => ipcRenderer.send('upd:releases'),
   onUpdate: (cb) => ipcRenderer.on('upd:status', (_e, s) => cb(s)),
+
+  applySettings: () => ipcRenderer.send('prefs:apply'),
+  onQuickGen: (cb) => ipcRenderer.on('quick:gen', (_e, kind) => cb(kind)),
+  notify: (title, body, tag) => ipcRenderer.send('notify', title, body, tag),
+  onNotifyClick: (cb) => ipcRenderer.on('notify:click', (_e, tag) => cb(tag)),
+  savePng: (name, dataUrl) => ipcRenderer.invoke('file:savePng', { name, dataUrl }),
 });

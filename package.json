@@ -1,7 +1,7 @@
 {
   "name": "q-b.util",
   "productName": "q-b.util",
-  "version": "1.1.0",
+  "version": "6.0.0",
   "description": "Утилиты для быстрой генерации паролей, ключей, почт, телефонов и фейковых данных",
   "main": "main.js",
   "scripts": {
@@ -46,15 +46,20 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "quenixxx",
+        "owner": "qbspace",
         "repo": "q-b.util",
         "releaseType": "release"
       }
-    ]
+    ],
+    "releaseInfo": {
+      "releaseName": "q-b.util 6.0.0",
+      "releaseNotes": "- Финальная версия\n- Обновлённый интерфейс и навигация\n- Быстрее запуск, меньше размер\n- Мелкие исправления и улучшения"
+    }
   },
   "dependencies": {
     "@fontsource/inter-tight": "^5.0.0",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "qrcode-generator": "^1.4.4"
   },
   "devDependencies": {
     "electron": "^33.0.0",

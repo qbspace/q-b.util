@@ -30,7 +30,8 @@
     try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; }
   };
 
-  const settings = Object.assign({ autocopy: false, history: true, mask: false }, load('qb.settings', {}));
+  const settings = Object.assign({ autocopy: false, history: true, mask: false, theme: 'light', tray: true, hotkey: true, autostart: true }, load('qb.settings', {}));
+  if (!settings.notify) settings.notify = { on: true };
   const stats = Object.assign({ gen: 0, copied: 0 }, load('qb.stats', {}));
   let history = settings.history ? load('qb.history', []) : [];
   let session = 0;
@@ -140,6 +141,7 @@
             <div class="row-body"><div class="row-val">${esc(it.v)}</div></div>
             ${it.bits != null ? `<span class="meta">${it.bits} БИТ</span><span class="strength"><i style="width:${Math.min(100, it.bits / 1.28)}%;background:${strengthColor(it.bits)}"></i></span>` : ''}
             ${it.meta ? `<span class="meta">${esc(it.meta)}</span>` : ''}
+            <button class="qr-btn" title="QR-код"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"/></svg></button>
             <button class="copy-dot" title="Копировать"></button>
           </div>`).join('')}
       </div>`;
@@ -147,6 +149,8 @@
       const a = e.target.closest('[data-a]');
       if (a?.dataset.a === 'all') return copy(items.map((x) => x.v).join('\n'));
       if (a?.dataset.a === 'save') return save(exportName || 'q-b.util.txt', items.map((x) => x.v).join('\n'));
+      const qrb = e.target.closest('.qr-btn');
+      if (qrb) return showQR(items[qrb.closest('.row').dataset.i].v);
       const row = e.target.closest('.row');
       if (!row || window.getSelection().toString()) return;
       copy(items[row.dataset.i].v);
@@ -163,6 +167,7 @@
     phones: ['Телефоны', 'НАЗАД НА ДАШБОРД'],
     identity: ['Личности', 'НАЗАД НА ДАШБОРД'],
     misc: ['Разное', 'НАЗАД НА ДАШБОРД'],
+    tables: ['Тестовые таблицы', 'НАЗАД НА ДАШБОРД'],
     history: ['История', 'НАЗАД НА ДАШБОРД'],
     settings: ['Настройки', 'НАЗАД НА ДАШБОРД'],
   };
@@ -190,7 +195,45 @@
   /* ---------------- passwords ---------------- */
   const pwMode = seg($('#pw-mode'), (v) => {
     $$('[data-mode]', $('[data-page=passwords]')).forEach((el) => (el.hidden = el.dataset.mode !== v));
+    $('#pw-count-f').hidden = $('#pw-gen').hidden = v === 'check';
+    if (v === 'check') { renderCheck(); $('#chk-in').focus(); } else renderResults($('#pw-results'), { items: [] });
   });
+
+  function renderCheck() {
+    const box = $('#pw-results');
+    const pw = $('#chk-in').value;
+    box.onclick = null;
+    if (!pw) {
+      box.innerHTML = `<div class="empty"><div class="sparkle">✦</div><p>ВСТАВЬ ПАРОЛЬ СЛЕВА — ОЦЕНКА ПОЯВИТСЯ ТУТ</p></div>`;
+      return;
+    }
+    const a = G.analyze(pw);
+    const col = ['#e5484d', '#f0b35a', '#e6d36a', '#c9df6f', '#5fc2ae'][a.score];
+    box.innerHTML = `
+      <div class="chk">
+        <div class="chk-top">
+          <div>
+            <span class="cap">НАДЁЖНОСТЬ</span>
+            <div class="chk-label" style="--c:${col}">${a.label}</div>
+          </div>
+          <div class="chk-bits"><b>${a.bits}</b><span>БИТ</span></div>
+        </div>
+        <div class="chk-meter">${[0, 1, 2, 3, 4].map((i) => `<i style="${i <= a.score ? `background:${col}` : ''}"></i>`).join('')}</div>
+        <div class="chk-times">
+          <div class="chk-time"><span>ПЕРЕБОР НА ВИДЕОКАРТЕ</span><b>${a.offline}</b><small>10 млрд попыток в секунду</small></div>
+          <div class="chk-time"><span>ПЕРЕБОР ЧЕРЕЗ ФОРМУ ВХОДА</span><b>${a.online}</b><small>100 попыток в секунду</small></div>
+        </div>
+        <div class="chk-list">
+          ${a.checks.map((c) => `<div class="chk-item ${c.ok ? 'ok' : ''}"><i></i>${c.text}${!c.ok && c.hint ? ` <small>· ${c.hint}</small>` : ''}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+  $('#chk-in').addEventListener('input', renderCheck);
+  $('#chk-eye').onclick = () => {
+    const i = $('#chk-in');
+    i.type = i.type === 'password' ? 'text' : 'password';
+    $('#chk-eye').classList.toggle('on', i.type === 'text');
+  };
   const pwLen = range('pw-len'), pwCount = range('pw-count'), ppWords = range('pp-words');
   const ppSep = seg($('#pp-sep'));
 
@@ -379,6 +422,7 @@
             <div class="row-type">${esc(h.sub)} · ${new Date(h.ts).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
             <div class="row-val">${esc(mask(h))}</div>
           </div>
+          <button class="qr-btn" title="QR-код"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"/></svg></button>
           <button class="copy-dot" title="Копировать"></button>
         </div>`).join('')}</div>`
         : `<div class="empty"><div class="sparkle">✦</div><p>ПОКА ПУСТО</p></div>`}`;
@@ -388,6 +432,8 @@
       const a = e.target.closest('[data-a]');
       if (a?.dataset.a === 'save') return exportHistory();
       if (a?.dataset.a === 'clear') return clearHistory();
+      const qrb = e.target.closest('.qr-btn');
+      if (qrb) return showQR(list[qrb.closest('.row').dataset.i].v);
       const row = e.target.closest('.row');
       if (!row) return;
       copy(list[row.dataset.i].v);
@@ -516,6 +562,44 @@
 
   renderProfile();
 
+  /* ---------------- what's new ---------------- */
+  const CHANGELOG = {
+    '6.0.0': [
+      'Финальная версия: обновлённый интерфейс и навигация',
+      'Быстрее запуск, меньше размер, стабильная работа в трее',
+      'Мелкие исправления и улучшения',
+    ],
+    '1.4.0': [
+      'QR-код для любого результата: кнопка в каждой строке, можно сохранить PNG',
+      'Автозапуск вместе с Windows — сразу в трей, Ctrl+Shift+Q работает с самого старта',
+    ],
+    '1.3.0': [
+      'Трей: иконка у часов с быстрым меню — пароль, UUID, почта, телефон в один клик',
+      'Ctrl+Shift+Q — свежий пароль в буфер из любой программы',
+      'Новый раздел «Таблицы»: тестовые данные до 1000 строк в CSV, JSON и SQL',
+      'Проверка своего пароля: энтропия, время взлома и подсказки',
+      'Тёмная тема — переключается в настройках',
+    ],
+    '1.2.0': [
+      'Окно «Что нового» — теперь после каждого обновления видно, что поменялось',
+      'В «Разном» появились генераторы координат и Unix-времени',
+      'Проверено автообновление через GitHub-релизы',
+    ],
+  };
+
+
+  function showWhatsNew(version) {
+    const seen = load('qb.seenVersion', null);
+    if (seen === version) return;
+    store('qb.seenVersion', version);
+    if (!CHANGELOG[version]) return;
+    $('#wn-ver').textContent = 'v' + version;
+    $('#wn-list').innerHTML = CHANGELOG[version].map((x) => `<li>${esc(x)}</li>`).join('');
+    $('#whatsnew').hidden = false;
+  }
+  $('#wn-ok').onclick = () => { $('#whatsnew').hidden = true; };
+  $('#whatsnew').onclick = (e) => { if (e.target.id === 'whatsnew') $('#whatsnew').hidden = true; };
+
   /* ---------------- updates ---------------- */
   let updPrev = '';
   function renderUpdate(u) {
@@ -553,7 +637,7 @@
   }
 
   if (window.qb && window.qb.updGet) {
-    window.qb.updGet().then(renderUpdate);
+    window.qb.updGet().then((u) => { renderUpdate(u); showWhatsNew(u.current); });
     window.qb.onUpdate(renderUpdate);
     $('#upd-check').onclick = () => window.qb.updCheck().then((u) => { if (u.state === 'dev') renderUpdate(u); });
     $('#upd-releases').onclick = () => window.qb.updReleases();
@@ -563,13 +647,167 @@
     $('#upd-check').onclick = () => toast('Обновления работают только в установленном приложении');
   }
 
+  /* ---------------- tables ---------------- */
+  const tbCols = new Set(['id', 'full_name', 'email', 'phone', 'city', 'created_at']);
+  $('#tb-cols').innerHTML = Object.entries(G.TABLE_COLUMNS)
+    .map(([k, c]) => `<button data-v="${k}" class="${tbCols.has(k) ? 'on' : ''}">${c.label}</button>`).join('');
+  const syncTbCount = () => ($('#tb-cols-c').textContent = `· ${tbCols.size} ИЗ ${Object.keys(G.TABLE_COLUMNS).length}`);
+  syncTbCount();
+  $('#tb-cols').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (tbCols.has(b.dataset.v)) tbCols.delete(b.dataset.v);
+    else tbCols.add(b.dataset.v);
+    b.classList.toggle('on', tbCols.has(b.dataset.v));
+    syncTbCount();
+  };
+  const tbFormat = seg($('#tb-format'), (v) => ($('#tb-table-f').hidden = v !== 'sql'));
+  const tbLocale = seg($('#tb-locale'));
+  const tbRows = range('tb-rows');
+
+  function genTable() {
+    // порядок колонок — как на экране, а не как кликали
+    const cols = Object.keys(G.TABLE_COLUMNS).filter((k) => tbCols.has(k));
+    if (!cols.length) return toast('Выбери хотя бы одну колонку');
+    const fmt = tbFormat(), n = tbRows();
+    const rows = G.tableRows(cols, n, tbLocale());
+    const text = G.formatTable(rows, cols, fmt, $('#tb-table').value);
+    const preview = rows.slice(0, 30);
+    const box = $('#tb-results');
+    box.innerHTML = `
+      <div class="res-head">
+        <h3>${n} строк · ${fmt.toUpperCase()}</h3>
+        <span class="count">${(new Blob([text]).size / 1024).toFixed(1)} КБ</span>
+        <button class="pill pill-white" data-a="copy">Копировать</button>
+        <button class="pill pill-dark" data-a="save">Сохранить файл</button>
+      </div>
+      <div class="tb-wrap">
+        <table class="tb">
+          <thead><tr><th>#</th>${cols.map((k) => `<th>${k}</th>`).join('')}</tr></thead>
+          <tbody>${preview.map((r, i) => `<tr><td>${i + 1}</td>${cols.map((k) => `<td>${esc(r[k])}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${n > preview.length ? `<div class="tb-more">+ ещё ${n - preview.length} строк в файле</div>` : ''}`;
+    box.onclick = (e) => {
+      const a = e.target.closest('[data-a]');
+      if (a?.dataset.a === 'copy') copy(text);
+      if (a?.dataset.a === 'save') save(`${$('#tb-table').value.replace(/[^\w-]/g, '') || 'data'}.${fmt}`, text);
+    };
+    stats.gen += n;
+    session += n;
+    persist();
+    renderStats();
+  }
+  $('#tb-gen').onclick = genTable;
+
+  /* ---------------- theme ---------------- */
+  const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
+  function applyTheme() {
+    const t = settings.theme === 'system' ? (sysDark.matches ? 'dark' : 'light') : settings.theme;
+    document.documentElement.dataset.theme = t;
+  }
+  const themeSeg = $('#set-theme');
+  $$('button', themeSeg).forEach((b) => b.classList.toggle('on', b.dataset.v === settings.theme));
+  seg(themeSeg, (v) => { settings.theme = v; persist(); applyTheme(); });
+  sysDark.addEventListener('change', applyTheme);
+  applyTheme();
+
+  /* ---------------- tray / hotkey ---------------- */
+  // Main-процесс просит сгенерировать что-то из трея или по горячей клавише
+  const QUICK_GEN = {
+    password: () => ['pw', 'Символы', G.password({ length: 20 }), 'Пароль'],
+    uuid: () => ['key', 'UUID v4', G.uuid4(), 'UUID'],
+    email: () => ['em', 'Почта', G.email(), 'Почта'],
+    phone: () => ['ph', 'Россия', G.phone('RU'), 'Телефон'],
+  };
+  if (window.qb && window.qb.onQuickGen) {
+    window.qb.onQuickGen((kind) => {
+      const q = QUICK_GEN[kind];
+      if (!q) return;
+      const [type, sub, value, title] = q();
+      copy(value, true);
+      record(type, sub, [value]);
+      const shown = type === 'pw' && settings.mask ? '•'.repeat(12) : value;
+      window.qb.notify(`${title} в буфере обмена`, shown);
+    });
+  }
+
+  /* ---------------- QR ---------------- */
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+  let qrValue = '';
+
+  function qrMatrix(text) {
+    const q = qrcode(0, 'M');
+    q.addData(text);
+    q.make();
+    return q;
+  }
+
+  function showQR(text) {
+    let q;
+    try {
+      q = qrMatrix(text);
+    } catch {
+      return toast('Слишком длинно для QR-кода');
+    }
+    qrValue = text;
+    const n = q.getModuleCount(), pad = 2, size = n + pad * 2;
+    let cells = '';
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (q.isDark(r, c)) cells += `<rect x="${c + pad}" y="${r + pad}" width="1.02" height="1.02" rx=".28"/>`;
+      }
+    }
+    $('#qr-box').innerHTML = `<svg viewBox="0 0 ${size} ${size}" shape-rendering="geometricPrecision"><rect width="${size}" height="${size}" fill="#fff" rx="2"/><g fill="#111">${cells}</g></svg>`;
+    $('#qr-text').textContent = text.length > 160 ? text.slice(0, 160) + '…' : text;
+    $('#qr-modal').hidden = false;
+  }
+
+  function qrPng(text, px = 768) {
+    const q = qrMatrix(text);
+    const n = q.getModuleCount(), pad = 3, cell = Math.floor(px / (n + pad * 2));
+    const c = document.createElement('canvas');
+    c.width = c.height = cell * (n + pad * 2);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#111';
+    for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+      if (q.isDark(r, col)) g.fillRect((col + pad) * cell, (r + pad) * cell, cell, cell);
+    }
+    return c.toDataURL('image/png');
+  }
+
+  const closeQR = () => { $('#qr-modal').hidden = true; };
+  $('#qr-close').onclick = closeQR;
+  $('#qr-modal').onclick = (e) => { if (e.target.id === 'qr-modal') closeQR(); };
+  $('#qr-copy').onclick = () => copy(qrValue);
+  $('#qr-save').onclick = async () => {
+    const url = qrPng(qrValue);
+    if (window.qb && window.qb.savePng) {
+      if (await window.qb.savePng('qr-code.png', url)) toast('QR сохранён');
+    } else {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'qr-code.png';
+      a.click();
+    }
+  };
+  $('#q-out').parentElement.addEventListener('dblclick', () => { if (qVal) showQR(qVal); });
+
   /* ---------------- settings ---------------- */
-  [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask']].forEach(([id, key]) => {
+  [['set-autocopy', 'autocopy'], ['set-history', 'history'], ['set-mask', 'mask'], ['set-tray', 'tray'], ['set-hotkey', 'hotkey'], ['set-autostart', 'autostart']].forEach(([id, key]) => {
     const el = $('#' + id);
     el.checked = settings[key];
-    el.onchange = () => { settings[key] = el.checked; persist(); renderDash(); };
+    el.onchange = () => {
+      settings[key] = el.checked;
+      persist();
+      renderDash();
+      if (['tray', 'hotkey', 'autostart'].includes(key) && window.qb && window.qb.applySettings) window.qb.applySettings();
+    };
   });
   $('#set-clear').onclick = clearHistory;
+
 
   /* ---------------- dashboard ---------------- */
   function renderHero() {
@@ -704,11 +942,14 @@
     $('.winctl').hidden = true;
   }
 
-  const GENS = { passwords: genPasswords, keys: genKeys, emails: genEmails, phones: genPhones, identity: () => genIdentity(), misc: genMisc };
+  const GENS = { tables: () => genTable(), passwords: () => pwMode() !== 'check' && genPasswords(), keys: genKeys, emails: genEmails, phones: genPhones, identity: () => genIdentity(), misc: genMisc };
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement.tagName) && GENS[current]) {
       e.preventDefault();
       GENS[current]();
+    }
+    if (e.key === 'Escape') {
+      ['#qr-modal', '#whatsnew'].forEach((m) => { $(m).hidden = true; });
     }
     if (e.ctrlKey && /^[1-9]$/.test(e.key)) go(Object.keys(PAGES)[+e.key - 1]);
   });
